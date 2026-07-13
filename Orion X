@@ -1276,15 +1276,6 @@ function OrionLib:MakeWindow(WindowConfig)
 	BackgroundBlur.Name = "OrionBackgroundBlur"
 	BackgroundBlur.Size = 0
 	BackgroundBlur.Parent = Lighting
-	local BackgroundOverlay = AddThemeObject(Create("Frame", {
-		Name = "BackgroundOverlay",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Active = false,
-		ZIndex = 0,
-		Parent = Orion,
-	}), "Main")
 	local KeystrokesLocked = false
 	local KeystrokesFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
 		Name = "Keystrokes",
@@ -1355,10 +1346,8 @@ function OrionLib:MakeWindow(WindowConfig)
 		if blurTween then blurTween:Cancel() end
 		local active = BlurEnabled and MainWindow.Visible and not UIHidden and not Minimized
 		local target = active and BlurSize or 0
-		local overlayTransparency = active and 1 - math.clamp(0.16 + BlurSize / 90, 0.18, 0.5) or 1
 		blurTween = TweenService:Create(BackgroundBlur, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = target})
 		blurTween:Play()
-		TweenService:Create(BackgroundOverlay, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = overlayTransparency}):Play()
 	end
 	Orion.Destroying:Connect(function()
 		BackgroundBlur:Destroy()
