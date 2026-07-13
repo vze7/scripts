@@ -1025,6 +1025,13 @@ function OrionLib:MakeWindow(WindowConfig)
 	function OrionLib:FindAndFocusElement(query)
 		query = normalizeSearchText(query)
 		if query == "" then return false end
+		for _, tabName in ipairs(TabsOrder) do
+			if normalizeSearchText(tabName) == query then
+				OrionLib:GoToTab(tabName)
+				animateSearchResult(Tabs[tabName].Frame.Title)
+				return true
+			end
+		end
 		if searchDirty then rebuildSearchIndex() end
 		local best, bestScore = nil, 0
 		for _, entry in ipairs(searchIndex) do
@@ -1042,9 +1049,12 @@ function OrionLib:MakeWindow(WindowConfig)
 	AddConnection(GlobalSearch:GetPropertyChangedSignal("Text"), function()
 		searchRequest += 1
 		local request, query = searchRequest, GlobalSearch.Text
-		task.delay(0.12, function()
+		task.delay(0.06, function()
 			if request == searchRequest and query ~= "" then OrionLib:FindAndFocusElement(query) end
 		end)
+	end)
+	AddConnection(GlobalSearch.FocusLost, function(enterPressed)
+		if enterPressed then OrionLib:FindAndFocusElement(GlobalSearch.Text) end
 	end)
 
 	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
@@ -1404,7 +1414,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		if sizeTween then sizeTween:Cancel() end
 
 		if Minimized then
-			ExpandedSize = lastAppliedSize or MainWindow.AbsoluteSize
 			ResizeHandle.Visible = false
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false

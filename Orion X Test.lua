@@ -1,5 +1,5 @@
 local OrionLib = loadstring(game:HttpGet(
-	"https://raw.githubusercontent.com/BlizTBr/scripts/main/Orion%20X"
+	"https://raw.githubusercontent.com/Lilwagz/scripts/main/Orion%20X?cache=" .. tostring(os.time())
 ))()
 
 local Window = OrionLib:MakeWindow({
