@@ -868,6 +868,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	local Minimized = false
 	local Loaded = false
 	local UIHidden = false
+	local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 	WindowConfig = WindowConfig or {}
 	WindowConfig.Name = WindowConfig.Name or "Orion Library"
@@ -1214,10 +1215,19 @@ function OrionLib:MakeWindow(WindowConfig)
 	}), "Second")
 
 	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 14), {
-		Size = UDim2.new(1, -30, 2, 0),
+		Size = UDim2.new(1, -245, 2, 0),
 		Position = UDim2.new(0, 25, 0, -24),
 		Font = Enum.Font.GothamBlack,
 		TextSize = 20
+	}), "Text")
+
+	local LocalInfo = AddThemeObject(SetProps(MakeElement("Label", "--:--  /  --°C", 13), {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Size = UDim2.fromOffset(132, 28),
+		Position = UDim2.new(1, -100, 0.5, 0),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Font = Enum.Font.GothamSemibold,
+		TextTransparency = 0.12,
 	}), "Text")
 
     task.wait(0.1)
@@ -1254,6 +1264,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			Name = "TopBar"
 		}), {
 			WindowName,
+			LocalInfo,
 			WindowTopBarLine,
 			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
 				Size = UDim2.new(0, 70, 0, 30),
@@ -1271,6 +1282,49 @@ function OrionLib:MakeWindow(WindowConfig)
 		DragPoint,
 		WindowStuff
 	}), "Main")
+	local localUtcOffset = 0
+	local localTemperature
+	local localInfoAlive = true
+	local function updateLocalInfoText()
+		local clock = os.date("!%H:%M", os.time() + localUtcOffset)
+		LocalInfo.Text = localTemperature and string.format("%s  /  %d°C", clock, math.floor(localTemperature + 0.5)) or clock
+	end
+	local function readJson(url)
+		local ok, body = pcall(game.HttpGet, game, url)
+		if not ok then return nil end
+		local decodedOk, data = pcall(HttpService.JSONDecode, HttpService, body)
+		return decodedOk and data or nil
+	end
+	task.spawn(function()
+		local location = readJson("https://ipwho.is/")
+		if location and location.success ~= false and location.latitude and location.longitude then
+			if location.timezone and type(location.timezone.utc) == "string" then
+				local sign, hours, minutes = location.timezone.utc:match("([+-])(%d%d):?(%d%d)")
+				if sign then
+					localUtcOffset = (tonumber(hours) * 60 + tonumber(minutes)) * 60 * (sign == "-" and -1 or 1)
+				end
+			end
+			while localInfoAlive do
+				local url = string.format("https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m&temperature_unit=celsius&timezone=auto", location.latitude, location.longitude)
+				local weather = readJson(url)
+				if weather then
+					localUtcOffset = tonumber(weather.utc_offset_seconds) or localUtcOffset
+					localTemperature = weather.current and tonumber(weather.current.temperature_2m) or localTemperature
+					updateLocalInfoText()
+				end
+				task.wait(600)
+			end
+		end
+	end)
+	task.spawn(function()
+		while localInfoAlive do
+			updateLocalInfoText()
+			task.wait(1)
+		end
+	end)
+	Orion.Destroying:Connect(function()
+		localInfoAlive = false
+	end)
 	local ExpandedSize = MainWindow.AbsoluteSize
 	local BackgroundBlur = Instance.new("BlurEffect")
 	BackgroundBlur.Name = "OrionBackgroundBlur"
@@ -1629,7 +1683,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		updateBlur()
 	end
 	function TabFunction:SetKeystrokes(Enabled)
-		KeystrokesFrame.Visible = Enabled == true
+		KeystrokesFrame.Visible = not IsMobile and Enabled == true
 	end
 	function TabFunction:SetKeystrokesLocked(Locked)
 		KeystrokesLocked = Locked == true
@@ -3732,25 +3786,27 @@ function OrionLib:MakeWindow(WindowConfig)
 			Name = "Background"
 		})
 
-		local keystrokes = config_tab:AddSection({
-			Name = "Keystrokes"
-		})
+		if not IsMobile then
+			local keystrokes = config_tab:AddSection({
+				Name = "Keystrokes"
+			})
 
-		keystrokes:AddToggle({
-			Name = "Show Keystrokes",
-			Default = false,
-			Callback = function(Value)
-				TabFunction:SetKeystrokes(Value)
-			end,
-		})
+			keystrokes:AddToggle({
+				Name = "Show Keystrokes",
+				Default = false,
+				Callback = function(Value)
+					TabFunction:SetKeystrokes(Value)
+				end,
+			})
 
-		keystrokes:AddToggle({
-			Name = "Lock Position",
-			Default = false,
-			Callback = function(Value)
-				TabFunction:SetKeystrokesLocked(Value)
-			end,
-		})
+			keystrokes:AddToggle({
+				Name = "Lock Position",
+				Default = false,
+				Callback = function(Value)
+					TabFunction:SetKeystrokesLocked(Value)
+				end,
+			})
+		end
 
 		background:AddToggle({
 			Name = "Background Blur",
