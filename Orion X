@@ -32,6 +32,7 @@ local OrionLib = {
 		},
 	},
 	Toggles = {},
+	Keystrokes = {},
 	SelectedTheme = "Default",
 	Folder = nil,
 	SaveCfg = false
@@ -110,10 +111,11 @@ Orion.Destroying:Connect(function()
 	end
 end)
 
-local function MakeDraggable(DragPoint, Main)
+local function MakeDraggable(DragPoint, Main, CanDrag)
 	local Dragging, DragInput, MousePos, FramePos = false
 	AddConnection(DragPoint.InputBegan, function(Input)
 		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+			if CanDrag and not CanDrag() then return end
 			Dragging = true
 			MousePos = Input.Position
 			FramePos = Main.Position
@@ -432,6 +434,13 @@ function OrionLib:SetTheme()
 					end
 				end
 			end
+		end
+	end
+
+	for _, key in ipairs(self.Keystrokes) do
+		if key.Frame and key.Frame.Parent then
+			key.Frame.BackgroundColor3 = key.Pressed and themeData.Accent or themeData.Second
+			key.Stroke.Color = key.Pressed and themeData.Accent or themeData.Stroke
 		end
 	end
 
@@ -1276,6 +1285,69 @@ function OrionLib:MakeWindow(WindowConfig)
 		ZIndex = 0,
 		Parent = Orion,
 	}), "Main")
+	local KeystrokesLocked = false
+	local KeystrokesFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
+		Name = "Keystrokes",
+		Size = UDim2.fromOffset(148, 114),
+		Position = UDim2.new(1, -172, 0.5, -57),
+		BackgroundTransparency = 0.08,
+		Visible = false,
+		Active = true,
+		ZIndex = 5,
+		Parent = Orion,
+	}), {
+		AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.3}), "Stroke"),
+	}), "Main")
+
+	local function createKeystroke(Name, Text, Position, Size)
+		local stroke = AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.35}), "Stroke")
+		local frame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 6), {
+			Name = Name,
+			Size = Size,
+			Position = Position,
+			ZIndex = 6,
+			Parent = KeystrokesFrame,
+		}), {
+			stroke,
+			AddThemeObject(SetProps(MakeElement("Label", Text, 12), {
+				Size = UDim2.fromScale(1, 1),
+				TextXAlignment = Enum.TextXAlignment.Center,
+				Font = Enum.Font.GothamSemibold,
+				ZIndex = 7,
+			}), "Text"),
+		}), "Second")
+		local item = {Frame = frame, Stroke = stroke, Pressed = false}
+		table.insert(OrionLib.Keystrokes, item)
+		return item
+	end
+
+	local KeystrokeMap = {
+		[Enum.KeyCode.W] = createKeystroke("W", "W", UDim2.fromOffset(58, 8), UDim2.fromOffset(32, 28)),
+		[Enum.KeyCode.A] = createKeystroke("A", "A", UDim2.fromOffset(21, 41), UDim2.fromOffset(32, 28)),
+		[Enum.KeyCode.S] = createKeystroke("S", "S", UDim2.fromOffset(58, 41), UDim2.fromOffset(32, 28)),
+		[Enum.KeyCode.D] = createKeystroke("D", "D", UDim2.fromOffset(95, 41), UDim2.fromOffset(32, 28)),
+		[Enum.UserInputType.MouseButton1] = createKeystroke("LMB", "LMB", UDim2.fromOffset(21, 76), UDim2.fromOffset(51, 28)),
+		[Enum.UserInputType.MouseButton2] = createKeystroke("RMB", "RMB", UDim2.fromOffset(77, 76), UDim2.fromOffset(50, 28)),
+	}
+
+	local function setKeystroke(Input, Pressed)
+		local item = KeystrokeMap[Input.KeyCode] or KeystrokeMap[Input.UserInputType]
+		if not item then return end
+		item.Pressed = Pressed
+		local theme = OrionLib.Themes[OrionLib.SelectedTheme]
+		item.Frame.BackgroundColor3 = Pressed and theme.Accent or theme.Second
+		item.Stroke.Color = Pressed and theme.Accent or theme.Stroke
+	end
+
+	AddConnection(UserInputService.InputBegan, function(Input)
+		setKeystroke(Input, true)
+	end)
+	AddConnection(UserInputService.InputEnded, function(Input)
+		setKeystroke(Input, false)
+	end)
+	MakeDraggable(KeystrokesFrame, KeystrokesFrame, function()
+		return not KeystrokesLocked
+	end)
 	local BlurEnabled = false
 	local BlurSize = 12
 	local blurTween
@@ -1566,6 +1638,12 @@ function OrionLib:MakeWindow(WindowConfig)
 		BlurEnabled = Enabled == true
 		if type(Size) == "number" then BlurSize = math.clamp(Size, 0, 56) end
 		updateBlur()
+	end
+	function TabFunction:SetKeystrokes(Enabled)
+		KeystrokesFrame.Visible = Enabled == true
+	end
+	function TabFunction:SetKeystrokesLocked(Locked)
+		KeystrokesLocked = Locked == true
 	end
 	function TabFunction:SetMobilePreview(Enabled)
 		MobilePreview = Enabled == true
@@ -3663,6 +3741,26 @@ function OrionLib:MakeWindow(WindowConfig)
 
 		local background = config_tab:AddSection({
 			Name = "Background"
+		})
+
+		local keystrokes = config_tab:AddSection({
+			Name = "Keystrokes"
+		})
+
+		keystrokes:AddToggle({
+			Name = "Show Keystrokes",
+			Default = false,
+			Callback = function(Value)
+				TabFunction:SetKeystrokes(Value)
+			end,
+		})
+
+		keystrokes:AddToggle({
+			Name = "Lock Position",
+			Default = false,
+			Callback = function(Value)
+				TabFunction:SetKeystrokesLocked(Value)
+			end,
 		})
 
 		background:AddToggle({
