@@ -1213,7 +1213,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		DragPoint,
 		WindowStuff
 	}), "Main")
-	local ExpandedSize = MainWindow.Size
+	local ExpandedSize = MainWindow.AbsoluteSize
 
 	mainWindowStroke.Parent = MainWindow
 	mainWindowStroke.Thickness = 2.5
@@ -1275,7 +1275,7 @@ function OrionLib:MakeWindow(WindowConfig)
     local startSize
 	local lastResizeUpdate = 0
 	local lastAppliedSize
-	local RESIZE_INTERVAL = 1 / 60
+	local RESIZE_INTERVAL = 1 / 30
 
 	local function updateResize(force)
 		if not resizing or Minimized then return end
@@ -1286,9 +1286,10 @@ function OrionLib:MakeWindow(WindowConfig)
 			math.floor(math.clamp(startSize.X + delta.X, MIN_SIZE.X, MAX_SIZE.X) + 0.5),
 			math.floor(math.clamp(startSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y) + 0.5)
 		)
-		if not force and lastAppliedSize and (size - lastAppliedSize).Magnitude < 2 then return end
+		if not force and lastAppliedSize and (size - lastAppliedSize).Magnitude < 3 then return end
 		lastResizeUpdate = now
 		lastAppliedSize = size
+		ExpandedSize = size
 		window.Size = UDim2.fromOffset(size.X, size.Y)
 	end
 
@@ -1394,27 +1395,42 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 	end)
 
+	local minimizeTransition = false
+	local sizeTween
 	AddConnection(MinimizeBtn.MouseButton1Up, function()
+		if minimizeTransition then return end
+		minimizeTransition = true
+		Minimized = not Minimized
+		if sizeTween then sizeTween:Cancel() end
+
 		if Minimized then
-			ResizeHandle.Visible = true
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = ExpandedSize}):Play()
-			MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
-			task.wait(.02)
-			MainWindow.ClipsDescendants = false
-			WindowStuff.Visible = true
-			WindowTopBarLine.Visible = true
-		else
-			ExpandedSize = MainWindow.Size
+			ExpandedSize = lastAppliedSize or MainWindow.AbsoluteSize
 			ResizeHandle.Visible = false
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false
 			MinimizeBtn.Ico.Image = "rbxassetid://7072720870"
-
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, WindowNameTBX.X + 140, 0, 50)}):Play()
-			task.wait(0.1)
-			WindowStuff.Visible = false
+			sizeTween = TweenService:Create(MainWindow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				Size = UDim2.fromOffset(WindowNameTBX.X + 140, 50),
+			})
+			sizeTween:Play()
+			sizeTween.Completed:Once(function()
+				WindowStuff.Visible = false
+				minimizeTransition = false
+			end)
+		else
+			WindowStuff.Visible = true
+			WindowTopBarLine.Visible = true
+			ResizeHandle.Visible = true
+			MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
+			sizeTween = TweenService:Create(MainWindow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				Size = UDim2.fromOffset(ExpandedSize.X, ExpandedSize.Y),
+			})
+			sizeTween:Play()
+			sizeTween.Completed:Once(function()
+				MainWindow.ClipsDescendants = false
+				minimizeTransition = false
+			end)
 		end
-		Minimized = not Minimized
 	end)
 
 	local function LoadSequence()
