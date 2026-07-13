@@ -1361,10 +1361,15 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	MakeDraggable(DragPoint, MainWindow)
 
+	local RestoreWindow
 	AddConnection(MobileOpenButton.MouseButton1Click, function()
 		MobileOpenButton.Visible = false
-		MainWindow.Visible = true
-		UIHidden = false
+		if RestoreWindow and Minimized then
+			RestoreWindow()
+		else
+			MainWindow.Visible = true
+			UIHidden = false
+		end
 	end)
 
 	local function showMobileOpenButton()
@@ -1373,7 +1378,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			return
 		end
 		if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-			if UIHidden then
+			if UIHidden or Minimized then
 				MobileOpenButton.Visible = true
 			else
 				MobileOpenButton.Visible = false
@@ -1429,14 +1434,15 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local minimizeTransition = false
 	local sizeTween
-	AddConnection(MinimizeBtn.MouseButton1Up, function()
-		if minimizeTransition then return end
+	local function setMinimized(Value)
+		if minimizeTransition or Minimized == Value then return end
 		minimizeTransition = true
-		Minimized = not Minimized
+		Minimized = Value
 		if sizeTween then sizeTween:Cancel() end
 
 		if Minimized then
 			ResizeHandle.Visible = false
+			showMobileOpenButton()
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false
 			MinimizeBtn.Ico.Image = "rbxassetid://7072720870"
@@ -1450,6 +1456,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				minimizeTransition = false
 			end)
 		else
+			showMobileOpenButton()
 			ContentFadeGroup.Visible = true
 			ContentFadeGroup.GroupTransparency = 1
 			WindowTopBarLine.Visible = true
@@ -1465,6 +1472,12 @@ function OrionLib:MakeWindow(WindowConfig)
 				minimizeTransition = false
 			end)
 		end
+	end
+	RestoreWindow = function()
+		setMinimized(false)
+	end
+	AddConnection(MinimizeBtn.MouseButton1Up, function()
+		setMinimized(not Minimized)
 	end)
 
 	local function LoadSequence()
@@ -2631,6 +2644,10 @@ function OrionLib:MakeWindow(WindowConfig)
 							return DropdownConfig.Callback(Dropdown.Value)
 						end
 					end
+				end
+
+				function Dropdown:SetOnce(Value)
+					return Dropdown:Set(Value, true)
 				end
 
 				AddConnection(Click.MouseButton1Click, function()
