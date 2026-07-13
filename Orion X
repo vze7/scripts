@@ -1025,12 +1025,28 @@ function OrionLib:MakeWindow(WindowConfig)
 	function OrionLib:FindAndFocusElement(query)
 		query = normalizeSearchText(query)
 		if query == "" then return false end
+		local compactQuery = string.gsub(query, " ", "")
+		local matchedTab
+		local matchedTabScore = 0
 		for _, tabName in ipairs(TabsOrder) do
-			if normalizeSearchText(tabName) == query then
-				OrionLib:GoToTab(tabName)
-				animateSearchResult(Tabs[tabName].Frame.Title)
-				return true
+			local tabText = normalizeSearchText(tabName)
+			local compactTab = string.gsub(tabText, " ", "")
+			local score = 0
+			if tabText == query then
+				score = 10000
+			elseif string.sub(tabText, 1, #query) == query then
+				score = 9000 - (#tabText - #query)
+			elseif string.sub(compactTab, 1, #compactQuery) == compactQuery then
+				score = 8000 - (#compactTab - #compactQuery)
+			elseif #compactQuery >= 4 and isSubsequence(compactQuery, compactTab) then
+				score = 7000 - (#compactTab - #compactQuery)
 			end
+			if score > matchedTabScore then matchedTab, matchedTabScore = tabName, score end
+		end
+		if matchedTab then
+			OrionLib:GoToTab(matchedTab)
+			animateSearchResult(Tabs[matchedTab].Frame.Title)
+			return true
 		end
 		if searchDirty then rebuildSearchIndex() end
 		local best, bestScore = nil, 0
