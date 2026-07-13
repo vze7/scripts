@@ -629,15 +629,16 @@ function OrionLib:GenTheme(mainColor)
     local r, g, b = mainColor.R * 255, mainColor.G * 255, mainColor.B * 255
     local lum = 0.299 * r + 0.587 * g + 0.114 * b
     local dark = lum < 128
+	local h, s, v = mainColor:ToHSV()
     local t = {Main = mainColor}
 
     if dark then
-        t.Second = Color3.fromRGB(math.clamp(r * 1.12, 0, 255), math.clamp(g * 1.12, 0, 255), math.clamp(b * 1.12, 0, 255))
-        t.Stroke = Color3.fromRGB(math.clamp(r * 1.45, 0, 255), math.clamp(g * 1.45, 0, 255), math.clamp(b * 1.45, 0, 255))
-        t.Divider = Color3.fromRGB(math.clamp(r * 1.28, 0, 255), math.clamp(g * 1.28, 0, 255), math.clamp(b * 1.28, 0, 255))
+		t.Second = lighterHSV(mainColor, 0.06)
+		t.Stroke = lighterHSV(mainColor, 0.16)
+		t.Divider = lighterHSV(mainColor, 0.1)
         t.Text = Color3.fromRGB(240, 240, 242)
         t.TextDark = Color3.fromRGB(155, 155, 160)
-        t.Accent = Color3.fromRGB(math.clamp(r * 1.85, 0, 255), math.clamp(g * 1.85, 0, 255), math.clamp(b * 1.85, 0, 255))
+		t.Accent = s < 0.12 and Color3.fromRGB(103, 132, 255) or Color3.fromHSV(h, math.max(s, 0.55), math.max(v, 0.78))
     else
         t.Second = Color3.fromRGB(math.clamp(r * 0.94, 0, 255), math.clamp(g * 0.94, 0, 255), math.clamp(b * 0.94, 0, 255))
         t.Stroke = Color3.fromRGB(math.clamp(r * 0.75, 0, 255), math.clamp(g * 0.75, 0, 255), math.clamp(b * 0.75, 0, 255))
@@ -1030,10 +1031,10 @@ function OrionLib:MakeWindow(WindowConfig)
 			TweenService:Create(scale, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Scale=1}):Play()
 		end)
 		activeSearchLabel = label
-		TweenService:Create(label, TweenInfo.new(0.16), {TextColor3=highlightColor}):Play()
+		label.TextColor3 = highlightColor
 		task.delay(0.35, function()
 			if token == searchHighlightToken and label.Parent then
-				TweenService:Create(label, TweenInfo.new(0.2), {TextColor3=OrionLib.Themes[OrionLib.SelectedTheme].Text}):Play()
+				label.TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text
 				activeSearchLabel = nil
 			end
 		end)
@@ -1041,10 +1042,11 @@ function OrionLib:MakeWindow(WindowConfig)
 		if not stroke then return end
 		activeSearchStroke = stroke
 		stroke.Color = highlightColor
-		TweenService:Create(stroke, TweenInfo.new(0.18), {Thickness=3}):Play()
+		stroke.Thickness = 3
 		task.delay(0.35, function()
 			if token == searchHighlightToken and stroke.Parent then
-				TweenService:Create(stroke, TweenInfo.new(0.2), {Thickness=1, Color=OrionLib.Themes[OrionLib.SelectedTheme].Stroke}):Play()
+				stroke.Thickness = 1
+				stroke.Color = OrionLib.Themes[OrionLib.SelectedTheme].Stroke
 				activeSearchStroke = nil
 			end
 		end)
