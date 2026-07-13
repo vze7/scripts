@@ -5,6 +5,7 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local PlayerService = game:GetService("Players")
 local UserService = game:GetService("UserService")
+local Lighting = game:GetService("Lighting")
 
 local SearchBarsTXTBox = {}
 
@@ -1260,6 +1261,22 @@ function OrionLib:MakeWindow(WindowConfig)
 		WindowStuff
 	}), "Main")
 	local ExpandedSize = MainWindow.AbsoluteSize
+	local BackgroundBlur = Instance.new("BlurEffect")
+	BackgroundBlur.Name = "OrionBackgroundBlur"
+	BackgroundBlur.Size = 0
+	BackgroundBlur.Parent = Lighting
+	local BlurEnabled = false
+	local BlurSize = 12
+	local blurTween
+	local function updateBlur()
+		if blurTween then blurTween:Cancel() end
+		local target = BlurEnabled and MainWindow.Visible and not UIHidden and not Minimized and BlurSize or 0
+		blurTween = TweenService:Create(BackgroundBlur, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = target})
+		blurTween:Play()
+	end
+	Orion.Destroying:Connect(function()
+		BackgroundBlur:Destroy()
+	end)
 	local ContentFadeGroup = Instance.new("CanvasGroup")
 	ContentFadeGroup.Name = "ContentFadeGroup"
 	ContentFadeGroup.Size = UDim2.fromScale(1, 1)
@@ -1369,6 +1386,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		else
 			MainWindow.Visible = true
 			UIHidden = false
+			updateBlur()
 		end
 	end)
 
@@ -1389,6 +1407,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	AddConnection(CloseBtn.MouseButton1Up, function()
 		MainWindow.Visible = false
 		UIHidden = true
+		updateBlur()
 
 		if WindowConfig.FreeMouse then
 			UnlockMouse(false)
@@ -1409,6 +1428,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			if Input.KeyCode == Enum.KeyCode[WindowConfig.KeyToOpenWindow] and UIHidden then
 				MainWindow.Visible = true
 				UIHidden = false
+				updateBlur()
 				if WindowConfig.FreeMouse then
 					UnlockMouse(true)
 				end
@@ -1417,6 +1437,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			elseif Input.KeyCode == Enum.KeyCode[WindowConfig.KeyToOpenWindow] and not UIHidden then
 				MainWindow.Visible = false
 				UIHidden = true
+				updateBlur()
 
 				if WindowConfig.FreeMouse then
 					UnlockMouse(false)
@@ -1438,6 +1459,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		if minimizeTransition or Minimized == Value then return end
 		minimizeTransition = true
 		Minimized = Value
+		updateBlur()
 		if sizeTween then sizeTween:Cancel() end
 
 		if Minimized then
@@ -1526,6 +1548,11 @@ function OrionLib:MakeWindow(WindowConfig)
 	end
 
 	local TabFunction = {}
+	function TabFunction:SetBlur(Enabled, Size)
+		BlurEnabled = Enabled == true
+		if type(Size) == "number" then BlurSize = math.clamp(Size, 0, 56) end
+		updateBlur()
+	end
 	function TabFunction:SetMobilePreview(Enabled)
 		MobilePreview = Enabled == true
 		showMobileOpenButton()
@@ -1916,13 +1943,8 @@ function OrionLib:MakeWindow(WindowConfig)
 					Toggle.Value = Value
 
 					local accolor = Toggle.uccolor and Toggle.ccolor or OrionLib.Themes[OrionLib.SelectedTheme].Accent
-
-					TweenService:Create(ToggleBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-						BackgroundColor3 = Toggle.Value and accolor or OrionLib.Themes[OrionLib.SelectedTheme].Divider
-					}):Play()
-					TweenService:Create(ToggleBox.Stroke, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-						Color = Toggle.Value and accolor or OrionLib.Themes[OrionLib.SelectedTheme].Stroke
-					}):Play()
+					ToggleBox.BackgroundColor3 = Toggle.Value and accolor or OrionLib.Themes[OrionLib.SelectedTheme].Divider
+					ToggleBox.Stroke.Color = Toggle.Value and accolor or OrionLib.Themes[OrionLib.SelectedTheme].Stroke
 					TweenService:Create(ToggleBox.Ico, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 						ImageTransparency = Toggle.Value and 0 or 1,
 						Size = Toggle.Value and UDim2.new(0, 20, 0, 20) or UDim2.new(0, 8, 0, 8)
@@ -3623,6 +3645,31 @@ function OrionLib:MakeWindow(WindowConfig)
 
 		local windowstroke = config_tab:AddSection({
 			Name = "Window Stroke"
+		})
+
+		local background = config_tab:AddSection({
+			Name = "Background"
+		})
+
+		background:AddToggle({
+			Name = "Background Blur",
+			Default = false,
+			Callback = function(Value)
+				TabFunction:SetBlur(Value)
+			end,
+		})
+
+		background:AddSlider({
+			Name = "Blur Strength",
+			Min = 0,
+			Max = 30,
+			Default = 12,
+			Increment = 1,
+			ValueName = "",
+			Callback = function(Value)
+				BlurSize = Value
+				updateBlur()
+			end,
 		})
 
 		windowstroke:AddSlider({
