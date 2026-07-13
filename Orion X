@@ -60,6 +60,8 @@ local Orion = Instance.new("ScreenGui")
 local FocusDrag = nil
 
 Orion.Name = "OrionBliz"
+Orion.DisplayOrder = 999
+Orion.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
 getgenv().gethui = function() return game.CoreGui end
 
@@ -1265,14 +1267,26 @@ function OrionLib:MakeWindow(WindowConfig)
 	BackgroundBlur.Name = "OrionBackgroundBlur"
 	BackgroundBlur.Size = 0
 	BackgroundBlur.Parent = Lighting
+	local BackgroundOverlay = AddThemeObject(Create("Frame", {
+		Name = "BackgroundOverlay",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Active = false,
+		ZIndex = 0,
+		Parent = Orion,
+	}), "Main")
 	local BlurEnabled = false
 	local BlurSize = 12
 	local blurTween
 	local function updateBlur()
 		if blurTween then blurTween:Cancel() end
-		local target = BlurEnabled and MainWindow.Visible and not UIHidden and not Minimized and BlurSize or 0
+		local active = BlurEnabled and MainWindow.Visible and not UIHidden and not Minimized
+		local target = active and BlurSize or 0
+		local overlayTransparency = active and 1 - math.clamp(0.16 + BlurSize / 90, 0.18, 0.5) or 1
 		blurTween = TweenService:Create(BackgroundBlur, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = target})
 		blurTween:Play()
+		TweenService:Create(BackgroundOverlay, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = overlayTransparency}):Play()
 	end
 	Orion.Destroying:Connect(function()
 		BackgroundBlur:Destroy()
