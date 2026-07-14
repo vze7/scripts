@@ -1058,12 +1058,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		KeystrokesLocked = false,
 		BlurEnabled = false,
 		BlurSize = 12,
-		BackgroundImageEnabled = false,
-		BackgroundImageSource = "",
-		BackgroundImageVisibility = 82,
-		BackgroundImageDim = 24,
-		BackgroundPanelTransparency = 18,
-		BackgroundImageScaleType = "Crop",
 		ShowFPS = false,
 		ShowPing = false,
 		ShowClock = true,
@@ -1450,7 +1444,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		TextTruncate = Enum.TextTruncate.AtEnd
 	}), "Text")
 
-	local LocalInfo = AddThemeObject(SetProps(MakeElement("Label", "--:--  |  --°C", 13), {
+	local LocalInfo = AddThemeObject(SetProps(MakeElement("Label", "--:--  /  --°C", 13), {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Size = UDim2.fromOffset(116, 28),
 		Position = UDim2.new(1, -100, 0.5, 0),
@@ -1528,176 +1522,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		DragPoint,
 		WindowStuff
 	}), "Main")
-
-	-- Optional custom background image. Supports Roblox asset IDs and, when the
-	-- executor exposes writefile/getcustomasset, direct image URLs such as Discord CDN links.
-	local BackgroundImage = Instance.new("ImageLabel")
-	BackgroundImage.Name = "CustomBackgroundImage"
-	BackgroundImage.Size = UDim2.fromScale(1, 1)
-	BackgroundImage.Position = UDim2.fromScale(0, 0)
-	BackgroundImage.BackgroundTransparency = 1
-	BackgroundImage.BorderSizePixel = 0
-	BackgroundImage.Image = ""
-	BackgroundImage.ImageTransparency = 1
-	BackgroundImage.ImageColor3 = Color3.new(1, 1, 1)
-	BackgroundImage.ScaleType = Enum.ScaleType.Crop
-	BackgroundImage.Visible = false
-	BackgroundImage.ZIndex = 0
-	BackgroundImage.Parent = MainWindow
-
-	local backgroundLoadToken = 0
-	local backgroundCustomAsset = getcustomasset or getsynasset or (syn and syn.getcustomasset)
-	local backgroundScaleTypes = {
-		Crop = Enum.ScaleType.Crop,
-		Fit = Enum.ScaleType.Fit,
-		Stretch = Enum.ScaleType.Stretch,
-	}
-
-	local function trimBackgroundSource(value)
-		return tostring(value or ""):match("^%s*(.-)%s*$") or ""
-	end
-
-	local function backgroundSourceHash(value)
-		local hash = 5381
-		for index = 1, #value do
-			hash = (hash * 33 + string.byte(value, index)) % 2147483647
-		end
-		return tostring(hash)
-	end
-
-	local function resolveBackgroundSource(source)
-		source = trimBackgroundSource(source)
-		if source == "" then return "" end
-
-		local numericId = source:match("^(%d+)$")
-		local embeddedId = source:match("rbxassetid://(%d+)")
-			or source:match("[?&]id=(%d+)")
-			or source:match("/library/(%d+)")
-			or source:match("/catalog/(%d+)")
-			or source:match("/asset/(%d+)")
-		local assetId = numericId or embeddedId
-		if assetId then
-			return "rbxassetid://" .. assetId
-		end
-
-		if not source:match("^https?://") then
-			return source
-		end
-
-		if type(backgroundCustomAsset) == "function" and fileFunctionsAvailable then
-			local cacheFolder = WindowConfig.ConfigFolder .. "/BackgroundCache"
-			if not isfolder(cacheFolder) then
-				pcall(makefolder, cacheFolder)
-			end
-
-			local cleanUrl = source:match("^[^?]+") or source
-			local extension = string.lower(cleanUrl:match("%.([%a%d]+)$") or "png")
-			if extension ~= "png" and extension ~= "jpg" and extension ~= "jpeg" and extension ~= "webp" then
-				extension = "png"
-			end
-
-			local cachePath = cacheFolder .. "/background_" .. backgroundSourceHash(source) .. "." .. extension
-			if not isfile(cachePath) then
-				local downloaded, bytes = pcall(game.HttpGet, game, source)
-				if not downloaded or type(bytes) ~= "string" or #bytes == 0 then
-					return nil, "The image URL could not be downloaded."
-				end
-				local wrote = pcall(writefile, cachePath, bytes)
-				if not wrote then
-					return nil, "The downloaded image could not be saved."
-				end
-			end
-
-			local converted, customAsset = pcall(backgroundCustomAsset, cachePath)
-			if converted and type(customAsset) == "string" and customAsset ~= "" then
-				return customAsset
-			end
-		end
-
-		-- Some environments accept direct HTTPS image content. Keep it as a fallback.
-		return source
-	end
-
-	local function applyBackgroundPanels()
-		local enabled = UIState.BackgroundImageEnabled == true
-			and trimBackgroundSource(UIState.BackgroundImageSource) ~= ""
-			and BackgroundImage.Image ~= ""
-		local panelTransparency = enabled
-			and math.clamp((tonumber(UIState.BackgroundPanelTransparency) or 18) / 100, 0, 0.85)
-			or 0
-
-		if WindowStuff and WindowStuff.Parent then
-			WindowStuff.BackgroundTransparency = panelTransparency
-		end
-		for _, tabData in pairs(Tabs) do
-			local container = tabData and tabData.Container
-			if container and container.Parent then
-				container.BackgroundTransparency = panelTransparency
-			end
-		end
-	end
-
-	local function applyBackgroundVisuals()
-		local source = trimBackgroundSource(UIState.BackgroundImageSource)
-		local enabled = UIState.BackgroundImageEnabled == true and source ~= "" and BackgroundImage.Image ~= ""
-		local visibility = math.clamp(tonumber(UIState.BackgroundImageVisibility) or 82, 0, 100)
-		local darkness = math.clamp(tonumber(UIState.BackgroundImageDim) or 24, 0, 100)
-		local brightness = math.floor(255 * (1 - darkness / 100) + 0.5)
-
-		BackgroundImage.Visible = enabled
-		BackgroundImage.ImageTransparency = VisibilityToTransparency(visibility)
-		BackgroundImage.ImageColor3 = Color3.fromRGB(brightness, brightness, brightness)
-		BackgroundImage.ScaleType = backgroundScaleTypes[tostring(UIState.BackgroundImageScaleType)] or Enum.ScaleType.Crop
-		applyBackgroundPanels()
-	end
-
-	local function loadBackgroundImage(source, quiet)
-		UIState.BackgroundImageSource = trimBackgroundSource(source)
-		backgroundLoadToken += 1
-		local token = backgroundLoadToken
-
-		if UIState.BackgroundImageSource == "" then
-			BackgroundImage.Image = ""
-			applyBackgroundVisuals()
-			return
-		end
-
-		if UIState.BackgroundImageEnabled ~= true then
-			applyBackgroundVisuals()
-			return
-		end
-
-		BackgroundImage.Image = ""
-		applyBackgroundVisuals()
-
-		task.spawn(function()
-			local resolved, reason = resolveBackgroundSource(UIState.BackgroundImageSource)
-			if token ~= backgroundLoadToken then return end
-			if not resolved or resolved == "" then
-				BackgroundImage.Image = ""
-				applyBackgroundVisuals()
-				if not quiet then
-					OrionLib:MakeNotification({
-						Name = "Background Image",
-						Content = reason or "The image could not be loaded.",
-						Time = 5,
-					})
-				end
-				return
-			end
-
-			BackgroundImage.Image = resolved
-			pcall(function()
-				game:GetService("ContentProvider"):PreloadAsync({BackgroundImage})
-			end)
-			applyBackgroundVisuals()
-		end)
-	end
-
-	applyBackgroundVisuals()
-	if UIState.BackgroundImageEnabled == true then
-		loadBackgroundImage(UIState.BackgroundImageSource, true)
-	end
 
 	-- Small horizontal-only drag handle on the sidebar's right edge.
 	local SidebarResizeHandle = Instance.new("TextButton")
@@ -1931,7 +1755,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		if UIState.ShowPing then table.insert(pieces, string.format("%d ms", math.max(0, math.floor(currentPingMS + 0.5)))) end
 		if UIState.ShowClock then table.insert(pieces, os.date("!%H:%M", os.time() + localUtcOffset)) end
 		if UIState.ShowTemperature then table.insert(pieces, formatTemperature()) end
-		LocalInfo.Text = table.concat(pieces, "  |  ")
+		LocalInfo.Text = table.concat(pieces, "  /  ")
 		updateTopBarResponsiveness()
 	end
 
@@ -2635,7 +2459,6 @@ function OrionLib:MakeWindow(WindowConfig)
 			Frame = TabFrame,
 			Container = Container
 		}
-		applyBackgroundPanels()
 		updateSidebarLayout()
 		searchDirty = true
 
@@ -5397,93 +5220,6 @@ function OrionLib:MakeWindow(WindowConfig)
 				end,
 			})
 		end
-
-		background:AddToggle({
-			Name = "Background Image",
-			Default = UIState.BackgroundImageEnabled == true,
-			Callback = function(Value)
-				UIState.BackgroundImageEnabled = Value == true
-				if UIState.BackgroundImageEnabled then
-					loadBackgroundImage(UIState.BackgroundImageSource)
-				else
-					backgroundLoadToken += 1
-					applyBackgroundVisuals()
-				end
-				scheduleUIConfigSave()
-			end,
-		})
-
-		background:AddTextbox({
-			Name = "Image Link / ID",
-			Default = tostring(UIState.BackgroundImageSource or ""),
-			BackGroundtext = "Discord URL or Roblox image ID",
-			TextDisappear = false,
-			Callback = function(Value)
-				UIState.BackgroundImageSource = trimBackgroundSource(Value)
-				loadBackgroundImage(UIState.BackgroundImageSource)
-				scheduleUIConfigSave()
-			end,
-		})
-
-		background:AddSlider({
-			Name = "Image Visibility",
-			Min = 0,
-			Max = 100,
-			Default = tonumber(UIState.BackgroundImageVisibility) or 82,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				UIState.BackgroundImageVisibility = Value
-				applyBackgroundVisuals()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		background:AddSlider({
-			Name = "Background Darkness",
-			Min = 0,
-			Max = 90,
-			Default = tonumber(UIState.BackgroundImageDim) or 24,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				UIState.BackgroundImageDim = Value
-				applyBackgroundVisuals()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		background:AddSlider({
-			Name = "Panel Transparency",
-			Min = 0,
-			Max = 70,
-			Default = tonumber(UIState.BackgroundPanelTransparency) or 18,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				UIState.BackgroundPanelTransparency = Value
-				applyBackgroundPanels()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		background:AddDropdown({
-			Name = "Image Fit",
-			Default = tostring(UIState.BackgroundImageScaleType or "Crop"),
-			Options = {"Crop", "Fit", "Stretch"},
-			Callback = function(Value)
-				UIState.BackgroundImageScaleType = tostring(Value or "Crop")
-				applyBackgroundVisuals()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		background:AddButton({
-			Name = "Reload Background",
-			Callback = function()
-				loadBackgroundImage(UIState.BackgroundImageSource)
-			end,
-		})
 
 		background:AddToggle({
 			Name = "Background Blur",
