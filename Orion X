@@ -338,18 +338,53 @@ local VisualPreferences = {
 	StrokeVisibility = 0,
 	SeparatorVisibility = 0,
 	KeystrokeBackgroundVisibility = 0,
+	KeystrokeStrokeVisibility = 0,
+	CornerRadius = 10,
 }
 OrionLib.VisualPreferences = VisualPreferences
 
+local ManagedCorners = {}
+
 local function VisibilityToTransparency(Value)
 	return 1 - (math.clamp(tonumber(Value) or 0, 0, 100) / 100)
+end
+
+local function RegisterManagedCorner(Corner, Scale, Offset)
+	if not Corner then return Corner end
+	Scale = tonumber(Scale) or 0
+	Offset = tonumber(Offset) or 0
+
+	-- Scale-based corners (avatars/circles/pills) keep their original shape.
+	-- Pixel-based corners are controlled by the global Roundness slider.
+	if Scale == 0 then
+		table.insert(ManagedCorners, Corner)
+		Corner.CornerRadius = UDim.new(0, math.clamp(VisualPreferences.CornerRadius, 0, 32))
+	else
+		Corner.CornerRadius = UDim.new(Scale, Offset)
+	end
+	return Corner
+end
+
+local function ApplyCornerRadius()
+	local radius = math.clamp(tonumber(VisualPreferences.CornerRadius) or 0, 0, 32)
+	for index = #ManagedCorners, 1, -1 do
+		local Corner = ManagedCorners[index]
+		if not Corner or Corner.Parent == nil then
+			table.remove(ManagedCorners, index)
+		else
+			Corner.CornerRadius = UDim.new(0, radius)
+		end
+	end
 end
 
 local function ApplyVisualPreferenceToObject(Object, Type)
 	if not Object then return end
 	if Type == "Stroke" then
 		if Object:IsA("UIStroke") then
-			Object.Transparency = VisibilityToTransparency(VisualPreferences.StrokeVisibility)
+			local visibility = Object:GetAttribute("OrionKeystrokeStroke")
+				and VisualPreferences.KeystrokeStrokeVisibility
+				or VisualPreferences.StrokeVisibility
+			Object.Transparency = VisibilityToTransparency(visibility)
 		elseif Object:IsA("Frame") then
 			-- Frames registered as Stroke are the one-pixel separator lines.
 			Object.BackgroundTransparency = VisibilityToTransparency(VisualPreferences.SeparatorVisibility)
@@ -450,6 +485,7 @@ local function ApplyVisualPreferences()
 	if mainWindowStroke then
 		mainWindowStroke.Transparency = VisibilityToTransparency(VisualPreferences.StrokeVisibility)
 	end
+	ApplyCornerRadius()
 end
 
 function OrionLib:SetTheme()
@@ -492,7 +528,7 @@ function OrionLib:SetTheme()
 			key.Frame.BackgroundColor3 = key.Pressed and themeData.Accent or themeData.Second
 			key.Frame.BackgroundTransparency = VisibilityToTransparency(VisualPreferences.KeystrokeBackgroundVisibility)
 			key.Stroke.Color = key.Pressed and themeData.Accent or themeData.Stroke
-			key.Stroke.Transparency = VisibilityToTransparency(VisualPreferences.StrokeVisibility)
+			key.Stroke.Transparency = VisibilityToTransparency(VisualPreferences.KeystrokeStrokeVisibility)
 			if key.Label then
 				key.Label.TextColor3 = key.Pressed and themeData.Accent or themeData.Text
 			end
@@ -555,10 +591,12 @@ local function CheckKey(Table, Key)
 end
 
 CreateElement("Corner", function(Scale, Offset)
+	local cornerScale = Scale or 0
+	local cornerOffset = Offset or 10
 	local Corner = Create("UICorner", {
-		CornerRadius = UDim.new(Scale or 0, Offset or 10)
+		CornerRadius = UDim.new(cornerScale, cornerOffset)
 	})
-	return Corner
+	return RegisterManagedCorner(Corner, cornerScale, cornerOffset)
 end)
 
 CreateElement("AspectRatio", function()
@@ -608,13 +646,16 @@ CreateElement("Frame", function(Color)
 end)
 
 CreateElement("RoundFrame", function(Color, Scale, Offset)
+	local cornerScale = Scale or 0
+	local cornerOffset = Offset or 10
+	local Corner = RegisterManagedCorner(Create("UICorner", {
+		CornerRadius = UDim.new(cornerScale, cornerOffset)
+	}), cornerScale, cornerOffset)
 	local Frame = Create("Frame", {
 		BackgroundColor3 = Color or Color3.fromRGB(255, 255, 255),
 		BorderSizePixel = 0
 	}, {
-		Create("UICorner", {
-			CornerRadius = UDim.new(Scale, Offset)
-		})
+		Corner
 	})
 	return Frame
 end)
@@ -927,11 +968,15 @@ function OrionLib:MakeWindow(WindowConfig)
 	local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 	-- Independent horizontal resizing for the left sidebar.
-	local SIDEBAR_MIN_WIDTH = 54
+	local SIDEBAR_MIN_WIDTH = 56
+	local SIDEBAR_COLLAPSED_WIDTH = 58
 	local SIDEBAR_DEFAULT_WIDTH = 150
 	local SIDEBAR_MAX_WIDTH = 320
-	local SIDEBAR_COLLAPSE_THRESHOLD = 96
-	local MIN_CONTENT_WIDTH = 220
+	local SIDEBAR_COLLAPSE_ENTER = 92
+	local SIDEBAR_COLLAPSE_EXIT = 116
+	local SIDEBAR_RELEASE_SNAP = 108
+	local SIDEBAR_DEFAULT_SNAP_DISTANCE = 14
+	local MIN_CONTENT_WIDTH = 240
 	local SidebarWidth = SIDEBAR_DEFAULT_WIDTH
 
 	WindowConfig = WindowConfig or {}
@@ -1371,8 +1416,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	local SidebarResizeHandle = Instance.new("TextButton")
 	SidebarResizeHandle.Name = "SidebarResizeHandle"
 	SidebarResizeHandle.AnchorPoint = Vector2.new(0.5, 1)
-	SidebarResizeHandle.Size = UDim2.fromOffset(18, 38)
-	SidebarResizeHandle.Position = UDim2.new(0, SidebarWidth, 1, -56)
+	SidebarResizeHandle.Size = UDim2.fromOffset(24, 54)
+	SidebarResizeHandle.Position = UDim2.new(0, SidebarWidth, 1, -8)
 	SidebarResizeHandle.BackgroundTransparency = 1
 	SidebarResizeHandle.Text = ""
 	SidebarResizeHandle.AutoButtonColor = false
@@ -1397,10 +1442,16 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local function updateSidebarLayout()
 		SidebarWidth = math.floor(math.clamp(SidebarWidth, SIDEBAR_MIN_WIDTH, getSidebarMaxWidth()) + 0.5)
-		SidebarCollapsed = SidebarWidth <= SIDEBAR_COLLAPSE_THRESHOLD
+
+		-- Hysteresis prevents tab names from flickering while dragging near the breakpoint.
+		if SidebarCollapsed then
+			if SidebarWidth >= SIDEBAR_COLLAPSE_EXIT then SidebarCollapsed = false end
+		elseif SidebarWidth <= SIDEBAR_COLLAPSE_ENTER then
+			SidebarCollapsed = true
+		end
 
 		WindowStuff.Size = UDim2.new(0, SidebarWidth, 1, -50)
-		SidebarResizeHandle.Position = UDim2.new(0, SidebarWidth, 1, -56)
+		SidebarResizeHandle.Position = UDim2.new(0, SidebarWidth, 1, -8)
 
 		if SidebarCollapsed then
 			GlobalSearch.Visible = false
@@ -1456,6 +1507,31 @@ function OrionLib:MakeWindow(WindowConfig)
 	local sidebarResizing = false
 	local sidebarStartMouseX = 0
 	local sidebarStartWidth = SidebarWidth
+	local sidebarActiveInput
+	local lastSidebarClick = 0
+
+	local function snapSidebarAfterDrag()
+		local maxWidth = getSidebarMaxWidth()
+		if SidebarWidth <= SIDEBAR_RELEASE_SNAP then
+			SidebarWidth = math.min(SIDEBAR_COLLAPSED_WIDTH, maxWidth)
+			SidebarCollapsed = true
+		elseif math.abs(SidebarWidth - SIDEBAR_DEFAULT_WIDTH) <= SIDEBAR_DEFAULT_SNAP_DISTANCE then
+			SidebarWidth = math.min(SIDEBAR_DEFAULT_WIDTH, maxWidth)
+			SidebarCollapsed = false
+		end
+		updateSidebarLayout()
+	end
+
+	local function toggleSidebarSize()
+		if SidebarCollapsed or SidebarWidth <= SIDEBAR_RELEASE_SNAP then
+			SidebarWidth = math.min(SIDEBAR_DEFAULT_WIDTH, getSidebarMaxWidth())
+			SidebarCollapsed = false
+		else
+			SidebarWidth = math.min(SIDEBAR_COLLAPSED_WIDTH, getSidebarMaxWidth())
+			SidebarCollapsed = true
+		end
+		updateSidebarLayout()
+	end
 
 	AddConnection(SidebarResizeHandle.MouseEnter, function()
 		TweenService:Create(SidebarResizeGlyph, TweenInfo.new(0.15), {TextTransparency = 0.05}):Play()
@@ -1467,25 +1543,32 @@ function OrionLib:MakeWindow(WindowConfig)
 	end)
 	AddConnection(SidebarResizeHandle.InputBegan, function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			local now = os.clock()
+			if now - lastSidebarClick <= 0.32 then
+				lastSidebarClick = 0
+				toggleSidebarSize()
+				return
+			end
+			lastSidebarClick = now
 			sidebarResizing = true
+			sidebarActiveInput = input
 			sidebarStartMouseX = input.Position.X
 			sidebarStartWidth = SidebarWidth
 		end
 	end)
 	AddConnection(UserInputService.InputChanged, function(input)
 		if not sidebarResizing or Minimized then return end
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input == sidebarActiveInput then
 			SidebarWidth = sidebarStartWidth + (input.Position.X - sidebarStartMouseX)
 			updateSidebarLayout()
 		end
 	end)
 	AddConnection(UserInputService.InputEnded, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			if sidebarResizing then
-				sidebarResizing = false
-				SidebarResizeGlyph.TextTransparency = 0.5
-				updateSidebarLayout()
-			end
+		if sidebarResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input == sidebarActiveInput) then
+			sidebarResizing = false
+			sidebarActiveInput = nil
+			SidebarResizeGlyph.TextTransparency = 0.5
+			snapSidebarAfterDrag()
 		end
 	end)
 
@@ -1550,6 +1633,12 @@ function OrionLib:MakeWindow(WindowConfig)
 	BackgroundBlur.Size = 0
 	BackgroundBlur.Parent = Lighting
 	local KeystrokesLocked = false
+	local KeystrokesOuterStroke = SetProps(MakeElement("Stroke"), {
+		Transparency = VisibilityToTransparency(VisualPreferences.KeystrokeStrokeVisibility)
+	})
+	KeystrokesOuterStroke:SetAttribute("OrionKeystrokeStroke", true)
+	KeystrokesOuterStroke = AddThemeObject(KeystrokesOuterStroke, "Stroke")
+
 	local KeystrokesFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
 		Name = "Keystrokes",
 		Size = UDim2.fromOffset(148, 114),
@@ -1561,13 +1650,15 @@ function OrionLib:MakeWindow(WindowConfig)
 		ZIndex = 5,
 		Parent = Orion,
 	}), {
-		AddThemeObject(SetProps(MakeElement("Stroke"), {Transparency = 0.3}), "Stroke"),
+		KeystrokesOuterStroke,
 	}), "Main")
 
 	local function createKeystroke(Name, Text, Position, Size)
-		local stroke = AddThemeObject(SetProps(MakeElement("Stroke"), {
-			Transparency = VisibilityToTransparency(VisualPreferences.StrokeVisibility)
-		}), "Stroke")
+		local stroke = SetProps(MakeElement("Stroke"), {
+			Transparency = VisibilityToTransparency(VisualPreferences.KeystrokeStrokeVisibility)
+		})
+		stroke:SetAttribute("OrionKeystrokeStroke", true)
+		stroke = AddThemeObject(stroke, "Stroke")
 		local label = AddThemeObject(SetProps(MakeElement("Label", Text, 12), {
 			Size = UDim2.fromScale(1, 1),
 			TextXAlignment = Enum.TextXAlignment.Center,
@@ -1607,7 +1698,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		item.Frame.BackgroundColor3 = Pressed and theme.Accent or theme.Second
 		item.Frame.BackgroundTransparency = VisibilityToTransparency(VisualPreferences.KeystrokeBackgroundVisibility)
 		item.Stroke.Color = Pressed and theme.Accent or theme.Stroke
-		item.Stroke.Transparency = VisibilityToTransparency(VisualPreferences.StrokeVisibility)
+		item.Stroke.Transparency = VisibilityToTransparency(VisualPreferences.KeystrokeStrokeVisibility)
 		if item.Label then
 			item.Label.TextColor3 = Pressed and theme.Accent or theme.Text
 		end
@@ -1671,24 +1762,39 @@ function OrionLib:MakeWindow(WindowConfig)
 
     AddThemeObject(icon, "Text")
 
-    local MIN_SIZE = Vector2.new(WindowNameTBX.X + 140, 150)
-    local MAX_SIZE = Vector2.new(9000, 6000)
+    local MIN_SIZE = Vector2.new(
+		math.max(WindowNameTBX.X + 180, SIDEBAR_MIN_WIDTH + MIN_CONTENT_WIDTH, 430),
+		260
+	)
 
     local resizing = false
+    local resizeActiveInput
     local startMousePos
     local startSize
 	local lastResizeUpdate = 0
 	local lastAppliedSize
 	local RESIZE_INTERVAL = 1 / 60
 
-	local function updateResize(force)
+	local function getResizeMaximum()
+		local camera = workspace.CurrentCamera
+		local viewport = camera and camera.ViewportSize or Vector2.new(1920, 1080)
+		local absolutePosition = window.AbsolutePosition
+		return Vector2.new(
+			math.max(MIN_SIZE.X, viewport.X - math.max(absolutePosition.X, 0) - 8),
+			math.max(MIN_SIZE.Y, viewport.Y - math.max(absolutePosition.Y, 0) - 8)
+		)
+	end
+
+	local function updateResize(force, currentPosition)
 		if not resizing or Minimized then return end
 		local now = os.clock()
 		if not force and now - lastResizeUpdate < RESIZE_INTERVAL then return end
-		local delta = UserInputService:GetMouseLocation() - startMousePos
+		local pointer = currentPosition or UserInputService:GetMouseLocation()
+		local delta = pointer - startMousePos
+		local maximum = getResizeMaximum()
 		local size = Vector2.new(
-			math.floor(math.clamp(startSize.X + delta.X, MIN_SIZE.X, MAX_SIZE.X) + 0.5),
-			math.floor(math.clamp(startSize.Y + delta.Y, MIN_SIZE.Y, MAX_SIZE.Y) + 0.5)
+			math.floor(math.clamp(startSize.X + delta.X, MIN_SIZE.X, maximum.X) + 0.5),
+			math.floor(math.clamp(startSize.Y + delta.Y, MIN_SIZE.Y, maximum.Y) + 0.5)
 		)
 		if not force and lastAppliedSize and (size - lastAppliedSize).Magnitude < 1 then return end
 		lastResizeUpdate = now
@@ -1707,9 +1813,10 @@ function OrionLib:MakeWindow(WindowConfig)
 	end)
 
 	AddConnection(ResizeHandle.InputBegan, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             resizing = true
-            startMousePos = UserInputService:GetMouseLocation()
+			resizeActiveInput = input
+            startMousePos = input.Position
             startSize = window.AbsoluteSize
 			lastAppliedSize = startSize
 			lastResizeUpdate = 0
@@ -1717,14 +1824,17 @@ function OrionLib:MakeWindow(WindowConfig)
 	end)
 
 	AddConnection(UserInputService.InputEnded, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			updateResize(true)
+		if resizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input == resizeActiveInput) then
+			updateResize(true, input.Position)
             resizing = false
+			resizeActiveInput = nil
         end
 	end)
 
 	AddConnection(UserInputService.InputChanged, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement then updateResize(false) end
+		if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input == resizeActiveInput) then
+			updateResize(false, input.Position)
+		end
 	end)
 
 	local WindowIcon
@@ -4118,7 +4228,7 @@ function OrionLib:MakeWindow(WindowConfig)
 					Image = "rbxassetid://4155801252",
 					ScaleType = Enum.ScaleType.Stretch,
 					BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-				}, {Create("UICorner", {CornerRadius = UDim.new(0, 5)}), ColorSelection})
+				}, {RegisterManagedCorner(Create("UICorner", {CornerRadius = UDim.new(0, 5)}), 0, 5), ColorSelection})
 
 				local Hue = Create("Frame", {
 					Size = UDim2.new(0, 20, 1, 0),
@@ -4137,7 +4247,7 @@ function OrionLib:MakeWindow(WindowConfig)
 							ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 4))
 						}
 					}),
-					Create("UICorner", {CornerRadius = UDim.new(0, 3)}),
+					RegisterManagedCorner(Create("UICorner", {CornerRadius = UDim.new(0, 3)}), 0, 3),
 					HueSelection
 				})
 
@@ -4750,6 +4860,19 @@ function OrionLib:MakeWindow(WindowConfig)
 			})
 
 			keystrokes:AddSlider({
+				Name = "Key Border Visibility",
+				Min = 0,
+				Max = 100,
+				Default = VisualPreferences.KeystrokeStrokeVisibility,
+				Increment = 1,
+				ValueName = "%",
+				Callback = function(Value)
+					VisualPreferences.KeystrokeStrokeVisibility = Value
+					ApplyVisualPreferences()
+				end,
+			})
+
+			keystrokes:AddSlider({
 				Name = "Key Background Visibility",
 				Min = 0,
 				Max = 100,
@@ -4817,7 +4940,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 		windowstroke:AddSlider({
 			Name = "Border Thickness",
-			Min = 1,
+			Min = 0,
 			Max = 3,
 			Default = 1.5,
 			Color = Color3.fromRGB(59, 122, 179),
@@ -4825,6 +4948,19 @@ function OrionLib:MakeWindow(WindowConfig)
 			ValueName = "Thickness",
 			Callback = function(Value)
 				mainWindowStroke.Thickness = Value
+			end,
+		})
+
+		windowstroke:AddSlider({
+			Name = "Roundness",
+			Min = 0,
+			Max = 24,
+			Default = VisualPreferences.CornerRadius,
+			Increment = 1,
+			ValueName = "px",
+			Callback = function(Value)
+				VisualPreferences.CornerRadius = Value
+				ApplyCornerRadius()
 			end,
 		})
 
