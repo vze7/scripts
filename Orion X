@@ -1,6 +1,6 @@
--- OrionX + FireOrion compatibility build v7
--- Full-window image backgrounds, theme-aware paragraph headers and a
--- responsive top-bar search field when the sidebar is collapsed.
+-- OrionX + FireOrion compatibility build
+-- Includes the documented FireOrion API, OrionX features, lifecycle helpers,
+-- advanced dropdown compatibility, infinite sliders and theme utilities.
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -43,8 +43,7 @@ local OrionLib = {
 	FreeMouse = false,
 	SelectedTheme = "Default",
 	Folder = nil,
-	SaveCfg = false,
-	Version = "7.0.0-responsive-background"
+	SaveCfg = false
 }
 
 local Icons = {}
@@ -584,9 +583,6 @@ function OrionLib:SetTheme()
 	end
 
 	ApplyVisualPreferences()
-	if type(self._RefreshWindowBackground) == "function" then
-		pcall(self._RefreshWindowBackground)
-	end
 	OrionLib:SaveThemeCfg()
 end
 
@@ -1064,9 +1060,9 @@ function OrionLib:MakeWindow(WindowConfig)
 		BlurSize = 12,
 		BackgroundImageEnabled = false,
 		BackgroundImageSource = "",
-		BackgroundImageVisibility = 100,
-		BackgroundImageDim = 18,
-		BackgroundPanelTransparency = 38,
+		BackgroundImageVisibility = 82,
+		BackgroundImageDim = 24,
+		BackgroundPanelTransparency = 18,
 		BackgroundImageScaleType = "Crop",
 		ShowFPS = false,
 		ShowPing = false,
@@ -1171,7 +1167,6 @@ function OrionLib:MakeWindow(WindowConfig)
 	GlobalSearch.TextXAlignment = Enum.TextXAlignment.Left
 	GlobalSearch.ClipsDescendants = true
 	GlobalSearch.TextTruncate = Enum.TextTruncate.AtEnd
-	GlobalSearch.ZIndex = 12
 	GlobalSearch.Visible = WindowConfig.SearchBar
 
 	function CSBC(baseColor)
@@ -1191,7 +1186,6 @@ function OrionLib:MakeWindow(WindowConfig)
 	Icon.AnchorPoint = Vector2.new(1, 0.5)
 	Icon.Position = UDim2.new(1, -6, 0.5, 0)
 	Icon.Size = UDim2.new(0, 18, 0, 18)
-	Icon.ZIndex = 13
 	Icon.Parent = GlobalSearch
 
 	local accentMap = { ["á"]="a", ["à"]="a", ["â"]="a", ["ã"]="a", ["é"]="e", ["ê"]="e", ["í"]="i", ["ó"]="o", ["ô"]="o", ["õ"]="o", ["ú"]="u", ["ç"]="c" }
@@ -1503,32 +1497,6 @@ function OrionLib:MakeWindow(WindowConfig)
 		and UDim2.fromOffset(tonumber(savedWindowPosition.x) or 30, tonumber(savedWindowPosition.y) or 30)
 		or UDim2.new(0.5, -math.floor(initialWindowWidth / 2), 0.5, -math.floor(initialWindowHeight / 2))
 
-	local WindowControls = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
-		Name = "WindowControls",
-		Size = UDim2.new(0, 70, 0, 30),
-		Position = UDim2.new(1, -90, 0, 10),
-		ZIndex = 8,
-	}), {
-		AddThemeObject(MakeElement("Stroke"), "Stroke"),
-		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(0, 1, 1, 0),
-			Position = UDim2.new(0.5, 0, 0, 0)
-		}), "Stroke"),
-		CloseBtn,
-		MinimizeBtn
-	}), "Second")
-
-	local TopBar = SetChildren(SetProps(MakeElement("TFrame"), {
-		Size = UDim2.new(1, 0, 0, 50),
-		Name = "TopBar",
-		ZIndex = 4,
-	}), {
-		WindowName,
-		LocalInfo,
-		WindowTopBarLine,
-		WindowControls,
-	})
-
 	local MainWindow = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 10), {
 		Parent = Orion,
 		Position = initialWindowPosition,
@@ -1536,14 +1504,33 @@ function OrionLib:MakeWindow(WindowConfig)
 		ClipsDescendants = true,
 		Active = true,
 	}), {
-		TopBar,
+
+		SetChildren(SetProps(MakeElement("TFrame"), {
+			Size = UDim2.new(1, 0, 0, 50),
+			Name = "TopBar"
+		}), {
+			WindowName,
+			LocalInfo,
+			WindowTopBarLine,
+			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
+				Size = UDim2.new(0, 70, 0, 30),
+				Position = UDim2.new(1, -90, 0, 10)
+			}), {
+				AddThemeObject(MakeElement("Stroke"), "Stroke"),
+				AddThemeObject(SetProps(MakeElement("Frame"), {
+					Size = UDim2.new(0, 1, 1, 0),
+					Position = UDim2.new(0.5, 0, 0, 0)
+				}), "Stroke"),
+				CloseBtn,
+				MinimizeBtn
+			}), "Second"),
+		}),
 		DragPoint,
 		WindowStuff
 	}), "Main")
 
-	-- Custom background image layer.
-	-- Roblox IDs work natively. Direct URLs (including Discord CDN links) are
-	-- downloaded and converted with getcustomasset/getsynasset when supported.
+	-- Optional custom background image. Supports Roblox asset IDs and, when the
+	-- executor exposes writefile/getcustomasset, direct image URLs such as Discord CDN links.
 	local BackgroundImage = Instance.new("ImageLabel")
 	BackgroundImage.Name = "CustomBackgroundImage"
 	BackgroundImage.Size = UDim2.fromScale(1, 1)
@@ -1555,43 +1542,11 @@ function OrionLib:MakeWindow(WindowConfig)
 	BackgroundImage.ImageColor3 = Color3.new(1, 1, 1)
 	BackgroundImage.ScaleType = Enum.ScaleType.Crop
 	BackgroundImage.Visible = false
-	BackgroundImage.Active = false
-	BackgroundImage.ZIndex = 1
+	BackgroundImage.ZIndex = 0
 	BackgroundImage.Parent = MainWindow
 
-	local BackgroundImageReady = false
-	local BackgroundAwarePanels = {}
-
-	local function registerBackgroundAwarePanel(object, baseTransparency)
-		if not object or not object:IsA("GuiObject") then return object end
-		object:SetAttribute("OrionBackgroundPanel", true)
-		object:SetAttribute("OrionBackgroundBaseTransparency", tonumber(baseTransparency) or object.BackgroundTransparency)
-		table.insert(BackgroundAwarePanels, object)
-		return object
-	end
-
-
-	-- The image fills the complete window (top bar, sidebar and content).
-	-- Keep every real control at ZIndex >= 2 so the image is visible but never
-	-- blocks buttons, textboxes, dropdowns or resize handles.
-	local function keepContentAboveBackground(object)
-		if object ~= BackgroundImage and object:IsA("GuiObject") and object.ZIndex < 2 then
-			object.ZIndex = 2
-		end
-	end
-	for _, object in ipairs(MainWindow:GetDescendants()) do
-		keepContentAboveBackground(object)
-	end
-	AddConnection(MainWindow.DescendantAdded, keepContentAboveBackground)
-
 	local backgroundLoadToken = 0
-	local env = (type(getgenv) == "function" and getgenv()) or _G
-	local backgroundCustomAsset = env.getcustomasset
-		or env.getsynasset
-		or (env.syn and env.syn.getcustomasset)
-	local backgroundRequest = env.request
-		or env.http_request
-		or (env.syn and env.syn.request)
+	local backgroundCustomAsset = getcustomasset or getsynasset or (syn and syn.getcustomasset)
 	local backgroundScaleTypes = {
 		Crop = Enum.ScaleType.Crop,
 		Fit = Enum.ScaleType.Fit,
@@ -1602,60 +1557,12 @@ function OrionLib:MakeWindow(WindowConfig)
 		return tostring(value or ""):match("^%s*(.-)%s*$") or ""
 	end
 
-	local function isBackgroundActive()
-		return UIState.BackgroundImageEnabled == true
-			and BackgroundImageReady
-			and trimBackgroundSource(UIState.BackgroundImageSource) ~= ""
-			and BackgroundImage.Image ~= ""
-	end
-
 	local function backgroundSourceHash(value)
 		local hash = 5381
 		for index = 1, #value do
 			hash = (hash * 33 + string.byte(value, index)) % 2147483647
 		end
 		return tostring(hash)
-	end
-
-	local function downloadBackgroundBytes(url)
-		if type(backgroundRequest) == "function" then
-			local ok, response = pcall(backgroundRequest, {
-				Url = url,
-				Method = "GET",
-				Headers = {
-					["User-Agent"] = "Mozilla/5.0",
-				},
-			})
-			if ok and type(response) == "table" then
-				local status = tonumber(response.StatusCode or response.Status or 200) or 200
-				local body = response.Body or response.body
-				if status >= 200 and status < 300 and type(body) == "string" and #body > 0 then
-					return body, response.Headers or response.headers
-				end
-			end
-		end
-
-		local ok, body = pcall(game.HttpGet, game, url)
-		if ok and type(body) == "string" and #body > 0 then
-			return body, nil
-		end
-		return nil, nil
-	end
-
-	local function extensionForBackground(url, headers)
-		local cleanUrl = (url:match("^[^?]+") or url):lower()
-		local extension = cleanUrl:match("%.([%a%d]+)$")
-		local contentType = ""
-		if type(headers) == "table" then
-			contentType = tostring(headers["content-type"] or headers["Content-Type"] or ""):lower()
-		end
-		if contentType:find("jpeg", 1, true) then extension = "jpg" end
-		if contentType:find("png", 1, true) then extension = "png" end
-		if contentType:find("webp", 1, true) then extension = "webp" end
-		if extension ~= "png" and extension ~= "jpg" and extension ~= "jpeg" and extension ~= "webp" then
-			extension = "png"
-		end
-		return extension
 	end
 
 	local function resolveBackgroundSource(source)
@@ -1674,88 +1581,67 @@ function OrionLib:MakeWindow(WindowConfig)
 		end
 
 		if not source:match("^https?://") then
-			return nil, "Use a Roblox image ID, rbxassetid://ID, or a direct HTTPS image URL."
+			return source
 		end
 
-		local canCache = type(backgroundCustomAsset) == "function"
-			and type(writefile) == "function"
-			and type(isfile) == "function"
-			and type(makefolder) == "function"
-			and type(isfolder) == "function"
-
-		if canCache then
+		if type(backgroundCustomAsset) == "function" and fileFunctionsAvailable then
 			local cacheFolder = WindowConfig.ConfigFolder .. "/BackgroundCache"
 			if not isfolder(cacheFolder) then
-				local made = pcall(makefolder, cacheFolder)
-				if not made then
-					return nil, "The background cache folder could not be created."
-				end
+				pcall(makefolder, cacheFolder)
 			end
 
-			local bytes, headers = downloadBackgroundBytes(source)
-			if not bytes then
-				return nil, "The image URL could not be downloaded. Discord attachment URLs may have expired."
+			local cleanUrl = source:match("^[^?]+") or source
+			local extension = string.lower(cleanUrl:match("%.([%a%d]+)$") or "png")
+			if extension ~= "png" and extension ~= "jpg" and extension ~= "jpeg" and extension ~= "webp" then
+				extension = "png"
 			end
 
-			local extension = extensionForBackground(source, headers)
 			local cachePath = cacheFolder .. "/background_" .. backgroundSourceHash(source) .. "." .. extension
-			local wrote = pcall(writefile, cachePath, bytes)
-			if not wrote then
-				return nil, "The downloaded image could not be saved."
+			if not isfile(cachePath) then
+				local downloaded, bytes = pcall(game.HttpGet, game, source)
+				if not downloaded or type(bytes) ~= "string" or #bytes == 0 then
+					return nil, "The image URL could not be downloaded."
+				end
+				local wrote = pcall(writefile, cachePath, bytes)
+				if not wrote then
+					return nil, "The downloaded image could not be saved."
+				end
 			end
 
 			local converted, customAsset = pcall(backgroundCustomAsset, cachePath)
 			if converted and type(customAsset) == "string" and customAsset ~= "" then
 				return customAsset
 			end
-			return nil, "Your executor failed to convert the downloaded image with getcustomasset."
 		end
 
-		-- Fallback for environments that accept HTTPS directly in ImageLabel.Image.
-		return source, "direct-url"
+		-- Some environments accept direct HTTPS image content. Keep it as a fallback.
+		return source
 	end
 
 	local function applyBackgroundPanels()
-		local enabled = isBackgroundActive()
+		local enabled = UIState.BackgroundImageEnabled == true
+			and trimBackgroundSource(UIState.BackgroundImageSource) ~= ""
+			and BackgroundImage.Image ~= ""
 		local panelTransparency = enabled
-			and math.clamp((tonumber(UIState.BackgroundPanelTransparency) or 38) / 100, 0, 1)
-			or nil
-
-		-- The image itself is the full-window background. The regular Main color
-		-- remains as the fallback and is restored whenever no valid image is loaded.
-		MainWindow.BackgroundTransparency = enabled and 1 or 0
+			and math.clamp((tonumber(UIState.BackgroundPanelTransparency) or 18) / 100, 0, 0.85)
+			or 0
 
 		if WindowStuff and WindowStuff.Parent then
-			WindowStuff.BackgroundTransparency = enabled and panelTransparency or 0
-			for _, child in ipairs(WindowStuff:GetChildren()) do
-				if child:IsA("Frame") and child.BackgroundTransparency < 1 and child.Name ~= "ProfileAvatar" then
-					child.BackgroundTransparency = enabled and panelTransparency or 0
-				end
-			end
+			WindowStuff.BackgroundTransparency = panelTransparency
 		end
-
 		for _, tabData in pairs(Tabs) do
 			local container = tabData and tabData.Container
 			if container and container.Parent then
-				container.BackgroundTransparency = enabled and panelTransparency or 0
-			end
-		end
-
-		for index = #BackgroundAwarePanels, 1, -1 do
-			local panel = BackgroundAwarePanels[index]
-			if not panel or panel.Parent == nil then
-				table.remove(BackgroundAwarePanels, index)
-			else
-				local base = tonumber(panel:GetAttribute("OrionBackgroundBaseTransparency")) or 0
-				panel.BackgroundTransparency = enabled and math.max(base, panelTransparency) or base
+				container.BackgroundTransparency = panelTransparency
 			end
 		end
 	end
+
 	local function applyBackgroundVisuals()
 		local source = trimBackgroundSource(UIState.BackgroundImageSource)
-		local enabled = isBackgroundActive()
-		local visibility = math.clamp(tonumber(UIState.BackgroundImageVisibility) or 100, 0, 100)
-		local darkness = math.clamp(tonumber(UIState.BackgroundImageDim) or 18, 0, 100)
+		local enabled = UIState.BackgroundImageEnabled == true and source ~= "" and BackgroundImage.Image ~= ""
+		local visibility = math.clamp(tonumber(UIState.BackgroundImageVisibility) or 82, 0, 100)
+		local darkness = math.clamp(tonumber(UIState.BackgroundImageDim) or 24, 0, 100)
 		local brightness = math.floor(255 * (1 - darkness / 100) + 0.5)
 
 		BackgroundImage.Visible = enabled
@@ -1765,24 +1651,14 @@ function OrionLib:MakeWindow(WindowConfig)
 		applyBackgroundPanels()
 	end
 
-	local function notifyBackground(content, isError)
-		OrionLib:MakeNotification({
-			Name = isError and "Background Error" or "Background Image",
-			Content = content,
-			Time = isError and 6 or 4,
-		})
-	end
-
 	local function loadBackgroundImage(source, quiet)
 		UIState.BackgroundImageSource = trimBackgroundSource(source)
 		backgroundLoadToken += 1
 		local token = backgroundLoadToken
 
 		if UIState.BackgroundImageSource == "" then
-			BackgroundImageReady = false
 			BackgroundImage.Image = ""
 			applyBackgroundVisuals()
-			if not quiet then notifyBackground("Background cleared.", false) end
 			return
 		end
 
@@ -1791,7 +1667,6 @@ function OrionLib:MakeWindow(WindowConfig)
 			return
 		end
 
-		BackgroundImageReady = false
 		BackgroundImage.Image = ""
 		applyBackgroundVisuals()
 
@@ -1799,10 +1674,15 @@ function OrionLib:MakeWindow(WindowConfig)
 			local resolved, reason = resolveBackgroundSource(UIState.BackgroundImageSource)
 			if token ~= backgroundLoadToken then return end
 			if not resolved or resolved == "" then
-				BackgroundImageReady = false
 				BackgroundImage.Image = ""
 				applyBackgroundVisuals()
-				if not quiet then notifyBackground(reason or "The image could not be loaded.", true) end
+				if not quiet then
+					OrionLib:MakeNotification({
+						Name = "Background Image",
+						Content = reason or "The image could not be loaded.",
+						Time = 5,
+					})
+				end
 				return
 			end
 
@@ -1810,31 +1690,8 @@ function OrionLib:MakeWindow(WindowConfig)
 			pcall(function()
 				game:GetService("ContentProvider"):PreloadAsync({BackgroundImage})
 			end)
-
-			local deadline = os.clock() + 5
-			while token == backgroundLoadToken and not BackgroundImage.IsLoaded and os.clock() < deadline do
-				task.wait(0.1)
-			end
-			if token ~= backgroundLoadToken then return end
-
-			BackgroundImageReady = BackgroundImage.IsLoaded == true
-			if not BackgroundImageReady then
-				BackgroundImage.Image = ""
-			end
 			applyBackgroundVisuals()
-			if not quiet then
-				if BackgroundImageReady then
-					notifyBackground("Image applied successfully.", false)
-				else
-					notifyBackground("The image did not finish loading. Use a valid Roblox image ID or an executor with getcustomasset.", true)
-				end
-			end
 		end)
-	end
-
-	registerBackgroundAwarePanel(GlobalSearch, 0.25)
-	OrionLib._RefreshWindowBackground = function()
-		applyBackgroundPanels()
 	end
 
 	applyBackgroundVisuals()
@@ -1865,18 +1722,6 @@ function OrionLib:MakeWindow(WindowConfig)
 	}), "Text")
 
 	local SidebarCollapsed = false
-	local updateTopBarResponsiveness
-
-	local function refreshWindowTitleText()
-		if Minimized then
-			WindowName.RichText = false
-			WindowName.Text = CompactWindowName
-		else
-			WindowName.RichText = WindowConfig.RichName ~= nil
-			WindowName.Text = WindowConfig.RichName or WindowConfig.Name
-		end
-	end
-
 	local function getSidebarMaxWidth()
 		local available = MainWindow.AbsoluteSize.X - MIN_CONTENT_WIDTH
 		return math.max(SIDEBAR_MIN_WIDTH, math.min(SIDEBAR_MAX_WIDTH, available))
@@ -1896,22 +1741,16 @@ function OrionLib:MakeWindow(WindowConfig)
 		SidebarResizeHandle.Position = UDim2.new(0, SidebarWidth, 1, -2)
 		UIState.SidebarWidth = SidebarWidth
 
-		refreshWindowTitleText()
 		if SidebarCollapsed then
-			if GlobalSearch.Parent ~= TopBar then GlobalSearch.Parent = TopBar end
+			GlobalSearch.Visible = false
 			TabHolder.Position = UDim2.new(0, 0, 0, 8)
 			TabHolder.Size = UDim2.new(1, 0, 1, -58)
 		else
-			if GlobalSearch.Parent ~= WindowStuff then GlobalSearch.Parent = WindowStuff end
 			GlobalSearch.Visible = WindowConfig.SearchBar
 			GlobalSearch.Position = UDim2.new(0, 10, 0, 10)
 			GlobalSearch.Size = UDim2.new(1, -20, 0, 32)
 			TabHolder.Position = UDim2.new(0, 0, 0, 50)
 			TabHolder.Size = UDim2.new(1, 0, 1, -100)
-		end
-
-		if updateTopBarResponsiveness then
-			updateTopBarResponsiveness()
 		end
 
 		local compactIconSize = math.clamp(math.floor(SidebarWidth * 0.39 + 0.5), 21, 25)
@@ -2071,90 +1910,28 @@ function OrionLib:MakeWindow(WindowConfig)
 		return string.format("%d°%s", math.floor(value + 0.5), unit)
 	end
 
-	updateTopBarResponsiveness = function()
+	local function updateTopBarResponsiveness()
 		if not MainWindow or not MainWindow.Parent then return end
-
-		local windowWidth = MainWindow.AbsoluteSize.X
-		local controlsLeft = math.max(120, windowWidth - 100)
-		local titleLeft = WindowConfig.ShowIcon and 50 or 25
-		local infoText = tostring(LocalInfo.Text or "")
-		local desiredInfoWidth = infoText ~= "" and (
-			TextService:GetTextSize(
-				LocalInfo.ContentText or infoText,
-				LocalInfo.TextSize,
-				LocalInfo.Font,
-				Vector2.new(math.huge, 28)
-			).X + 8
-		) or 0
-
-		if Minimized then
-			GlobalSearch.Visible = false
-			local infoWidth = math.clamp(desiredInfoWidth, 0, math.max(0, windowWidth - 285))
-			LocalInfo.Size = UDim2.fromOffset(infoWidth, 28)
-			LocalInfo.Position = UDim2.new(1, -100, 0.5, 0)
-			LocalInfo.Visible = infoWidth > 20 and infoText ~= ""
-			WindowName.Position = UDim2.new(0, titleLeft, 0, -24)
-			WindowName.Size = UDim2.new(1, -(120 + infoWidth + (titleLeft - 25)), 2, 0)
-			return
-		end
-
-		if SidebarCollapsed and WindowConfig.SearchBar then
-			-- Fit the complete hub name first, then leave a usable search field before the live info.
-			refreshWindowTitleText()
-			local titleDesired = TextService:GetTextSize(
-				WindowName.ContentText or WindowName.Text,
-				WindowName.TextSize,
-				Enum.Font.GothamBlack,
-				Vector2.new(math.huge, 40)
-			).X + 4
-
-			local minimumSearchWidth = 82
-			local minimumTitleWidth = 64
-			local infoRoom = math.max(0, controlsLeft - titleLeft - minimumTitleWidth - minimumSearchWidth - 28)
-			local infoWidth = math.min(desiredInfoWidth, infoRoom)
-			if infoWidth < 34 then infoWidth = 0 end
-
-			LocalInfo.Size = UDim2.fromOffset(infoWidth, 28)
-			LocalInfo.Position = UDim2.fromOffset(controlsLeft, 25)
-			LocalInfo.Visible = infoWidth > 20 and infoText ~= ""
-
-			local infoLeft = controlsLeft - infoWidth
-			local availableBeforeInfo = math.max(0, infoLeft - titleLeft - 20)
-			local maximumTitleWidth = math.max(
-				minimumTitleWidth,
-				availableBeforeInfo - minimumSearchWidth - 10
-			)
-			local titleWidth = math.clamp(
-				math.min(titleDesired, maximumTitleWidth),
-				minimumTitleWidth,
-				maximumTitleWidth
-			)
-			local searchLeft = titleLeft + titleWidth + 10
-			local searchRight = infoLeft - 10
-			local searchWidth = math.max(0, searchRight - searchLeft)
-
-			WindowName.Position = UDim2.new(0, titleLeft, 0, -24)
-			WindowName.Size = UDim2.new(0, titleWidth, 2, 0)
-			GlobalSearch.Position = UDim2.fromOffset(searchLeft, 9)
-			GlobalSearch.Size = UDim2.fromOffset(searchWidth, 32)
-			GlobalSearch.Visible = searchWidth >= minimumSearchWidth
-		else
-			local available = math.max(0, windowWidth - 285)
-			local infoWidth = math.clamp(desiredInfoWidth, 0, available)
-			LocalInfo.Size = UDim2.fromOffset(infoWidth, 28)
-			LocalInfo.Position = UDim2.new(1, -100, 0.5, 0)
-			LocalInfo.Visible = infoWidth > 20 and infoText ~= ""
-			WindowName.Position = UDim2.new(0, titleLeft, 0, -24)
-			WindowName.Size = UDim2.new(1, -(120 + infoWidth + (titleLeft - 25)), 2, 0)
-		end
+		local desiredWidth = TextService:GetTextSize(
+			LocalInfo.ContentText or LocalInfo.Text,
+			LocalInfo.TextSize,
+			LocalInfo.Font,
+			Vector2.new(math.huge, 28)
+		).X + 8
+		local available = math.max(0, MainWindow.AbsoluteSize.X - 285)
+		local infoWidth = math.clamp(desiredWidth, 0, available)
+		LocalInfo.Size = UDim2.fromOffset(infoWidth, 28)
+		LocalInfo.Visible = infoWidth > 20 and LocalInfo.Text ~= ""
+		WindowName.Size = UDim2.new(1, -(120 + infoWidth), 2, 0)
 	end
+
 	local function updateLocalInfoText()
 		local pieces = {}
 		if UIState.ShowFPS then table.insert(pieces, string.format("%d FPS", math.max(0, math.floor(smoothedFPS + 0.5)))) end
 		if UIState.ShowPing then table.insert(pieces, string.format("%d ms", math.max(0, math.floor(currentPingMS + 0.5)))) end
 		if UIState.ShowClock then table.insert(pieces, os.date("!%H:%M", os.time() + localUtcOffset)) end
 		if UIState.ShowTemperature then table.insert(pieces, formatTemperature()) end
-		LocalInfo.Text = table.concat(pieces, " | ")
+		LocalInfo.Text = table.concat(pieces, "  |  ")
 		updateTopBarResponsiveness()
 	end
 
@@ -2613,14 +2390,13 @@ function OrionLib:MakeWindow(WindowConfig)
 		if sizeTween then sizeTween:Cancel() end
 
 		if Minimized then
-			refreshWindowTitleText()
+			WindowName.Text = CompactWindowName
 			ResizeHandle.Visible = false
 			SidebarResizeHandle.Visible = false
 			showMobileOpenButton()
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false
 			MinimizeBtn.Ico.Image = "rbxassetid://7072720870"
-			updateTopBarResponsiveness()
 			TweenService:Create(ContentFadeGroup, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 1}):Play()
 			sizeTween = TweenService:Create(MainWindow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 				Size = UDim2.fromOffset(math.max(360, CompactWindowNameTBX.X + 250), 50),
@@ -2631,7 +2407,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				minimizeTransition = false
 			end)
 		else
-			refreshWindowTitleText()
+			WindowName.Text = WindowConfig.RichName or WindowConfig.Name
 			showMobileOpenButton()
 			ContentFadeGroup.Visible = true
 			ContentFadeGroup.GroupTransparency = 1
@@ -2639,7 +2415,6 @@ function OrionLib:MakeWindow(WindowConfig)
 			ResizeHandle.Visible = true
 			SidebarResizeHandle.Visible = true
 			MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
-			updateTopBarResponsiveness()
 			TweenService:Create(ContentFadeGroup, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
 			sizeTween = TweenService:Create(MainWindow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 				Size = UDim2.fromOffset(ExpandedSize.X, ExpandedSize.Y),
@@ -2774,8 +2549,8 @@ function OrionLib:MakeWindow(WindowConfig)
 		CompactWindowName = plainText:match("^%s*(.-)%s+[-|]%s+") or plainText
 		WindowNameTBX = TextService:GetTextSize(plainText, WindowName.TextSize, Enum.Font.GothamBlack, Vector2.new(math.huge, math.huge))
 		CompactWindowNameTBX = TextService:GetTextSize(CompactWindowName, WindowName.TextSize, Enum.Font.GothamBlack, Vector2.new(math.huge, math.huge))
-		refreshWindowTitleText()
-		updateTopBarResponsiveness()
+		WindowName.RichText = true
+		WindowName.Text = Minimized and CompactWindowName or richText
 	end
 
 	function TabFunction:Destroy()
@@ -3014,32 +2789,22 @@ function OrionLib:MakeWindow(WindowConfig)
 				local content
 				local alignment
 
-				local function normalizeParagraphContent(value, fallback)
-					if value == nil then return fallback end
-					local stringValue = tostring(value)
-					if string.lower(stringValue):match("^%s*nil%s*$") then return "" end
-					return stringValue
-				end
-
 				local firstAsString = tostring(First or "")
 				if Third ~= nil and (type(First) == "number" or string.match(firstAsString, "^%d+$")) then
 					userId = tonumber(First)
-					title = tostring(Second or "Text")
-					content = normalizeParagraphContent(Third, "Content")
+					title = Second or "Text"
+					content = Third or "Content"
 					alignment = Fourth or "Left"
 				else
-					title = tostring(First or "Text")
-					content = normalizeParagraphContent(Second, "Content")
+					title = First or "Text"
+					content = Second or "Content"
 					alignment = Third or "Left"
 				end
 
 				local leftOffset = userId and 72 or 12
-				local isHeading = userId == nil and content == "" and tostring(alignment) == "Center"
-				local paragraphBaseTransparency = isHeading and 0.08 or 0.7
-				local paragraphThemeType = isHeading and "Main" or "Second"
 				local ParagraphFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 5), {
-					Size = UDim2.new(1, 0, 0, userId and 72 or 38),
-					BackgroundTransparency = paragraphBaseTransparency,
+					Size = UDim2.new(1, 0, 0, userId and 72 or 48),
+					BackgroundTransparency = 0.7,
 					Parent = ItemParent
 				}), {
 					AddThemeObject(SetProps(MakeElement("Label", title, 15), {
@@ -3058,13 +2823,7 @@ function OrionLib:MakeWindow(WindowConfig)
 						TextYAlignment = Enum.TextYAlignment.Top
 					}), "TextDark"),
 					AddThemeObject(MakeElement("Stroke"), "Stroke")
-				}), paragraphThemeType)
-
-				if isHeading then
-					ParagraphFrame:SetAttribute("OrionConfigHeading", true)
-					registerBackgroundAwarePanel(ParagraphFrame, paragraphBaseTransparency)
-					applyBackgroundPanels()
-				end
+				}), "Second")
 
 				if userId then
 					local Avatar = SetProps(MakeElement("Image", ""), {
@@ -3092,23 +2851,13 @@ function OrionLib:MakeWindow(WindowConfig)
 				local function updateParagraphSize()
 					task.defer(function()
 						if not ParagraphFrame.Parent then return end
-						local hasContent = ParagraphFrame.Content.Text:match("%S") ~= nil
-						ParagraphFrame.Content.Visible = hasContent
 						local titleHeight = math.max(18, ParagraphFrame.Title.TextBounds.Y)
 						ParagraphFrame.Title.Size = UDim2.new(1, -(leftOffset + 12), 0, titleHeight)
-
-						if hasContent then
-							ParagraphFrame.Title.Position = UDim2.new(0, leftOffset, 0, 8)
-							ParagraphFrame.Content.Position = UDim2.new(0, leftOffset, 0, 12 + titleHeight)
-							local contentHeight = math.max(18, ParagraphFrame.Content.TextBounds.Y)
-							ParagraphFrame.Content.Size = UDim2.new(1, -(leftOffset + 12), 0, contentHeight)
-							local textHeight = 18 + titleHeight + contentHeight
-							ParagraphFrame.Size = UDim2.new(1, 0, 0, math.max(userId and 72 or 48, textHeight))
-						else
-							local frameHeight = userId and 72 or math.max(36, titleHeight + 18)
-							ParagraphFrame.Title.Position = UDim2.new(0, leftOffset, 0.5, -math.floor(titleHeight / 2))
-							ParagraphFrame.Size = UDim2.new(1, 0, 0, frameHeight)
-						end
+						ParagraphFrame.Content.Position = UDim2.new(0, leftOffset, 0, 12 + titleHeight)
+						local contentHeight = math.max(18, ParagraphFrame.Content.TextBounds.Y)
+						ParagraphFrame.Content.Size = UDim2.new(1, -(leftOffset + 12), 0, contentHeight)
+						local textHeight = 18 + titleHeight + contentHeight
+						ParagraphFrame.Size = UDim2.new(1, 0, 0, math.max(userId and 72 or 48, textHeight))
 					end)
 				end
 
@@ -3121,10 +2870,10 @@ function OrionLib:MakeWindow(WindowConfig)
 				local ParagraphFunction = {}
 				function ParagraphFunction:Set(NewTitle, NewContent, NewAlignment)
 					if NewContent == nil and NewAlignment == nil then
-						ParagraphFrame.Content.Text = normalizeParagraphContent(NewTitle, "")
+						ParagraphFrame.Content.Text = tostring(NewTitle or "")
 					else
 						if NewTitle ~= nil then ParagraphFrame.Title.Text = tostring(NewTitle) end
-						if NewContent ~= nil then ParagraphFrame.Content.Text = normalizeParagraphContent(NewContent, "") end
+						if NewContent ~= nil then ParagraphFrame.Content.Text = tostring(NewContent) end
 						if NewAlignment ~= nil then applyAlignment(NewAlignment) end
 					end
 					updateParagraphSize()
@@ -5537,280 +5286,32 @@ function OrionLib:MakeWindow(WindowConfig)
             PremiumOnly = false
         })
 
-		-- Load the saved theme before creating the colorpicker. In the older build,
-		-- LoadThemeCfg ran at the end and visually desynchronised the picker from
-		-- the actual background/theme color.
-		if not LoadedThemeFile then
-			LoadThemeCfg(FILE_PATH)
-		end
-
-		local function heading(Name)
-			return config_tab:AddParagraph(Name, "nil", "Center")
-		end
-
-		heading("Theme")
-		local BaseColorPicker
-		BaseColorPicker = config_tab:AddColorpicker({
-			Name = "Base Color",
-			Default = OrionLib.Themes[OrionLib.SelectedTheme].Main,
-			Mode = 2,
-			Callback = function(Value)
-				if typeof(Value) ~= "Color3" then return end
-				OrionLib.Themes.Custom = OrionLib:GenTheme(Value)
-				OrionLib.SelectedTheme = "Custom"
-				OrionLib:SetTheme()
-			end
+		local select_theme = config_tab:AddSection({
+			Name = "Theme"
 		})
 
-		config_tab:AddButton({
-			Name = "Reset Theme",
-			Callback = function()
-				BaseColorPicker:Set(Color3.fromRGB(25, 25, 25))
-			end
+		local windowstroke = config_tab:AddSection({
+			Name = "Window Stroke"
 		})
 
-		heading("Window Appearance")
-		config_tab:AddSlider({
-			Name = "Border Visibility",
-			Min = 0,
-			Max = 100,
-			Default = VisualPreferences.StrokeVisibility,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				VisualPreferences.StrokeVisibility = Value
-				UIState.StrokeVisibility = Value
-				ApplyVisualPreferences()
-				scheduleUIConfigSave()
-			end,
+		local background = config_tab:AddSection({
+			Name = "Background"
 		})
 
-		config_tab:AddSlider({
-			Name = "Separator Visibility",
-			Min = 0,
-			Max = 100,
-			Default = VisualPreferences.SeparatorVisibility,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				VisualPreferences.SeparatorVisibility = Value
-				UIState.SeparatorVisibility = Value
-				ApplyVisualPreferences()
-				scheduleUIConfigSave()
-			end,
+		local topbar_info = config_tab:AddSection({
+			Name = "Top Bar Info"
 		})
 
-		config_tab:AddSlider({
-			Name = "Border Thickness",
-			Min = 0,
-			Max = 3,
-			Default = UIState.BorderThickness,
-			Color = Color3.fromRGB(59, 122, 179),
-			Increment = 0.1,
-			ValueName = "Thickness",
-			Callback = function(Value)
-				mainWindowStroke.Thickness = Value
-				UIState.BorderThickness = Value
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddSlider({
-			Name = "Roundness",
-			Min = 0,
-			Max = 24,
-			Default = VisualPreferences.CornerRadius,
-			Increment = 1,
-			ValueName = "px",
-			Callback = function(Value)
-				VisualPreferences.CornerRadius = Value
-				UIState.CornerRadius = Value
-				ApplyCornerRadius()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		heading("Background")
-		config_tab:AddToggle({
-			Name = "Enable Background Image",
-			Default = UIState.BackgroundImageEnabled == true,
-			Callback = function(Value)
-				UIState.BackgroundImageEnabled = Value == true
-				if UIState.BackgroundImageEnabled then
-					loadBackgroundImage(UIState.BackgroundImageSource, false)
-				else
-					backgroundLoadToken += 1
-					applyBackgroundVisuals()
-				end
-				scheduleUIConfigSave()
-			end,
-		})
-
-		local BackgroundSourceTextbox = config_tab:AddTextbox({
-			Name = "Image Link / Roblox ID",
-			Default = tostring(UIState.BackgroundImageSource or ""),
-			BackGroundtext = "Discord CDN URL, Roblox ID or rbxassetid://ID",
-			TextDisappear = false,
-			Callback = function(Value)
-				UIState.BackgroundImageSource = trimBackgroundSource(Value)
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddButton({
-			Name = "Apply Background",
-			Callback = function()
-				UIState.BackgroundImageEnabled = true
-				loadBackgroundImage(UIState.BackgroundImageSource, false)
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddButton({
-			Name = "Clear Background",
-			Callback = function()
-				UIState.BackgroundImageEnabled = false
-				UIState.BackgroundImageSource = ""
-				BackgroundSourceTextbox:Set("")
-				backgroundLoadToken += 1
-				BackgroundImageReady = false
-				BackgroundImage.Image = ""
-				applyBackgroundVisuals()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddSlider({
-			Name = "Image Visibility",
-			Min = 0,
-			Max = 100,
-			Default = tonumber(UIState.BackgroundImageVisibility) or 100,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				UIState.BackgroundImageVisibility = Value
-				applyBackgroundVisuals()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddSlider({
-			Name = "Image Darkness",
-			Min = 0,
-			Max = 90,
-			Default = tonumber(UIState.BackgroundImageDim) or 18,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				UIState.BackgroundImageDim = Value
-				applyBackgroundVisuals()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddSlider({
-			Name = "Panel Transparency",
-			Min = 0,
-			Max = 100,
-			Default = tonumber(UIState.BackgroundPanelTransparency) or 38,
-			Increment = 1,
-			ValueName = "%",
-			Callback = function(Value)
-				UIState.BackgroundPanelTransparency = Value
-				applyBackgroundPanels()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddDropdown({
-			Name = "Image Fit",
-			Default = tostring(UIState.BackgroundImageScaleType or "Crop"),
-			Options = {"Crop", "Fit", "Stretch"},
-			Callback = function(Value)
-				UIState.BackgroundImageScaleType = tostring(Value or "Crop")
-				applyBackgroundVisuals()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddToggle({
-			Name = "Background Blur",
-			Default = UIState.BlurEnabled == true,
-			Callback = function(Value)
-				TabFunction:SetBlur(Value)
-			end,
-		})
-
-		config_tab:AddSlider({
-			Name = "Blur Strength",
-			Min = 0,
-			Max = 30,
-			Default = UIState.BlurSize,
-			Increment = 1,
-			ValueName = "",
-			Callback = function(Value)
-				BlurSize = Value
-				UIState.BlurSize = Value
-				updateBlur()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		heading("Top Bar Information")
-		config_tab:AddToggle({
-			Name = "Show FPS",
-			Default = UIState.ShowFPS == true,
-			Callback = function(Value)
-				UIState.ShowFPS = Value == true
-				updateLocalInfoText()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddToggle({
-			Name = "Show Ping",
-			Default = UIState.ShowPing == true,
-			Callback = function(Value)
-				UIState.ShowPing = Value == true
-				updateLocalInfoText()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddToggle({
-			Name = "Show Clock",
-			Default = UIState.ShowClock == true,
-			Callback = function(Value)
-				UIState.ShowClock = Value == true
-				updateLocalInfoText()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddToggle({
-			Name = "Show Temperature",
-			Default = UIState.ShowTemperature == true,
-			Callback = function(Value)
-				UIState.ShowTemperature = Value == true
-				updateLocalInfoText()
-				scheduleUIConfigSave()
-			end,
-		})
-
-		config_tab:AddDropdown({
-			Name = "Temperature Unit",
-			Default = tostring(UIState.TemperatureUnit or "Auto"),
-			Options = {"Auto", "Celsius", "Fahrenheit", "Kelvin"},
-			Callback = function(Value)
-				UIState.TemperatureUnit = tostring(Value)
-				updateLocalInfoText()
-				scheduleUIConfigSave()
-			end,
+		local persistence = config_tab:AddSection({
+			Name = "Save"
 		})
 
 		if not IsMobile then
-			heading("Keystrokes")
-			config_tab:AddToggle({
+			local keystrokes = config_tab:AddSection({
+				Name = "Keystrokes"
+			})
+
+			keystrokes:AddToggle({
 				Name = "Show Keystrokes",
 				Default = UIState.ShowKeystrokes == true,
 				Callback = function(Value)
@@ -5818,7 +5319,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				end,
 			})
 
-			config_tab:AddToggle({
+			keystrokes:AddToggle({
 				Name = "Lock Position",
 				Default = UIState.KeystrokesLocked == true,
 				Callback = function(Value)
@@ -5826,7 +5327,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				end,
 			})
 
-			config_tab:AddSlider({
+			keystrokes:AddSlider({
 				Name = "Key Border Visibility",
 				Min = 0,
 				Max = 100,
@@ -5841,7 +5342,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				end,
 			})
 
-			config_tab:AddSlider({
+			keystrokes:AddSlider({
 				Name = "Key Background Visibility",
 				Min = 0,
 				Max = 100,
@@ -5861,7 +5362,8 @@ function OrionLib:MakeWindow(WindowConfig)
 				end,
 			})
 
-			config_tab:AddSlider({
+
+			keystrokes:AddSlider({
 				Name = "Key Roundness",
 				Min = 0,
 				Max = 14,
@@ -5880,7 +5382,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				end,
 			})
 
-			config_tab:AddSlider({
+			keystrokes:AddSlider({
 				Name = "Pressed Color Strength",
 				Min = 0,
 				Max = 100,
@@ -5896,17 +5398,238 @@ function OrionLib:MakeWindow(WindowConfig)
 			})
 		end
 
-		heading("Save")
-		config_tab:AddToggle({
+		background:AddToggle({
+			Name = "Background Image",
+			Default = UIState.BackgroundImageEnabled == true,
+			Callback = function(Value)
+				UIState.BackgroundImageEnabled = Value == true
+				if UIState.BackgroundImageEnabled then
+					loadBackgroundImage(UIState.BackgroundImageSource)
+				else
+					backgroundLoadToken += 1
+					applyBackgroundVisuals()
+				end
+				scheduleUIConfigSave()
+			end,
+		})
+
+		background:AddTextbox({
+			Name = "Image Link / ID",
+			Default = tostring(UIState.BackgroundImageSource or ""),
+			BackGroundtext = "Discord URL or Roblox image ID",
+			TextDisappear = false,
+			Callback = function(Value)
+				UIState.BackgroundImageSource = trimBackgroundSource(Value)
+				loadBackgroundImage(UIState.BackgroundImageSource)
+				scheduleUIConfigSave()
+			end,
+		})
+
+		background:AddSlider({
+			Name = "Image Visibility",
+			Min = 0,
+			Max = 100,
+			Default = tonumber(UIState.BackgroundImageVisibility) or 82,
+			Increment = 1,
+			ValueName = "%",
+			Callback = function(Value)
+				UIState.BackgroundImageVisibility = Value
+				applyBackgroundVisuals()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		background:AddSlider({
+			Name = "Background Darkness",
+			Min = 0,
+			Max = 90,
+			Default = tonumber(UIState.BackgroundImageDim) or 24,
+			Increment = 1,
+			ValueName = "%",
+			Callback = function(Value)
+				UIState.BackgroundImageDim = Value
+				applyBackgroundVisuals()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		background:AddSlider({
+			Name = "Panel Transparency",
+			Min = 0,
+			Max = 70,
+			Default = tonumber(UIState.BackgroundPanelTransparency) or 18,
+			Increment = 1,
+			ValueName = "%",
+			Callback = function(Value)
+				UIState.BackgroundPanelTransparency = Value
+				applyBackgroundPanels()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		background:AddDropdown({
+			Name = "Image Fit",
+			Default = tostring(UIState.BackgroundImageScaleType or "Crop"),
+			Options = {"Crop", "Fit", "Stretch"},
+			Callback = function(Value)
+				UIState.BackgroundImageScaleType = tostring(Value or "Crop")
+				applyBackgroundVisuals()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		background:AddButton({
+			Name = "Reload Background",
+			Callback = function()
+				loadBackgroundImage(UIState.BackgroundImageSource)
+			end,
+		})
+
+		background:AddToggle({
+			Name = "Background Blur",
+			Default = UIState.BlurEnabled == true,
+			Callback = function(Value)
+				TabFunction:SetBlur(Value)
+			end,
+		})
+
+		background:AddSlider({
+			Name = "Blur Strength",
+			Min = 0,
+			Max = 30,
+			Default = UIState.BlurSize,
+			Increment = 1,
+			ValueName = "",
+			Callback = function(Value)
+				BlurSize = Value
+				UIState.BlurSize = Value
+				updateBlur()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		windowstroke:AddSlider({
+			Name = "Border Visibility",
+			Min = 0,
+			Max = 100,
+			Default = VisualPreferences.StrokeVisibility,
+			Increment = 1,
+			ValueName = "%",
+			Callback = function(Value)
+				VisualPreferences.StrokeVisibility = Value
+				UIState.StrokeVisibility = Value
+				ApplyVisualPreferences()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		windowstroke:AddSlider({
+			Name = "Separator Visibility",
+			Min = 0,
+			Max = 100,
+			Default = VisualPreferences.SeparatorVisibility,
+			Increment = 1,
+			ValueName = "%",
+			Callback = function(Value)
+				VisualPreferences.SeparatorVisibility = Value
+				UIState.SeparatorVisibility = Value
+				ApplyVisualPreferences()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		windowstroke:AddSlider({
+			Name = "Border Thickness",
+			Min = 0,
+			Max = 3,
+			Default = UIState.BorderThickness,
+			Color = Color3.fromRGB(59, 122, 179),
+			Increment = 0.1,
+			ValueName = "Thickness",
+			Callback = function(Value)
+				mainWindowStroke.Thickness = Value
+				UIState.BorderThickness = Value
+				scheduleUIConfigSave()
+			end,
+		})
+
+		windowstroke:AddSlider({
+			Name = "Roundness",
+			Min = 0,
+			Max = 24,
+			Default = VisualPreferences.CornerRadius,
+			Increment = 1,
+			ValueName = "px",
+			Callback = function(Value)
+				VisualPreferences.CornerRadius = Value
+				UIState.CornerRadius = Value
+				ApplyCornerRadius()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		topbar_info:AddToggle({
+			Name = "Show FPS",
+			Default = UIState.ShowFPS == true,
+			Callback = function(Value)
+				UIState.ShowFPS = Value == true
+				updateLocalInfoText()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		topbar_info:AddToggle({
+			Name = "Show Ping",
+			Default = UIState.ShowPing == true,
+			Callback = function(Value)
+				UIState.ShowPing = Value == true
+				updateLocalInfoText()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		topbar_info:AddToggle({
+			Name = "Show Clock",
+			Default = UIState.ShowClock == true,
+			Callback = function(Value)
+				UIState.ShowClock = Value == true
+				updateLocalInfoText()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		topbar_info:AddToggle({
+			Name = "Show Temperature",
+			Default = UIState.ShowTemperature == true,
+			Callback = function(Value)
+				UIState.ShowTemperature = Value == true
+				updateLocalInfoText()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		topbar_info:AddDropdown({
+			Name = "Temperature Unit",
+			Default = tostring(UIState.TemperatureUnit or "Auto"),
+			Options = {"Auto", "Celsius", "Fahrenheit", "Kelvin"},
+			Callback = function(Value)
+				UIState.TemperatureUnit = tostring(Value)
+				updateLocalInfoText()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		persistence:AddToggle({
 			Name = "Auto Save UI",
 			Default = UIState.AutoSave ~= false,
 			Callback = function(Value)
 				UIState.AutoSave = Value == true
+				-- Force one final write so the disabled state itself is remembered.
 				saveUIConfig(true)
 			end,
 		})
 
-		config_tab:AddButton({
+		persistence:AddButton({
 			Name = "Save UI Now",
 			Callback = function()
 				captureWindowGeometry()
@@ -5914,9 +5637,31 @@ function OrionLib:MakeWindow(WindowConfig)
 			end,
 		})
 
+		select_theme:AddColorpicker({
+			Name = "Base Color",
+			Default = OrionLib.Themes[OrionLib.SelectedTheme].Main,
+			Mode = 2,
+			Callback = function(Value)
+				local newTheme = OrionLib:GenTheme(Value)
+				OrionLib.Themes.Custom = newTheme
+				OrionLib.SelectedTheme = "Custom"
+				OrionLib:SetTheme()
+
+			end
+		})
+
+		select_theme:AddButton({
+			Name = "Reset Theme",
+			Callback = function()
+				OrionLib.Themes.Custom = OrionLib:GenTheme(Color3.fromRGB(25, 25, 25))
+				OrionLib.SelectedTheme = "Custom"
+				OrionLib:SetTheme()
+			end
+		})
+
+		LoadThemeCfg(FILE_PATH)
 		updateLocalInfoText()
 		updateBlur()
-		applyBackgroundVisuals()
 		saveUIConfig(false)
     end
 
