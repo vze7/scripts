@@ -1999,7 +1999,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			else
 				if UIState.ShowPing then
 					local ok, ping = pcall(function()
-						return LocalPlayer:GetNetworkPing() * 1000
+						return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
 					end)
 					if ok and type(ping) == "number" and ping >= 0 and ping < 10000 then
 						table.insert(pingSamples, ping)
