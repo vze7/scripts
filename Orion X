@@ -20,6 +20,7 @@ local acc = 0
 local LocalPlayer = PlayerService.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
+-- Orion X v9: macOS traffic-light window controls
 local OrionLib = {
 	Elements = {},
 	ThemeObjects = {},
@@ -996,6 +997,7 @@ end
 function OrionLib:MakeWindow(WindowConfig)
 	local FirstTab = true
 	local Minimized = false
+	local Maximized = false
 	local Loaded = false
 	local UIHidden = false
 	local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -1358,27 +1360,94 @@ function OrionLib:MakeWindow(WindowConfig)
 		if enterPressed then OrionLib:FindAndFocusElement(GlobalSearch.Text) end
 	end)
 
-	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
-		Size = UDim2.new(0.5, 0, 1, 0),
-		Position = UDim2.new(0.5, 0, 0, 0),
-		BackgroundTransparency = 1
-	}), {
-		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072725342"), {
-			Position = UDim2.new(0, 9, 0, 6),
-			Size = UDim2.new(0, 18, 0, 18)
-		}), "Text")
-	})
+	local function CreateMacControl(Name, Color, GlyphText, X)
+		local Button = Create("TextButton", {
+			Name = Name,
+			Size = UDim2.fromOffset(14, 14),
+			Position = UDim2.fromOffset(X, 8),
+			BackgroundColor3 = Color,
+			BackgroundTransparency = 0,
+			BorderSizePixel = 0,
+			Text = "",
+			AutoButtonColor = false,
+			ZIndex = 20,
+		})
 
-	local MinimizeBtn = SetChildren(SetProps(MakeElement("Button"), {
-		Size = UDim2.new(0.5, 0, 1, 0),
-		BackgroundTransparency = 1
-	}), {
-		AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://7072719338"), {
-			Position = UDim2.new(0, 9, 0, 6),
-			Size = UDim2.new(0, 18, 0, 18),
-			Name = "Ico"
-		}), "Text")
-	})
+		Create("UICorner", {
+			CornerRadius = UDim.new(1, 0),
+			Parent = Button,
+		})
+
+		Create("UIStroke", {
+			Color = Color3.new(0, 0, 0),
+			Transparency = 0.72,
+			Thickness = 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Parent = Button,
+		})
+
+		local Glyph = Create("TextLabel", {
+			Name = "Glyph",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Text = GlyphText,
+			TextColor3 = Color3.fromRGB(55, 40, 35),
+			TextTransparency = 1,
+			TextSize = 10,
+			Font = Enum.Font.GothamBold,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 21,
+			Parent = Button,
+		})
+
+		AddConnection(Button.MouseEnter, function()
+			TweenService:Create(Glyph, TweenInfo.new(0.12), {TextTransparency = 0.08}):Play()
+			TweenService:Create(Button, TweenInfo.new(0.12), {
+				BackgroundColor3 = Color:Lerp(Color3.new(1, 1, 1), 0.12),
+			}):Play()
+		end)
+
+		AddConnection(Button.MouseLeave, function()
+			TweenService:Create(Glyph, TweenInfo.new(0.12), {TextTransparency = 1}):Play()
+			TweenService:Create(Button, TweenInfo.new(0.12), {BackgroundColor3 = Color}):Play()
+		end)
+
+		AddConnection(Button.MouseButton1Down, function()
+			TweenService:Create(Button, TweenInfo.new(0.06), {
+				Size = UDim2.fromOffset(12, 12),
+				Position = UDim2.fromOffset(X + 1, 9),
+			}):Play()
+		end)
+
+		AddConnection(Button.MouseButton1Up, function()
+			TweenService:Create(Button, TweenInfo.new(0.08), {
+				Size = UDim2.fromOffset(14, 14),
+				Position = UDim2.fromOffset(X, 8),
+			}):Play()
+		end)
+
+		return Button, Glyph
+	end
+
+	local CloseBtn, CloseGlyph = CreateMacControl(
+		"Close",
+		Color3.fromRGB(255, 95, 87),
+		"×",
+		4
+	)
+	local MinimizeBtn, MinimizeGlyph = CreateMacControl(
+		"Minimize",
+		Color3.fromRGB(255, 189, 46),
+		"−",
+		28
+	)
+	local MaximizeBtn, MaximizeGlyph = CreateMacControl(
+		"Maximize",
+		Color3.fromRGB(40, 200, 64),
+		"↗",
+		52
+	)
 
 	local DragPoint = SetProps(MakeElement("TFrame"), {
 		Size = UDim2.new(1, 0, 0, 50)
@@ -1506,20 +1575,17 @@ function OrionLib:MakeWindow(WindowConfig)
 		and UDim2.fromOffset(tonumber(savedWindowPosition.x) or 30, tonumber(savedWindowPosition.y) or 30)
 		or UDim2.new(0.5, -math.floor(initialWindowWidth / 2), 0.5, -math.floor(initialWindowHeight / 2))
 
-	local WindowControls = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 7), {
+	local WindowControls = SetChildren(SetProps(MakeElement("TFrame"), {
 		Name = "WindowControls",
-		Size = UDim2.new(0, 70, 0, 30),
-		Position = UDim2.new(1, -90, 0, 10),
-		ZIndex = 8,
+		Size = UDim2.fromOffset(70, 30),
+		Position = UDim2.new(1, -82, 0, 10),
+		BackgroundTransparency = 1,
+		ZIndex = 19,
 	}), {
-		AddThemeObject(MakeElement("Stroke"), "Stroke"),
-		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(0, 1, 1, 0),
-			Position = UDim2.new(0.5, 0, 0, 0)
-		}), "Stroke"),
 		CloseBtn,
-		MinimizeBtn
-	}), "Second")
+		MinimizeBtn,
+		MaximizeBtn,
+	})
 
 	local TopBar = SetChildren(SetProps(MakeElement("TFrame"), {
 		Size = UDim2.new(1, 0, 0, 50),
@@ -2098,7 +2164,8 @@ function OrionLib:MakeWindow(WindowConfig)
 
 		local windowWidth = math.max(MainWindow.AbsoluteSize.X, 1)
 		local titleLeft = WindowConfig.ShowIcon and 54 or 25
-		local controlsLeft = math.max(titleLeft + 120, windowWidth - 100)
+		-- Keep title/search/info clear of the three macOS traffic-light buttons.
+		local controlsLeft = math.max(titleLeft + 120, windowWidth - 88)
 		local controlsGap = 10
 		local infoText = tostring(LocalInfo.Text or "")
 		local desiredInfoWidth = infoText ~= "" and (
@@ -2439,7 +2506,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	end
 
 	local function captureWindowGeometry()
-		if Minimized then return end
+		if Minimized or Maximized then return end
 		UIState.WindowSize = {
 			x = math.floor(ExpandedSize.X + 0.5),
 			y = math.floor(ExpandedSize.Y + 0.5),
@@ -2499,6 +2566,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	AddConnection(ResizeHandle.InputBegan, function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if Maximized then return end
             resizing = true
 			resizeActiveInput = input
             startMousePos = input.Position
@@ -2551,7 +2619,15 @@ function OrionLib:MakeWindow(WindowConfig)
 	if workspace.CurrentCamera then
 		AddConnection(workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"), function()
 			local viewport = workspace.CurrentCamera.ViewportSize
-			if not Minimized then
+			if Maximized then
+				local fitted = Vector2.new(
+					math.max(MIN_SIZE.X, viewport.X - 16),
+					math.max(MIN_SIZE.Y, viewport.Y - 16)
+				)
+				ExpandedSize = fitted
+				MainWindow.Position = UDim2.fromOffset(8, 8)
+				MainWindow.Size = UDim2.fromOffset(fitted.X, fitted.Y)
+			elseif not Minimized then
 				local fitted = Vector2.new(
 					math.clamp(ExpandedSize.X, MIN_SIZE.X, math.max(MIN_SIZE.X, viewport.X - 8)),
 					math.clamp(ExpandedSize.Y, MIN_SIZE.Y, math.max(MIN_SIZE.Y, viewport.Y - 8))
@@ -2663,7 +2739,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			showMobileOpenButton()
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false
-			MinimizeBtn.Ico.Image = "rbxassetid://7072720870"
+			MinimizeGlyph.Text = "+"
 			updateTopBarResponsiveness()
 			TweenService:Create(ContentFadeGroup, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 1}):Play()
 			sizeTween = TweenService:Create(MainWindow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
@@ -2682,7 +2758,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			WindowTopBarLine.Visible = true
 			ResizeHandle.Visible = true
 			SidebarResizeHandle.Visible = true
-			MinimizeBtn.Ico.Image = "rbxassetid://7072719338"
+			MinimizeGlyph.Text = "−"
 			updateTopBarResponsiveness()
 			TweenService:Create(ContentFadeGroup, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
 			sizeTween = TweenService:Create(MainWindow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
@@ -2701,6 +2777,76 @@ function OrionLib:MakeWindow(WindowConfig)
 	end
 	AddConnection(MinimizeBtn.MouseButton1Up, function()
 		setMinimized(not Minimized)
+	end)
+
+	local maximizeRestoreSize
+	local maximizeRestorePosition
+	local maximizeTween
+
+	local function setMaximized(Value)
+		Value = Value == true
+		if Maximized == Value or minimizeTransition then return end
+
+		if Minimized then
+			setMinimized(false)
+			task.wait(0.38)
+		end
+
+		local camera = workspace.CurrentCamera
+		local viewport = camera and camera.ViewportSize or Vector2.new(1920, 1080)
+		if maximizeTween then maximizeTween:Cancel() end
+
+		if Value then
+			maximizeRestoreSize = ExpandedSize
+			maximizeRestorePosition = MainWindow.Position
+			Maximized = true
+			MaximizeGlyph.Text = "↙"
+			ResizeHandle.Visible = false
+
+			local targetSize = Vector2.new(
+				math.max(MIN_SIZE.X, viewport.X - 16),
+				math.max(MIN_SIZE.Y, viewport.Y - 16)
+			)
+			ExpandedSize = targetSize
+			maximizeTween = TweenService:Create(
+				MainWindow,
+				TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+				{
+					Position = UDim2.fromOffset(8, 8),
+					Size = UDim2.fromOffset(targetSize.X, targetSize.Y),
+				}
+			)
+		else
+			Maximized = false
+			MaximizeGlyph.Text = "↗"
+			ResizeHandle.Visible = true
+
+			local targetSize = maximizeRestoreSize or Vector2.new(initialWindowWidth, initialWindowHeight)
+			local targetPosition = maximizeRestorePosition or initialWindowPosition
+			ExpandedSize = targetSize
+			maximizeTween = TweenService:Create(
+				MainWindow,
+				TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+				{
+					Position = targetPosition,
+					Size = UDim2.fromOffset(targetSize.X, targetSize.Y),
+				}
+			)
+		end
+
+		maximizeTween:Play()
+		maximizeTween.Completed:Once(function()
+			updateSidebarLayout()
+			updateTopBarResponsiveness()
+			if not Maximized then
+				clampWindowToViewport()
+				captureWindowGeometry()
+			end
+		end)
+	end
+
+	AddConnection(MaximizeBtn.MouseButton1Up, function()
+		setMaximized(not Maximized)
 	end)
 
 	local function LoadSequence()
