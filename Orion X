@@ -1,6 +1,6 @@
--- OrionX + FireOrion compatibility build v7
--- Full-window image backgrounds, theme-aware paragraph headers and a
--- responsive top-bar search field when the sidebar is collapsed.
+-- OrionX + FireOrion compatibility build v11
+-- Full-surface background images, complete theme propagation and
+-- responsive layout fixes.
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -45,7 +45,7 @@ local OrionLib = {
 	SelectedTheme = "Default",
 	Folder = nil,
 	SaveCfg = false,
-	Version = "10.0.0-obsidian-background-colorpicker-fix"
+	Version = "11.0.0-full-background-theme-sync"
 }
 
 local Icons = {}
@@ -348,6 +348,17 @@ local VisualPreferences = {
 }
 OrionLib.VisualPreferences = VisualPreferences
 
+-- Assigned by MakeWindow after the full-window background layer exists.
+-- AddThemeObject uses these hooks so every themed surface created later is
+-- immediately included in the background/transparency system.
+local RegisterBackgroundAwarePanel
+local RefreshBackgroundAwarePanels
+local BackgroundThemeTypes = {
+	Main = true,
+	Second = true,
+	Divider = true,
+}
+
 local ManagedCorners = {}
 
 local function VisibilityToTransparency(Value)
@@ -427,6 +438,12 @@ function AddThemeObject(Object, Type)
     Total.AddThemeObject = Total.AddThemeObject + 1
     table.insert(OrionLib.ThemeObjects[Type], Object)
 
+    -- Keeping the semantic theme type on the instance makes theme refreshes
+    -- and background auditing deterministic, even for dynamically-created UI.
+    pcall(function()
+        Object:SetAttribute("OrionThemeType", Type)
+    end)
+
     local themeColor = OrionLib.Themes[OrionLib.SelectedTheme][Type]
     local property = ReturnProperty(Object)
 
@@ -435,6 +452,13 @@ function AddThemeObject(Object, Type)
     end
 
     ApplyVisualPreferenceToObject(Object, Type)
+
+    if RegisterBackgroundAwarePanel
+        and BackgroundThemeTypes[Type]
+        and Object:IsA("GuiObject") then
+        RegisterBackgroundAwarePanel(Object)
+    end
+
     return Object
 end
 
@@ -587,6 +611,8 @@ function OrionLib:SetTheme()
 	ApplyVisualPreferences()
 	if type(self._RefreshWindowBackground) == "function" then
 		pcall(self._RefreshWindowBackground)
+	elseif type(RefreshBackgroundAwarePanels) == "function" then
+		pcall(RefreshBackgroundAwarePanels)
 	end
 	OrionLib:SaveThemeCfg()
 end
@@ -1069,7 +1095,8 @@ function OrionLib:MakeWindow(WindowConfig)
 		BackgroundImageSource = WindowConfig.BackgroundImage,
 		BackgroundImageVisibility = 100,
 		BackgroundImageDim = 18,
-		BackgroundPanelTransparency = 38,
+		BackgroundPanelTransparency = 64,
+		BackgroundSurfaceVersion = 1,
 		BackgroundImageScaleType = "Crop",
 		ShowFPS = false,
 		ShowPing = false,
@@ -1094,6 +1121,16 @@ function OrionLib:MakeWindow(WindowConfig)
 				end
 			end
 		end)
+	end
+
+	-- v11 migration: the old 38% value left most components visually opaque.
+	-- Raise old configurations once; users can still move the slider anywhere.
+	if (tonumber(UIState.BackgroundSurfaceVersion) or 1) < 2 then
+		UIState.BackgroundPanelTransparency = math.max(
+			tonumber(UIState.BackgroundPanelTransparency) or 0,
+			64
+		)
+		UIState.BackgroundSurfaceVersion = 2
 	end
 
 	VisualPreferences.StrokeVisibility = math.clamp(tonumber(UIState.StrokeVisibility) or 0, 0, 100)
@@ -1634,9 +1671,32 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local BackgroundImageReady = false
 	local BackgroundAwarePanels = {}
+	local trimBackgroundSource
+
+	local function isBackgroundActive()
+		return UIState.BackgroundImageEnabled == true
+			and BackgroundImageReady
+			and trimBackgroundSource(UIState.BackgroundImageSource) ~= ""
+			and BackgroundImage.Image ~= ""
+	end
+
+	local function currentBackgroundPanelTransparency()
+		return math.clamp(
+			(tonumber(UIState.BackgroundPanelTransparency) or 64) / 100,
+			0,
+			1
+		)
+	end
 
 	local function registerBackgroundAwarePanel(object, baseTransparency)
 		if not object or not object:IsA("GuiObject") then return object end
+		if object == BackgroundImage or object:GetAttribute("OrionBackgroundExclude") == true then
+			return object
+		end
+		if object ~= MainWindow and not object:IsDescendantOf(MainWindow) then
+			return object
+		end
+
 		object:SetAttribute("OrionBackgroundPanel", true)
 		if object:GetAttribute("OrionBackgroundBaseTransparency") == nil then
 			local original = tonumber(baseTransparency)
@@ -1646,8 +1706,21 @@ function OrionLib:MakeWindow(WindowConfig)
 		if not table.find(BackgroundAwarePanels, object) then
 			table.insert(BackgroundAwarePanels, object)
 		end
+
+		-- Apply the current state immediately. This fixes dynamically-created
+		-- buttons/sliders staying opaque after a background was already enabled.
+		local base = tonumber(object:GetAttribute("OrionBackgroundBaseTransparency"))
+		if base == nil then base = object.BackgroundTransparency end
+		if object ~= MainWindow then
+			object.BackgroundTransparency = isBackgroundActive()
+				and math.max(base, currentBackgroundPanelTransparency())
+				or base
+		end
+
 		return object
 	end
+
+	RegisterBackgroundAwarePanel = registerBackgroundAwarePanel
 
 	-- The image is behind the complete window. Every interactive descendant is
 	-- kept above it so the image never intercepts input or covers controls.
@@ -1675,7 +1748,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	local BackgroundImageManager = {}
 	local BackgroundImageAssets = {}
 
-	local function trimBackgroundSource(value)
+	trimBackgroundSource = function(value)
 		return tostring(value or ""):match("^%s*(.-)%s*$") or ""
 	end
 
@@ -1819,58 +1892,55 @@ function OrionLib:MakeWindow(WindowConfig)
 		return nil, downloadReason or "The image URL could not be downloaded."
 	end
 
-	local function isBackgroundActive()
-		return UIState.BackgroundImageEnabled == true
-			and BackgroundImageReady
-			and trimBackgroundSource(UIState.BackgroundImageSource) ~= ""
-			and BackgroundImage.Image ~= ""
+	local function registerExistingBackgroundPanels()
+		for themeType in pairs(BackgroundThemeTypes) do
+			for _, object in ipairs(OrionLib.ThemeObjects[themeType] or {}) do
+				if object
+					and object.Parent
+					and object:IsA("GuiObject")
+					and (object == MainWindow or object:IsDescendantOf(MainWindow)) then
+					registerBackgroundAwarePanel(object)
+				end
+			end
+		end
 	end
 
 	local function applyBackgroundPanels()
 		local enabled = isBackgroundActive()
 		local theme = OrionLib.Themes[OrionLib.SelectedTheme] or OrionLib.Themes.Default
-		local panelTransparency = math.clamp(
-			(tonumber(UIState.BackgroundPanelTransparency) or 38) / 100,
-			0,
-			1
-		)
+		local panelTransparency = currentBackgroundPanelTransparency()
+
+		-- Catch every surface already present and every component added by tabs.
+		-- Main/Second/Divider are semantic panel colors; functional Accent objects
+		-- such as slider fills remain visible and are themed separately.
+		registerExistingBackgroundPanels()
 
 		MainWindow.BackgroundColor3 = theme.Main
 		MainWindow.BackgroundTransparency = enabled and 1 or 0
-
-		if WindowStuff and WindowStuff.Parent then
-			WindowStuff.BackgroundColor3 = theme.Second
-			WindowStuff.BackgroundTransparency = enabled and panelTransparency or 0
-			for _, childName in ipairs({"SidebarTopFill", "SidebarRightFill"}) do
-				local fill = WindowStuff:FindFirstChild(childName)
-				if fill and fill:IsA("GuiObject") then
-					fill.BackgroundColor3 = theme.Second
-					fill.BackgroundTransparency = enabled and panelTransparency or 0
-				end
-			end
-		end
-
-		for _, tabData in pairs(Tabs) do
-			local container = tabData and tabData.Container
-			if container and container.Parent then
-				container.BackgroundColor3 = theme.Main
-				-- Item containers are intentionally transparent. Making them opaque
-				-- recreates the old gray sheet bug.
-				container.BackgroundTransparency = 1
-			end
-		end
 
 		for index = #BackgroundAwarePanels, 1, -1 do
 			local panel = BackgroundAwarePanels[index]
 			if not panel or panel.Parent == nil then
 				table.remove(BackgroundAwarePanels, index)
-			else
+			elseif panel ~= MainWindow then
 				local base = tonumber(panel:GetAttribute("OrionBackgroundBaseTransparency"))
 				if base == nil then base = panel.BackgroundTransparency end
 				panel.BackgroundTransparency = enabled and math.max(base, panelTransparency) or base
 			end
 		end
+
+		-- Item containers must always stay transparent. Their children now handle
+		-- the tint, preventing the old white/gray full-page sheet from returning.
+		for _, tabData in pairs(Tabs) do
+			local container = tabData and tabData.Container
+			if container and container.Parent then
+				container.BackgroundColor3 = theme.Main
+				container.BackgroundTransparency = 1
+			end
+		end
 	end
+
+	RefreshBackgroundAwarePanels = applyBackgroundPanels
 
 	local function applyBackgroundVisuals()
 		local enabled = isBackgroundActive()
@@ -1963,6 +2033,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		applyBackgroundPanels()
 	end
 
+	registerExistingBackgroundPanels()
 	applyBackgroundVisuals()
 	if UIState.BackgroundImageEnabled == true then
 		loadBackgroundImage(UIState.BackgroundImageSource, true, false)
@@ -3576,6 +3647,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				SliderConfig.Default = SliderConfig.Default == nil and 50 or SliderConfig.Default
 				SliderConfig.Callback = SliderConfig.Callback or function() end
 				SliderConfig.ValueName = SliderConfig.ValueName or ""
+				local SliderUsesThemeAccent = SliderConfig.Color == nil
 				SliderConfig.Color = SliderConfig.Color or OrionLib.Themes[OrionLib.SelectedTheme].Accent
 				SliderConfig.Flag = SliderConfig.Flag or nil
 				SliderConfig.Save = SliderConfig.Save or false
@@ -3613,7 +3685,14 @@ function OrionLib:MakeWindow(WindowConfig)
 					return math.clamp((Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min), 0, 1)
 				end
 
-				local SliderDrag = SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 5), {
+				local function themeSliderObject(object)
+					if SliderUsesThemeAccent then
+						return AddThemeObject(object, "Accent")
+					end
+					return object
+				end
+
+				local SliderDrag = themeSliderObject(SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 5), {
 					Size = UDim2.new(0, 0, 1, 0),
 					BackgroundTransparency = 0.3,
 					ClipsDescendants = true
@@ -3624,15 +3703,20 @@ function OrionLib:MakeWindow(WindowConfig)
 						Font = Enum.Font.GothamBold,
 						Name = "Value"
 					}), "Text")
-				})
+				}))
 
-				local SliderBar = SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 5), {
+				local SliderStroke = SetProps(MakeElement("Stroke"), {Color = SliderConfig.Color})
+				if SliderUsesThemeAccent then
+					SliderStroke = AddThemeObject(SliderStroke, "Accent")
+				end
+
+				local SliderBar = themeSliderObject(SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 5), {
 					Size = UDim2.new(1, -24, 0, 26),
 					Position = UDim2.new(0, 12, 0, 30),
 					BackgroundTransparency = 0.9,
 					Active = true
 				}), {
-					SetProps(MakeElement("Stroke"), {Color = SliderConfig.Color}),
+					SliderStroke,
 					AddThemeObject(SetProps(MakeElement("Label", "value", 13), {
 						Size = UDim2.new(1, -12, 0, 14),
 						Position = UDim2.new(0, 12, 0, 6),
@@ -3641,7 +3725,7 @@ function OrionLib:MakeWindow(WindowConfig)
 						TextTransparency = 0.8
 					}), "Text"),
 					SliderDrag
-				})
+				}))
 
 				local SliderFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 4), {
 					Size = UDim2.new(1, 0, 0, 65),
@@ -3841,6 +3925,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				})
 
 				table.insert(SearchBarsTXTBox, SearchBox)
+				registerBackgroundAwarePanel(SearchBox, 0)
 				local SearchOpened = false
 
 				local function UpdateSearchPosition()
@@ -5885,7 +5970,6 @@ function OrionLib:MakeWindow(WindowConfig)
 			Min = 0,
 			Max = 3,
 			Default = UIState.BorderThickness,
-			Color = Color3.fromRGB(59, 122, 179),
 			Increment = 0.1,
 			ValueName = "Thickness",
 			Callback = function(Value)
@@ -5911,7 +5995,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		})
 
 		heading("Background")
-		config_tab:AddParagraph("Background Image", "Roblox ID or direct image URL. Uses local custom-asset caching like Obsidian.", "Center")
+		config_tab:AddParagraph("Background Image", "Applies one image behind the entire window. Every themed panel becomes transparent and follows the selected UI color.", "Center")
 		config_tab:AddToggle({
 			Name = "Enable Background Image",
 			Default = UIState.BackgroundImageEnabled == true,
@@ -5993,7 +6077,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			Name = "Panel Transparency",
 			Min = 0,
 			Max = 100,
-			Default = tonumber(UIState.BackgroundPanelTransparency) or 38,
+			Default = tonumber(UIState.BackgroundPanelTransparency) or 64,
 			Increment = 1,
 			ValueName = "%",
 			Callback = function(Value)
