@@ -1,6 +1,6 @@
--- OrionX + FireOrion compatibility build v12
--- Smart themed background, border-aware image clipping, coherent colors,
--- responsive layout fixes and isolated network RTT display.
+-- OrionX + FireOrion compatibility build v13
+-- Adaptive glass theme, image-aware contrast, clipped avatar, pseudo image blur,
+-- border-safe background geometry and isolated network RTT display.
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -45,8 +45,17 @@ local OrionLib = {
 	SelectedTheme = "Default",
 	Folder = nil,
 	SaveCfg = false,
-	Version = "12.0.0-smart-theme-network-rtt"
+	Version = "13.0.0-adaptive-glass-image-blur",
+	CurrentRenderTheme = nil,
 }
+
+local function GetRawTheme()
+	return OrionLib.Themes[OrionLib.SelectedTheme] or OrionLib.Themes.Default
+end
+
+local function GetActiveTheme()
+	return OrionLib.CurrentRenderTheme or GetRawTheme()
+end
 
 local Icons = {}
 
@@ -255,7 +264,7 @@ end
 
 CTC = {}
 
-for t, v in pairs(OrionLib.Themes[OrionLib.SelectedTheme]) do
+for t, v in pairs(GetActiveTheme()) do
     local color = Instance.new("Color3Value", Orion)
     color.Name = t
     color.Value = v
@@ -317,7 +326,7 @@ local function ApplyTheme(Type)
 	local list = OrionLib.ThemeObjects[Type]
 	if not list then return end
 
-	local color = OrionLib.Themes[OrionLib.SelectedTheme][Type]
+	local color = GetActiveTheme()[Type]
 	if not color then return end
 
 	for i = 1, #list do
@@ -373,6 +382,39 @@ local function MixColor(From, To, Amount)
 		From.G + (To.G - From.G) * Amount,
 		From.B + (To.B - From.B) * Amount
 	)
+end
+
+local function LinearColorChannel(Channel)
+	return Channel <= 0.04045 and (Channel / 12.92) or (((Channel + 0.055) / 1.055) ^ 2.4)
+end
+
+local function RelativeLuminance(Color)
+	return 0.2126 * LinearColorChannel(Color.R)
+		+ 0.7152 * LinearColorChannel(Color.G)
+		+ 0.0722 * LinearColorChannel(Color.B)
+end
+
+local function ContrastRatio(A, B)
+	local first = RelativeLuminance(A)
+	local second = RelativeLuminance(B)
+	local lighter = math.max(first, second)
+	local darker = math.min(first, second)
+	return (lighter + 0.05) / (darker + 0.05)
+end
+
+local function EnsureReadableText(Surface, Preferred)
+	local white = Color3.fromRGB(248, 248, 250)
+	local black = Color3.fromRGB(18, 18, 22)
+	local preferred = Preferred or white
+	local preferredRatio = ContrastRatio(preferred, Surface)
+	local alternate = RelativeLuminance(preferred) > 0.5 and black or white
+	if preferredRatio >= 4.5 then
+		return preferred
+	end
+	if ContrastRatio(alternate, Surface) > preferredRatio then
+		return alternate
+	end
+	return preferred
 end
 
 local function GetKeystrokeVisual(Theme, Pressed)
@@ -448,7 +490,7 @@ function AddThemeObject(Object, Type)
         Object:SetAttribute("OrionThemeType", Type)
     end)
 
-    local themeColor = OrionLib.Themes[OrionLib.SelectedTheme][Type]
+    local themeColor = GetActiveTheme()[Type]
     local property = ReturnProperty(Object)
 
     if themeColor and property and Object[property] ~= nil then
@@ -544,81 +586,99 @@ local function ApplyVisualPreferences()
 end
 
 function OrionLib:SetTheme()
-	local themeData = self.Themes[self.SelectedTheme]
-	if not themeData then return end
-	for typeName, objects in pairs(self.ThemeObjects) do
-		local color = themeData[typeName]
-		if color then
-			for _, obj in ipairs(objects) do
-				local prop = ReturnProperty(obj)
-				if prop and obj[prop] ~= nil then
-					obj[prop] = color
-				end
+	if self._ThemeApplying then return end
+	self._ThemeApplying = true
+
+	local ok, err = pcall(function()
+		local rawTheme = GetRawTheme()
+		local themeData = rawTheme
+		if type(self._BuildRenderTheme) == "function" then
+			local success, rendered = pcall(self._BuildRenderTheme, self, rawTheme)
+			if success and type(rendered) == "table" then
+				themeData = rendered
 			end
 		end
-	end
+		self.CurrentRenderTheme = themeData
 
-	if self.Toggles then
-		for _, toggle in ipairs(self.Toggles) do
-			if toggle and toggle.Box and toggle.Box.Parent then
-				local accolor = toggle.uccolor and toggle.ccolor or themeData.Accent
-
-				if toggle.Value then
-					toggle.Box.BackgroundColor3 = accolor
-					if toggle.Box.Stroke then
-						toggle.Box.Stroke.Color = accolor
-					end
-				else
-					toggle.Box.BackgroundColor3 = themeData.Divider
-					if toggle.Box.Stroke then
-						toggle.Box.Stroke.Color = themeData.Stroke
+		for typeName, objects in pairs(self.ThemeObjects) do
+			local color = themeData[typeName]
+			if color then
+				for _, obj in ipairs(objects) do
+					if obj and obj.Parent then
+						local prop = ReturnProperty(obj)
+						if prop and obj[prop] ~= nil then
+							obj[prop] = color
+						end
 					end
 				end
 			end
 		end
-	end
 
-	for _, key in ipairs(self.Keystrokes) do
-		if key.Frame and key.Frame.Parent then
-			local backgroundColor, strokeColor, textColor = GetKeystrokeVisual(themeData, key.Pressed)
-			key.Frame.BackgroundColor3 = backgroundColor
-			key.Frame.BackgroundTransparency = VisibilityToTransparency(VisualPreferences.KeystrokeBackgroundVisibility)
-			key.Stroke.Color = strokeColor
-			key.Stroke.Transparency = VisibilityToTransparency(VisualPreferences.KeystrokeStrokeVisibility)
-			if key.Corner then
-				key.Corner.CornerRadius = UDim.new(0, math.clamp(tonumber(VisualPreferences.KeystrokeCornerRadius) or 0, 0, 16))
-			end
-			if key.Label then
-				key.Label.TextColor3 = textColor
+		if self.Toggles then
+			for _, toggle in ipairs(self.Toggles) do
+				if toggle and toggle.Box and toggle.Box.Parent then
+					local accolor = toggle.uccolor and toggle.ccolor or themeData.Accent
+					if toggle.Value then
+						toggle.Box.BackgroundColor3 = accolor
+						if toggle.Box.Stroke then toggle.Box.Stroke.Color = accolor end
+					else
+						toggle.Box.BackgroundColor3 = themeData.Divider
+						if toggle.Box.Stroke then toggle.Box.Stroke.Color = themeData.Stroke end
+					end
+				end
 			end
 		end
-	end
 
-	if mainWindowGradient then
-		mainWindowGradient.Color = createGradientFromColor(themeData["Stroke"], 0.7)
-	end
-
-	if SearchBarsTXTBox then
-		for _, obj in pairs(SearchBarsTXTBox) do
-			obj.PlaceholderColor3 = themeData.Text
-			obj.TextColor3 = themeData.Text
-			obj.BackgroundColor3 = themeData.Main
+		for _, key in ipairs(self.Keystrokes) do
+			if key.Frame and key.Frame.Parent then
+				local backgroundColor, strokeColor, textColor = GetKeystrokeVisual(themeData, key.Pressed)
+				key.Frame.BackgroundColor3 = backgroundColor
+				key.Frame.BackgroundTransparency = VisibilityToTransparency(VisualPreferences.KeystrokeBackgroundVisibility)
+				key.Stroke.Color = strokeColor
+				key.Stroke.Transparency = VisibilityToTransparency(VisualPreferences.KeystrokeStrokeVisibility)
+				if key.Corner then
+					key.Corner.CornerRadius = UDim.new(0, math.clamp(tonumber(VisualPreferences.KeystrokeCornerRadius) or 0, 0, 16))
+				end
+				if key.Label then key.Label.TextColor3 = textColor end
+			end
 		end
-	end
 
-	if GlobalSearch then
-		GlobalSearch.PlaceholderColor3 = themeData.Text
-		GlobalSearch.TextColor3 = themeData.Text
-		GlobalSearch.BackgroundColor3 = themeData.Main
-	end
+		if mainWindowGradient then
+			mainWindowGradient.Color = createGradientFromColor(themeData.Stroke, 0.7)
+		end
 
-	ApplyVisualPreferences()
-	if type(self._RefreshWindowBackground) == "function" then
-		pcall(self._RefreshWindowBackground)
-	elseif type(RefreshBackgroundAwarePanels) == "function" then
-		pcall(RefreshBackgroundAwarePanels)
+		if SearchBarsTXTBox then
+			for _, obj in pairs(SearchBarsTXTBox) do
+				if obj and obj.Parent then
+					obj.PlaceholderColor3 = themeData.TextDark or themeData.Text
+					obj.TextColor3 = themeData.Text
+					obj.BackgroundColor3 = themeData.Main
+				end
+			end
+		end
+
+		if GlobalSearch then
+			GlobalSearch.PlaceholderColor3 = themeData.TextDark or themeData.Text
+			GlobalSearch.TextColor3 = themeData.Text
+			GlobalSearch.BackgroundColor3 = themeData.Main
+		end
+
+		ApplyVisualPreferences()
+		if type(self._ApplyBackgroundReadability) == "function" then
+			pcall(self._ApplyBackgroundReadability, self, themeData)
+		end
+		if type(self._RefreshWindowBackground) == "function" then
+			pcall(self._RefreshWindowBackground, true)
+		elseif type(RefreshBackgroundAwarePanels) == "function" then
+			pcall(RefreshBackgroundAwarePanels)
+		end
+		OrionLib:SaveThemeCfg()
+	end)
+
+	self._ThemeApplying = false
+	if not ok then
+		warn("OrionX theme refresh failed: " .. tostring(err))
 	end
-	OrionLib:SaveThemeCfg()
 end
 
 local WhitelistedMouse = {Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3}
@@ -1119,10 +1179,11 @@ function OrionLib:MakeWindow(WindowConfig)
 		BackgroundImageSource = WindowConfig.BackgroundImage,
 		BackgroundImageVisibility = 100,
 		BackgroundImageDim = 10,
+		BackgroundImageBlur = 0,
 		BackgroundPanelTransparency = 64,
 		BackgroundSmartTheme = true,
 		BackgroundTintStrength = 52,
-		BackgroundSurfaceVersion = 3,
+		BackgroundSurfaceVersion = 4,
 		BackgroundImageScaleType = "Crop",
 		ShowFPS = false,
 		ShowPing = false,
@@ -1151,7 +1212,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	-- v12 migration: preserve old values, enable the smart themed image layer,
 	-- and prevent legacy configurations from recreating washed-out gray panels.
-	if (tonumber(UIState.BackgroundSurfaceVersion) or 1) < 3 then
+	if (tonumber(UIState.BackgroundSurfaceVersion) or 1) < 4 then
 		UIState.BackgroundPanelTransparency = math.max(
 			tonumber(UIState.BackgroundPanelTransparency) or 0,
 			58
@@ -1160,7 +1221,8 @@ function OrionLib:MakeWindow(WindowConfig)
 			UIState.BackgroundSmartTheme = true
 		end
 		UIState.BackgroundTintStrength = tonumber(UIState.BackgroundTintStrength) or 52
-		UIState.BackgroundSurfaceVersion = 3
+		UIState.BackgroundImageBlur = tonumber(UIState.BackgroundImageBlur) or 0
+		UIState.BackgroundSurfaceVersion = 4
 	end
 
 	VisualPreferences.StrokeVisibility = math.clamp(tonumber(UIState.StrokeVisibility) or 0, 0, 100)
@@ -1327,7 +1389,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local function clearSearchHighlight()
 		searchHighlightToken += 1
-		local theme = OrionLib.Themes[OrionLib.SelectedTheme]
+		local theme = GetActiveTheme()
 		if activeSearchLabel and activeSearchLabel.Parent then activeSearchLabel.TextColor3 = theme.Text end
 		if activeSearchStroke and activeSearchStroke.Parent then
 			activeSearchStroke.Color = theme.Stroke
@@ -1342,7 +1404,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		local token = searchHighlightToken
 		local frame = label.Parent
 		if not frame or not frame:IsA("GuiObject") then return end
-		local theme = OrionLib.Themes[OrionLib.SelectedTheme]
+		local theme = GetActiveTheme()
 		local highlightColor = theme.Accent or theme.Stroke or theme.Text
 		local scale = frame:FindFirstChild("SearchScale") or Instance.new("UIScale")
 		scale.Name, scale.Scale, scale.Parent = "SearchScale", 1, frame
@@ -1355,7 +1417,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		label.TextColor3 = highlightColor
 		task.delay(0.35, function()
 			if token == searchHighlightToken and label.Parent then
-				label.TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text
+				label.TextColor3 = GetActiveTheme().Text
 				activeSearchLabel = nil
 			end
 		end)
@@ -1367,7 +1429,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		task.delay(0.35, function()
 			if token == searchHighlightToken and stroke.Parent then
 				stroke.Thickness = 1
-				stroke.Color = OrionLib.Themes[OrionLib.SelectedTheme].Stroke
+				stroke.Color = GetActiveTheme().Stroke
 				activeSearchStroke = nil
 			end
 		end)
@@ -1547,21 +1609,25 @@ function OrionLib:MakeWindow(WindowConfig)
 			Size = UDim2.new(1, 0, 0, 50),
 			Position = UDim2.new(0, 0, 1, -50)
 		}), {
-			-- No horizontal separator above the profile footer.
-			AddThemeObject(SetChildren(SetProps(MakeElement("Frame"), {
+			-- No horizontal separator above the profile footer. The avatar owns its
+			-- clipping mask, so the headshot can never leak a square white background.
+			SetChildren(SetProps(MakeElement("Frame"), {
 				Name = "ProfileAvatar",
 				AnchorPoint = Vector2.new(0, 0.5),
 				Size = UDim2.new(0, 32, 0, 32),
-				Position = UDim2.new(0, 10, 0.5, 0)
+				Position = UDim2.new(0, 10, 0.5, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ClipsDescendants = true,
 			}), {
-				SetProps(MakeElement("Image", "https://www.roblox.com/headshot-thumbnail/image?userId=".. LocalPlayer.UserId .."&width=420&height=420&format=png"), {
-					Size = UDim2.new(1, 0, 1, 0)
-				}),
-				AddThemeObject(SetProps(MakeElement("Image", "rbxassetid://4031889928"), {
-					Size = UDim2.new(1, 0, 1, 0),
-				}), "Second"),
-				MakeElement("Corner", 1)
-			}), "Divider"),
+				SetChildren(SetProps(MakeElement("Image", "https://www.roblox.com/headshot-thumbnail/image?userId=".. LocalPlayer.UserId .."&width=420&height=420&format=png"), {
+					Name = "AvatarImage",
+					Size = UDim2.fromScale(1, 1),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+				}), {MakeElement("Corner", 1)}),
+				MakeElement("Corner", 1),
+			}),
 			SetChildren(SetProps(MakeElement("TFrame"), {
 				Name = "ProfileAvatarOutline",
 				AnchorPoint = Vector2.new(0, 0.5),
@@ -1696,6 +1762,48 @@ function OrionLib:MakeWindow(WindowConfig)
 	local BackgroundLayerCorner = Instance.new("UICorner")
 	BackgroundLayerCorner.Parent = BackgroundLayer
 
+	local BackgroundBlurHolder = Instance.new("Frame")
+	BackgroundBlurHolder.Name = "BackgroundImageBlurHolder"
+	BackgroundBlurHolder.Size = UDim2.fromScale(1, 1)
+	BackgroundBlurHolder.Position = UDim2.fromScale(0, 0)
+	BackgroundBlurHolder.BackgroundTransparency = 1
+	BackgroundBlurHolder.BorderSizePixel = 0
+	BackgroundBlurHolder.ClipsDescendants = false
+	BackgroundBlurHolder.Active = false
+	BackgroundBlurHolder.ZIndex = 1
+	BackgroundBlurHolder:SetAttribute("OrionBackgroundExclude", true)
+	BackgroundBlurHolder.Parent = BackgroundLayer
+
+	local BackgroundBlurSamples = {}
+	local blurDirections = {
+		Vector2.new(-1, 0), Vector2.new(1, 0),
+		Vector2.new(0, -1), Vector2.new(0, 1),
+		Vector2.new(-0.72, -0.72), Vector2.new(0.72, -0.72),
+		Vector2.new(-0.72, 0.72), Vector2.new(0.72, 0.72),
+		Vector2.new(-0.38, -0.92), Vector2.new(0.38, -0.92),
+		Vector2.new(-0.38, 0.92), Vector2.new(0.38, 0.92),
+	}
+	for index, direction in ipairs(blurDirections) do
+		local sample = Instance.new("ImageLabel")
+		sample.Name = "BlurSample" .. tostring(index)
+		sample.Size = UDim2.fromScale(1, 1)
+		sample.Position = UDim2.fromScale(0, 0)
+		sample.BackgroundTransparency = 1
+		sample.BorderSizePixel = 0
+		sample.Image = ""
+		sample.ImageTransparency = 1
+		sample.ImageColor3 = Color3.new(1, 1, 1)
+		sample.ScaleType = Enum.ScaleType.Crop
+		sample.Visible = false
+		sample.Active = false
+		sample.ZIndex = 1
+		sample:SetAttribute("BlurDirectionX", direction.X)
+		sample:SetAttribute("BlurDirectionY", direction.Y)
+		sample:SetAttribute("OrionBackgroundExclude", true)
+		sample.Parent = BackgroundBlurHolder
+		table.insert(BackgroundBlurSamples, sample)
+	end
+
 	local BackgroundImage = Instance.new("ImageLabel")
 	BackgroundImage.Name = "CustomBackgroundImage"
 	BackgroundImage.Size = UDim2.fromScale(1, 1)
@@ -1710,35 +1818,36 @@ function OrionLib:MakeWindow(WindowConfig)
 	BackgroundImage.ScaleType = Enum.ScaleType.Crop
 	BackgroundImage.Visible = false
 	BackgroundImage.Active = false
-	BackgroundImage.ZIndex = 1
+	BackgroundImage.ZIndex = 2
 	BackgroundImage:SetAttribute("OrionBackgroundExclude", true)
 	BackgroundImage.Parent = BackgroundLayer
 
 	local BackgroundImageCorner = Instance.new("UICorner")
 	BackgroundImageCorner.Parent = BackgroundImage
 
-	-- Darkness is independent from the selected theme color.
+	-- Neutral readability veil. In smart mode it prevents bright image regions
+	-- from destroying contrast without flooding the whole image with the UI hue.
 	local BackgroundDarken = Instance.new("Frame")
-	BackgroundDarken.Name = "BackgroundDarken"
+	BackgroundDarken.Name = "BackgroundReadabilityVeil"
 	BackgroundDarken.Size = UDim2.fromScale(1, 1)
 	BackgroundDarken.BackgroundColor3 = Color3.new(0, 0, 0)
 	BackgroundDarken.BackgroundTransparency = 1
 	BackgroundDarken.BorderSizePixel = 0
-	BackgroundDarken.ZIndex = 2
+	BackgroundDarken.ZIndex = 3
 	BackgroundDarken:SetAttribute("OrionBackgroundExclude", true)
 	BackgroundDarken.Parent = BackgroundLayer
 
 	local BackgroundDarkenCorner = Instance.new("UICorner")
 	BackgroundDarkenCorner.Parent = BackgroundDarken
 
-	-- Theme tint keeps colored themes readable over bright or high-contrast
-	-- images. It updates every time SetTheme is called.
+	-- A deliberately subtle hue tint. Panel surfaces carry most of the selected
+	-- color; the photograph itself remains recognisable.
 	local BackgroundTint = Instance.new("Frame")
 	BackgroundTint.Name = "BackgroundThemeTint"
 	BackgroundTint.Size = UDim2.fromScale(1, 1)
 	BackgroundTint.BackgroundTransparency = 1
 	BackgroundTint.BorderSizePixel = 0
-	BackgroundTint.ZIndex = 3
+	BackgroundTint.ZIndex = 4
 	BackgroundTint:SetAttribute("OrionBackgroundExclude", true)
 	BackgroundTint.Parent = BackgroundLayer
 
@@ -1750,12 +1859,14 @@ function OrionLib:MakeWindow(WindowConfig)
 	local trimBackgroundSource
 
 	local function syncBackgroundGeometry()
-		local thickness = math.max(0, tonumber(mainWindowStroke and mainWindowStroke.Thickness) or 0)
-		local strokeRatio = math.clamp((tonumber(VisualPreferences.StrokeVisibility) or 0) / 100, 0, 1)
-		local inset = math.max(0, math.ceil(thickness * strokeRatio * 0.5))
-		local radius = math.max(0, math.clamp(tonumber(VisualPreferences.CornerRadius) or 0, 0, 32) - inset)
-		BackgroundLayer.Position = UDim2.fromOffset(inset, inset)
-		BackgroundLayer.Size = UDim2.new(1, -(inset * 2), 1, -(inset * 2))
+		-- The image fills the exact window bounds. The window itself and this layer
+		-- perform clipping, while the UIStroke is drawn above the image. This avoids
+		-- colored seams when border thickness/visibility changes.
+		local radius = math.max(0, math.clamp(tonumber(VisualPreferences.CornerRadius) or 0, 0, 32))
+		BackgroundLayer.Position = UDim2.fromScale(0, 0)
+		BackgroundLayer.Size = UDim2.fromScale(1, 1)
+		BackgroundBlurHolder.Position = UDim2.fromScale(0, 0)
+		BackgroundBlurHolder.Size = UDim2.fromScale(1, 1)
 		for _, corner in ipairs({BackgroundLayerCorner, BackgroundImageCorner, BackgroundDarkenCorner, BackgroundTintCorner}) do
 			corner.CornerRadius = UDim.new(0, radius)
 		end
@@ -1778,6 +1889,45 @@ function OrionLib:MakeWindow(WindowConfig)
 		)
 	end
 
+	local function buildSmartGlassTheme(rawTheme)
+		if not isBackgroundActive() or UIState.BackgroundSmartTheme == false then
+			return rawTheme
+		end
+
+		local requestedTint = math.clamp(tonumber(UIState.BackgroundTintStrength) or 52, 0, 100) / 100
+		local h, s = rawTheme.Main:ToHSV()
+		local hueSeed
+		if s < 0.08 then
+			hueSeed = rawTheme.Accent or Color3.fromRGB(112, 126, 170)
+		else
+			hueSeed = Color3.fromHSV(h, math.clamp(s, 0.32, 0.72), 0.72)
+		end
+
+		-- Panels stay neutral enough to preserve the photograph. The selected hue
+		-- appears as a restrained glass tint instead of flooding the whole window.
+		local hueWeight = math.clamp(0.055 + requestedTint * 0.19, 0.055, 0.24)
+		local render = {
+			Main = MixColor(Color3.fromRGB(8, 9, 11), hueSeed, hueWeight * 0.72),
+			Second = MixColor(Color3.fromRGB(17, 18, 22), hueSeed, hueWeight),
+			Divider = MixColor(Color3.fromRGB(25, 26, 31), hueSeed, hueWeight * 1.08),
+			Stroke = MixColor(Color3.fromRGB(105, 108, 119), hueSeed, math.min(0.34, hueWeight + 0.09)),
+			Text = Color3.fromRGB(248, 248, 251),
+			TextDark = Color3.fromRGB(183, 185, 194),
+			Accent = rawTheme.Accent,
+		}
+
+		-- Very dark/weak accents are lifted so sliders and toggles remain visible.
+		local ah, as, av = render.Accent:ToHSV()
+		if av < 0.62 then
+			render.Accent = Color3.fromHSV(ah, math.max(as, 0.42), 0.76)
+		end
+		return render
+	end
+
+	OrionLib._BuildRenderTheme = function(_, rawTheme)
+		return buildSmartGlassTheme(rawTheme)
+	end
+
 	local function registerBackgroundAwarePanel(object, baseTransparency)
 		if not object or not object:IsA("GuiObject") then return object end
 		if object == BackgroundLayer
@@ -1786,9 +1936,9 @@ function OrionLib:MakeWindow(WindowConfig)
 			or object:GetAttribute("OrionBackgroundExclude") == true then
 			return object
 		end
-		if object ~= MainWindow and not object:IsDescendantOf(MainWindow) then
-			return object
-		end
+
+		local themeType = object:GetAttribute("OrionThemeType")
+		if not BackgroundThemeTypes[themeType] then return object end
 
 		object:SetAttribute("OrionBackgroundPanel", true)
 		if object:GetAttribute("OrionBackgroundBaseTransparency") == nil then
@@ -1800,16 +1950,11 @@ function OrionLib:MakeWindow(WindowConfig)
 			table.insert(BackgroundAwarePanels, object)
 		end
 
-		-- Apply the current state immediately. This fixes dynamically-created
-		-- buttons/sliders staying opaque after a background was already enabled.
 		local base = tonumber(object:GetAttribute("OrionBackgroundBaseTransparency"))
 		if base == nil then base = object.BackgroundTransparency end
-		if object ~= MainWindow then
-			object.BackgroundTransparency = isBackgroundActive()
-				and math.max(base, currentBackgroundPanelTransparency())
-				or base
-		end
-
+		object.BackgroundTransparency = isBackgroundActive()
+			and math.max(base, currentBackgroundPanelTransparency())
+			or base
 		return object
 	end
 
@@ -1843,156 +1988,129 @@ function OrionLib:MakeWindow(WindowConfig)
 	local BackgroundImageAssets = {}
 
 	trimBackgroundSource = function(value)
-		return tostring(value or ""):match("^%s*(.-)%s*$") or ""
+		return tostring(value or ""):match("^%s*(.-)%s*$")
 	end
 
 	local function backgroundSourceHash(value)
-		local hash = 5381
+		local hash = 2166136261
 		for index = 1, #value do
-			hash = (hash * 33 + string.byte(value, index)) % 2147483647
+			hash = bit32.bxor(hash, string.byte(value, index))
+			hash = (hash * 16777619) % 4294967296
 		end
-		return tostring(hash)
+		return string.format("%08x", hash)
 	end
 
 	local function safeBackgroundExtension(url)
-		local cleanUrl = (url:match("^[^?#]+") or url):lower()
-		local extension = cleanUrl:match("%.([%a%d]+)$")
-		if extension == "jpeg" then extension = "jpg" end
-		if extension ~= "png" and extension ~= "jpg" and extension ~= "webp" then
+		local clean = tostring(url):match("^[^?]+") or tostring(url)
+		local extension = clean:match("%.([%w]+)$")
+		extension = extension and string.lower(extension) or "png"
+		if extension ~= "png" and extension ~= "jpg" and extension ~= "jpeg" and extension ~= "webp" then
 			extension = "png"
 		end
 		return extension
 	end
 
-	local function createFolderPath(path)
-		if type(isfolder) ~= "function" or type(makefolder) ~= "function" then
-			return false, "missing folder functions"
-		end
-		local traversed = ""
-		for segment in tostring(path):gsub("\\", "/"):gmatch("[^/]+") do
-			traversed = traversed == "" and segment or (traversed .. "/" .. segment)
-			if not isfolder(traversed) then
-				local ok = pcall(makefolder, traversed)
-				if not ok and not isfolder(traversed) then
-					return false, "could not create " .. traversed
-				end
+	local function getRequestFunction()
+		return env.request
+			or env.http_request
+			or (env.syn and env.syn.request)
+			or (env.http and env.http.request)
+	end
+
+	local function fetchBinary(url)
+		local requestFunction = getRequestFunction()
+		if type(requestFunction) == "function" then
+			local ok, response = pcall(requestFunction, {Url = url, Method = "GET"})
+			if ok and response and tonumber(response.StatusCode or response.Status) and tonumber(response.StatusCode or response.Status) >= 200 and tonumber(response.StatusCode or response.Status) < 300 then
+				return response.Body or response.body
 			end
 		end
-		return true
+		local ok, body = pcall(function() return game:HttpGet(url) end)
+		if ok then return body end
+		return nil
 	end
 
 	function BackgroundImageManager.AddAsset(assetName, robloxAssetId, url, forceRedownload)
-		assetName = tostring(assetName)
-		robloxAssetId = tonumber(robloxAssetId) or 0
+		local extension = safeBackgroundExtension(url or "")
+		local assetFolder = OrionLib.Folder .. "/OrionX/custom_assets"
+		local path = assetFolder .. "/" .. assetName
 		BackgroundImageAssets[assetName] = {
-			RobloxId = robloxAssetId,
-			Path = WindowConfig.ConfigFolder .. "/OrionX/custom_assets/" .. assetName,
-			URL = tostring(url or ""),
-			Id = nil,
+			RobloxAssetId = robloxAssetId,
+			Url = url,
+			Path = path,
+			Extension = extension,
 		}
 		return BackgroundImageManager.DownloadAsset(assetName, forceRedownload)
 	end
 
 	function BackgroundImageManager.DownloadAsset(assetName, forceRedownload)
 		local asset = BackgroundImageAssets[assetName]
-		if not asset then return false, "unknown asset" end
+		if not asset then return false, "asset-missing" end
 		if type(backgroundCustomAsset) ~= "function"
 			or type(writefile) ~= "function"
-			or type(isfile) ~= "function" then
-			return false, "missing getcustomasset/writefile/isfile"
+			or type(isfile) ~= "function"
+			or type(makefolder) ~= "function"
+			or type(isfolder) ~= "function" then
+			return false, "custom-assets-unavailable"
 		end
 
-		local folder = asset.Path:match("^(.*)/[^/]+$")
-		if folder then
-			local made, reason = createFolderPath(folder)
-			if not made then return false, reason end
-		end
+		local folder = OrionLib.Folder .. "/OrionX"
+		local assetFolder = folder .. "/custom_assets"
+		if not isfolder(folder) then pcall(makefolder, folder) end
+		if not isfolder(assetFolder) then pcall(makefolder, assetFolder) end
+		if isfile(asset.Path) and not forceRedownload then return true, "cached" end
 
-		if forceRedownload ~= true and isfile(asset.Path) then
-			return true
-		end
-
-		local ok, result = pcall(function()
-			writefile(asset.Path, game:HttpGet(asset.URL))
-		end)
-		if not ok then return false, tostring(result) end
-		asset.Id = nil
-		return true
+		local body = fetchBinary(asset.Url)
+		if not body or #body == 0 then return false, "download-failed" end
+		local ok = pcall(writefile, asset.Path, body)
+		return ok, ok and "downloaded" or "write-failed"
 	end
 
 	function BackgroundImageManager.GetAsset(assetName)
 		local asset = BackgroundImageAssets[assetName]
-		if not asset then return nil, "unknown asset" end
-		if asset.Id then return asset.Id end
-
-		local fallback = asset.RobloxId > 0 and ("rbxassetid://" .. asset.RobloxId) or nil
+		if not asset then return nil, "asset-missing" end
+		if asset.RobloxAssetId then return asset.RobloxAssetId, "roblox" end
 		if type(backgroundCustomAsset) == "function" then
 			local ok, customId = pcall(backgroundCustomAsset, asset.Path)
-			if ok and type(customId) == "string" and customId ~= "" then
-				asset.Id = customId
-				return customId
-			end
+			if ok and customId then return customId, "custom" end
 		end
-		asset.Id = fallback
-		return fallback, fallback and nil or "getcustomasset failed"
+		return nil, "custom-asset-failed"
 	end
 
 	local function resolveBackgroundSourceObsidianStyle(source, forceRedownload)
 		source = trimBackgroundSource(source)
 		if source == "" then return nil, "empty" end
-
-		local numericId = source:match("^(%d+)$")
-		local embeddedId = source:match("rbxassetid://(%d+)")
-			or source:match("[?&]id=(%d+)")
-			or source:match("/library/(%d+)")
-			or source:match("/catalog/(%d+)")
-			or source:match("/asset/(%d+)")
-		local assetId = numericId or embeddedId
-		if assetId then
-			return "rbxassetid://" .. assetId
+		if source:match("^rbxassetid://%d+$") or source:match("^rbxasset://") then
+			return source, "roblox"
 		end
-
-		if not source:match("^https?://") then
-			return nil, "Use a Roblox image ID, rbxassetid://ID, or a direct HTTP/HTTPS image URL."
-		end
+		if source:match("^%d+$") then return "rbxassetid://" .. source, "roblox" end
+		local id = source:match("[?&]id=(%d+)") or source:match("/library/(%d+)") or source:match("/asset/(%d+)")
+		if id then return "rbxassetid://" .. id, "roblox" end
+		if not source:match("^https?://") then return nil, "invalid-source" end
 
 		local extension = safeBackgroundExtension(source)
 		local assetName = "background_" .. backgroundSourceHash(source) .. "." .. extension
 		local existing = BackgroundImageAssets[assetName]
-		if existing then
-			existing.URL = source
-			existing.Id = nil
-		else
+		if not existing then
 			BackgroundImageAssets[assetName] = {
-				RobloxId = 0,
-				Path = WindowConfig.ConfigFolder .. "/OrionX/custom_assets/" .. assetName,
-				URL = source,
-				Id = nil,
+				Url = source,
+				Path = OrionLib.Folder .. "/OrionX/custom_assets/" .. assetName,
+				Extension = extension,
 			}
 		end
-
 		local downloaded, downloadReason = BackgroundImageManager.DownloadAsset(assetName, forceRedownload)
 		if downloaded then
 			local customId, customReason = BackgroundImageManager.GetAsset(assetName)
-			if customId then return customId end
-			return nil, customReason or "The downloaded image could not be converted."
+			if customId then return customId, customReason end
 		end
-
-		-- Some environments accept HTTPS directly in ImageLabel.Image. Keep this
-		-- fallback, while the primary path remains Obsidian's local asset manager.
-		if downloadReason and downloadReason:find("missing", 1, true) then
-			return source, "direct-url"
-		end
-		return nil, downloadReason or "The image URL could not be downloaded."
+		-- Some executors support direct image URLs even without custom assets.
+		return source, downloadReason == "custom-assets-unavailable" and "direct-url" or downloadReason
 	end
 
 	local function registerExistingBackgroundPanels()
 		for themeType in pairs(BackgroundThemeTypes) do
 			for _, object in ipairs(OrionLib.ThemeObjects[themeType] or {}) do
-				if object
-					and object.Parent
-					and object:IsA("GuiObject")
-					and (object == MainWindow or object:IsDescendantOf(MainWindow)) then
+				if object and object.Parent and object:IsA("GuiObject") then
 					registerBackgroundAwarePanel(object)
 				end
 			end
@@ -2001,13 +2119,10 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local function applyBackgroundPanels()
 		local enabled = isBackgroundActive()
-		local theme = OrionLib.Themes[OrionLib.SelectedTheme] or OrionLib.Themes.Default
+		local theme = GetActiveTheme()
 		local panelTransparency = currentBackgroundPanelTransparency()
-
 		registerExistingBackgroundPanels()
 
-		-- The window itself remains opaque. The image stack sits above this base,
-		-- preventing the 3D world from leaking through transparent pixels.
 		MainWindow.BackgroundColor3 = theme.Main
 		MainWindow.BackgroundTransparency = 0
 
@@ -2016,6 +2131,11 @@ function OrionLib:MakeWindow(WindowConfig)
 			if not panel or panel.Parent == nil then
 				table.remove(BackgroundAwarePanels, index)
 			elseif panel ~= MainWindow then
+				local themeType = panel:GetAttribute("OrionThemeType")
+				local color = theme[themeType]
+				if color and panel:IsA("GuiObject") and not panel:IsA("ScrollingFrame") then
+					panel.BackgroundColor3 = color
+				end
 				local base = tonumber(panel:GetAttribute("OrionBackgroundBaseTransparency"))
 				if base == nil then base = panel.BackgroundTransparency end
 				panel.BackgroundTransparency = enabled and math.max(base, panelTransparency) or base
@@ -2033,34 +2153,112 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	RefreshBackgroundAwarePanels = applyBackgroundPanels
 
-	local function applyBackgroundVisuals()
+	local function syncBlurSamples(enabled, visibility, blurAmount, scaleType)
+		local opacity = math.clamp(visibility / 100, 0, 1)
+		local blur = math.clamp(tonumber(blurAmount) or 0, 0, 24)
+		local useBlur = enabled and blur > 0.1 and BackgroundImage.Image ~= ""
+		BackgroundBlurHolder.Visible = useBlur
+		BackgroundImage.ImageTransparency = enabled and (1 - (useBlur and opacity * 0.38 or opacity)) or 1
+		BackgroundImage.ScaleType = scaleType
+
+		local overscan = math.ceil(blur * 1.7) + 2
+		local sampleOpacity = opacity * 0.065
+		for _, sample in ipairs(BackgroundBlurSamples) do
+			local dx = tonumber(sample:GetAttribute("BlurDirectionX")) or 0
+			local dy = tonumber(sample:GetAttribute("BlurDirectionY")) or 0
+			sample.Visible = useBlur
+			sample.Image = BackgroundImage.Image
+			sample.ImageRectOffset = BackgroundImage.ImageRectOffset
+			sample.ImageRectSize = BackgroundImage.ImageRectSize
+			sample.ImageColor3 = BackgroundImage.ImageColor3
+			sample.ScaleType = scaleType
+			sample.ImageTransparency = 1 - sampleOpacity
+			sample.Size = UDim2.new(1, overscan * 2, 1, overscan * 2)
+			sample.Position = UDim2.fromOffset(
+				-overscan + math.floor(dx * blur + 0.5),
+				-overscan + math.floor(dy * blur + 0.5)
+			)
+		end
+	end
+
+	local function applyBackgroundReadability(_, themeData)
 		local enabled = isBackgroundActive()
-		local theme = OrionLib.Themes[OrionLib.SelectedTheme] or OrionLib.Themes.Default
+		local surface = themeData.Second or themeData.Main
+		local primary = EnsureReadableText(surface, themeData.Text)
+		local secondary = EnsureReadableText(surface, themeData.TextDark)
+		if enabled and UIState.BackgroundSmartTheme ~= false then
+			primary = Color3.fromRGB(248, 248, 251)
+			secondary = Color3.fromRGB(188, 190, 198)
+		end
+
+		for themeType, color in pairs({Text = primary, TextDark = secondary}) do
+			for _, object in ipairs(OrionLib.ThemeObjects[themeType] or {}) do
+				if object and object.Parent then
+					local prop = ReturnProperty(object)
+					if prop and object[prop] ~= nil then object[prop] = color end
+					if object:IsA("TextLabel") or object:IsA("TextBox") then
+						if object:GetAttribute("OrionOriginalTextStrokeTransparency") == nil then
+							object:SetAttribute("OrionOriginalTextStrokeTransparency", object.TextStrokeTransparency)
+						end
+						if enabled then
+							object.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+							object.TextStrokeTransparency = 0.78
+						else
+							object.TextStrokeTransparency = tonumber(object:GetAttribute("OrionOriginalTextStrokeTransparency")) or 1
+						end
+					end
+				end
+			end
+		end
+
+		GlobalSearch.TextColor3 = primary
+		GlobalSearch.PlaceholderColor3 = secondary
+		if Icon and Icon.Parent then Icon.ImageColor3 = secondary end
+	end
+	OrionLib._ApplyBackgroundReadability = applyBackgroundReadability
+
+	local function applyBackgroundVisuals(fromThemeRefresh)
+		if not fromThemeRefresh and not OrionLib._ThemeApplying then
+			OrionLib:SetTheme()
+			return
+		end
+
+		local enabled = isBackgroundActive()
+		local rawTheme = GetRawTheme()
 		local visibility = math.clamp(tonumber(UIState.BackgroundImageVisibility) or 100, 0, 100)
 		local darkness = math.clamp(tonumber(UIState.BackgroundImageDim) or 10, 0, 90) / 100
 		local requestedTint = math.clamp(tonumber(UIState.BackgroundTintStrength) or 52, 0, 100) / 100
 		local panelTransparency = currentBackgroundPanelTransparency()
-
-		-- Smart mode increases tint only when panels become highly transparent.
-		-- This keeps every selected hue coherent without flattening the image.
-		local tintOpacity = requestedTint
-		if UIState.BackgroundSmartTheme ~= false then
-			local autoMinimum = 0.34 + (panelTransparency * 0.25)
-			tintOpacity = math.clamp(math.max(requestedTint, autoMinimum), 0, 0.82)
-		end
+		local blurAmount = math.clamp(tonumber(UIState.BackgroundImageBlur) or 0, 0, 24)
+		local scaleType = backgroundScaleTypes[tostring(UIState.BackgroundImageScaleType)] or Enum.ScaleType.Crop
 
 		BackgroundLayer.Visible = enabled
 		BackgroundImage.Visible = enabled
-		BackgroundImage.ImageTransparency = VisibilityToTransparency(visibility)
 		BackgroundImage.ImageColor3 = Color3.new(1, 1, 1)
-		BackgroundImage.ScaleType = backgroundScaleTypes[tostring(UIState.BackgroundImageScaleType)] or Enum.ScaleType.Crop
+		syncBlurSamples(enabled, visibility, blurAmount, scaleType)
+
+		local smart = enabled and UIState.BackgroundSmartTheme ~= false
+		local readabilityOpacity = darkness
+		if smart then
+			-- Higher panel transparency requires a slightly stronger neutral veil.
+			local automaticMinimum = 0.16 + panelTransparency * 0.17
+			readabilityOpacity = math.clamp(math.max(darkness, automaticMinimum), 0, 0.54)
+		end
 		BackgroundDarken.Visible = enabled
-		BackgroundDarken.BackgroundTransparency = enabled and (1 - darkness) or 1
+		BackgroundDarken.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		BackgroundDarken.BackgroundTransparency = enabled and (1 - readabilityOpacity) or 1
+
+		local tintOpacity = requestedTint
+		if smart then tintOpacity = math.clamp(requestedTint * 0.20, 0, 0.20) end
+		local h, s = rawTheme.Main:ToHSV()
+		local tintColor = s < 0.08 and (rawTheme.Accent or rawTheme.Main) or Color3.fromHSV(h, math.clamp(s, 0.30, 0.72), 0.70)
 		BackgroundTint.Visible = enabled
-		BackgroundTint.BackgroundColor3 = theme.Main
+		BackgroundTint.BackgroundColor3 = tintColor
 		BackgroundTint.BackgroundTransparency = enabled and (1 - tintOpacity) or 1
+
 		syncBackgroundGeometry()
 		applyBackgroundPanels()
+		applyBackgroundReadability(OrionLib, GetActiveTheme())
 	end
 
 	local function notifyBackground(content, isError)
@@ -2138,8 +2336,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	registerBackgroundAwarePanel(GlobalSearch, 0.25)
 	OrionLib.ImageManager = OrionLib.ImageManager or {}
 	OrionLib.ImageManager.Background = BackgroundImageManager
-	OrionLib._RefreshWindowBackground = function()
-		applyBackgroundVisuals()
+	OrionLib._RefreshWindowBackground = function(fromThemeRefresh)
+		applyBackgroundVisuals(fromThemeRefresh == true)
 	end
 
 	registerExistingBackgroundPanels()
@@ -2636,7 +2834,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		local item = KeystrokeMap[Input.KeyCode] or KeystrokeMap[Input.UserInputType]
 		if not item then return end
 		item.Pressed = Pressed
-		local theme = OrionLib.Themes[OrionLib.SelectedTheme]
+		local theme = GetActiveTheme()
 		local backgroundColor, strokeColor, textColor = GetKeystrokeVisual(theme, Pressed)
 		item.Frame.BackgroundColor3 = backgroundColor
 		item.Frame.BackgroundTransparency = VisibilityToTransparency(VisualPreferences.KeystrokeBackgroundVisibility)
@@ -2691,10 +2889,10 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	mainWindowStroke.Parent = MainWindow
 	mainWindowStroke.Thickness = math.clamp(tonumber(UIState.BorderThickness) or 1.5, 0, 3)
-	mainWindowStroke.Color = OrionLib.Themes[OrionLib.SelectedTheme].Stroke
+	mainWindowStroke.Color = GetActiveTheme().Stroke
 	mainWindowStroke.Transparency = VisibilityToTransparency(VisualPreferences.StrokeVisibility)
 	mainWindowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	mainWindowGradient.Color = createGradientFromColor(OrionLib.Themes[OrionLib.SelectedTheme].Stroke, 0.7)
+	mainWindowGradient.Color = createGradientFromColor(GetActiveTheme().Stroke, 0.7)
 	ApplyVisualPreferences()
 
     local window = MainWindow
@@ -3220,6 +3418,15 @@ function OrionLib:MakeWindow(WindowConfig)
 	function TabFunction:GetBackgroundImage()
 		return UIState.BackgroundImageSource
 	end
+	function TabFunction:SetBackgroundImageBlur(Value)
+		UIState.BackgroundImageBlur = math.clamp(tonumber(Value) or 0, 0, 24)
+		applyBackgroundVisuals()
+		scheduleUIConfigSave()
+		return self
+	end
+	function TabFunction:GetBackgroundImageBlur()
+		return tonumber(UIState.BackgroundImageBlur) or 0
+	end
 	function TabFunction:SetKeystrokes(Enabled)
 		UIState.ShowKeystrokes = Enabled == true
 		KeystrokesFrame.Visible = not IsMobile and UIState.ShowKeystrokes
@@ -3280,7 +3487,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			Parent = ContentFadeGroup,
 			Visible = false,
 			Name = "ItemContainer",
-			BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Main,
+			BackgroundColor3 = GetActiveTheme().Main,
 			BackgroundTransparency = 1
 		}), {
 			MakeElement("List", 0, 6),
@@ -3608,22 +3815,22 @@ function OrionLib:MakeWindow(WindowConfig)
 				}), "Second")
 
 				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 3, GetActiveTheme().Second.G * 255 + 3, GetActiveTheme().Second.B * 255 + 3)}):Play()
 				end)
 
 				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Second}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = GetActiveTheme().Second}):Play()
 				end)
 
 				AddConnection(Click.MouseButton1Up, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 3, GetActiveTheme().Second.G * 255 + 3, GetActiveTheme().Second.B * 255 + 3)}):Play()
 					task.spawn(function()
 						ButtonConfig.Callback()
 					end)
 				end)
 
 				AddConnection(Click.MouseButton1Down, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 6)}):Play()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 6, GetActiveTheme().Second.G * 255 + 6, GetActiveTheme().Second.B * 255 + 6)}):Play()
 				end)
 
 				function Button:Set(ButtonText)
@@ -3671,7 +3878,7 @@ function OrionLib:MakeWindow(WindowConfig)
 
 				Toggle["Event2"] = set_value_event
 
-				local accolor = ToggleConfig.Color or OrionLib.Themes[OrionLib.SelectedTheme].Accent
+				local accolor = ToggleConfig.Color or GetActiveTheme().Accent
 
 				local ToggleBox = SetChildren(SetProps(MakeElement("RoundFrame", accolor, 0, 4), {
 					Size = UDim2.new(0, 24, 0, 24),
@@ -3714,9 +3921,9 @@ function OrionLib:MakeWindow(WindowConfig)
 				function Toggle:Set(Value)
 					Toggle.Value = Value
 
-					local accolor = Toggle.uccolor and Toggle.ccolor or OrionLib.Themes[OrionLib.SelectedTheme].Accent
-					ToggleBox.BackgroundColor3 = Toggle.Value and accolor or OrionLib.Themes[OrionLib.SelectedTheme].Divider
-					ToggleBox.Stroke.Color = Toggle.Value and accolor or OrionLib.Themes[OrionLib.SelectedTheme].Stroke
+					local accolor = Toggle.uccolor and Toggle.ccolor or GetActiveTheme().Accent
+					ToggleBox.BackgroundColor3 = Toggle.Value and accolor or GetActiveTheme().Divider
+					ToggleBox.Stroke.Color = Toggle.Value and accolor or GetActiveTheme().Stroke
 					TweenService:Create(ToggleBox.Ico, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 						ImageTransparency = Toggle.Value and 0 or 1,
 						Size = Toggle.Value and UDim2.new(0, 20, 0, 20) or UDim2.new(0, 8, 0, 8)
@@ -3734,21 +3941,21 @@ function OrionLib:MakeWindow(WindowConfig)
 				Toggle:Set(Toggle.Value)
 
 				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 3, GetActiveTheme().Second.G * 255 + 3, GetActiveTheme().Second.B * 255 + 3)}):Play()
 				end)
 
 				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Second}):Play()
+					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = GetActiveTheme().Second}):Play()
 				end)
 
 				AddConnection(Click.Activated, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 3, GetActiveTheme().Second.G * 255 + 3, GetActiveTheme().Second.B * 255 + 3)}):Play()
 					SaveCfg(game.GameId)
 					Toggle:Set(not Toggle.Value)
 				end)
 
 				AddConnection(Click.MouseButton1Down, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 6)}):Play()
+					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 6, GetActiveTheme().Second.G * 255 + 6, GetActiveTheme().Second.B * 255 + 6)}):Play()
 				end)
 
 				if ToggleConfig.Flag then
@@ -3768,7 +3975,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				SliderConfig.Callback = SliderConfig.Callback or function() end
 				SliderConfig.ValueName = SliderConfig.ValueName or ""
 				local SliderUsesThemeAccent = SliderConfig.Color == nil
-				SliderConfig.Color = SliderConfig.Color or OrionLib.Themes[OrionLib.SelectedTheme].Accent
+				SliderConfig.Color = SliderConfig.Color or GetActiveTheme().Accent
 				SliderConfig.Flag = SliderConfig.Flag or nil
 				SliderConfig.Save = SliderConfig.Save or false
 				SliderConfig.VarFunc = SliderConfig.VarFunc or SliderConfig.varFunc
@@ -4412,7 +4619,7 @@ function OrionLib:MakeWindow(WindowConfig)
 						if n then
 							AddThemeType(Dropdown.Buttons[Option])
 							Dropdown.Buttons[Option].State.Visible = false
-							TweenService:Create(Dropdown.Buttons[Option],TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme]["Divider"]}):Play()
+							TweenService:Create(Dropdown.Buttons[Option],TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{BackgroundColor3 = GetActiveTheme()["Divider"]}):Play()
 						else
 							Dropdown.Buttons[Option]:Destroy()
 							Dropdown.Buttons[Option] = nil
@@ -5207,19 +5414,19 @@ function OrionLib:MakeWindow(WindowConfig)
 				end)
 
 				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 3, GetActiveTheme().Second.G * 255 + 3, GetActiveTheme().Second.B * 255 + 3)}):Play()
 				end)
 
 				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Second}):Play()
+					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = GetActiveTheme().Second}):Play()
 				end)
 
 				AddConnection(Click.MouseButton1Up, function()
-					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3)}):Play()
+					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 3, GetActiveTheme().Second.G * 255 + 3, GetActiveTheme().Second.B * 255 + 3)}):Play()
 				end)
 
 				AddConnection(Click.MouseButton1Down, function()
-					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 6, OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 6)}):Play()
+					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(GetActiveTheme().Second.R * 255 + 6, GetActiveTheme().Second.G * 255 + 6, GetActiveTheme().Second.B * 255 + 6)}):Play()
 				end)
 
 				function Bind:Set(Key)
@@ -5314,16 +5521,16 @@ function OrionLib:MakeWindow(WindowConfig)
 				AddConnection(Click.MouseEnter, function()
 					TweenService:Create(TextboxFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 						BackgroundColor3 = Color3.fromRGB(
-							OrionLib.Themes[OrionLib.SelectedTheme].Second.R * 255 + 3,
-							OrionLib.Themes[OrionLib.SelectedTheme].Second.G * 255 + 3,
-							OrionLib.Themes[OrionLib.SelectedTheme].Second.B * 255 + 3
+							GetActiveTheme().Second.R * 255 + 3,
+							GetActiveTheme().Second.G * 255 + 3,
+							GetActiveTheme().Second.B * 255 + 3
 						)
 					}):Play()
 				end)
 
 				AddConnection(Click.MouseLeave, function()
 					TweenService:Create(TextboxFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-						BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Second
+						BackgroundColor3 = GetActiveTheme().Second
 					}):Play()
 				end)
 
@@ -5728,8 +5935,8 @@ function OrionLib:MakeWindow(WindowConfig)
 						Size = UDim2.new(1, -18, 1, 0),
 						Position = UDim2.new(0, 18, 0, 0),
 						BackgroundTransparency = 1,
-						TextColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text,
-						PlaceholderColor3 = OrionLib.Themes[OrionLib.SelectedTheme].TextDark,
+						TextColor3 = GetActiveTheme().Text,
+						PlaceholderColor3 = GetActiveTheme().TextDark,
 						PlaceholderText = "...",
 						Font = Enum.Font.GothamBold,
 						TextXAlignment = Enum.TextXAlignment.Center,
@@ -5814,7 +6021,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			function ElementFunction:AddSmartTheme()
 				local Picker = self:AddColorpicker({
 					Name = "Base Color",
-					Default = OrionLib.Themes[OrionLib.SelectedTheme].Main,
+					Default = GetRawTheme().Main,
 					Mode = 2,
 					Callback = function(Value)
 						OrionLib.Themes.Custom = OrionLib:GenTheme(Value)
@@ -6037,7 +6244,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		local BaseColorPicker
 		BaseColorPicker = config_tab:AddColorpicker({
 			Name = "Base Color",
-			Default = OrionLib.Themes[OrionLib.SelectedTheme].Main,
+			Default = GetRawTheme().Main,
 			Mode = 2,
 			Callback = function(Value)
 				if typeof(Value) ~= "Color3" then return end
@@ -6191,6 +6398,20 @@ function OrionLib:MakeWindow(WindowConfig)
 			ValueName = "%",
 			Callback = function(Value)
 				UIState.BackgroundImageDim = Value
+				applyBackgroundVisuals()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		config_tab:AddSlider({
+			Name = "Image Blur",
+			Min = 0,
+			Max = 24,
+			Default = tonumber(UIState.BackgroundImageBlur) or 0,
+			Increment = 1,
+			ValueName = "px",
+			Callback = function(Value)
+				UIState.BackgroundImageBlur = Value
 				applyBackgroundVisuals()
 				scheduleUIConfigSave()
 			end,
