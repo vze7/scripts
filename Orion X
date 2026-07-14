@@ -1,6 +1,6 @@
--- OrionX + FireOrion compatibility build v11
--- Full-surface background images, complete theme propagation and
--- responsive layout fixes.
+-- OrionX + FireOrion compatibility build v12
+-- Smart themed background, border-aware image clipping, coherent colors,
+-- responsive layout fixes and isolated network RTT display.
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -45,7 +45,7 @@ local OrionLib = {
 	SelectedTheme = "Default",
 	Folder = nil,
 	SaveCfg = false,
-	Version = "11.0.0-full-background-theme-sync"
+	Version = "12.0.0-smart-theme-network-rtt"
 }
 
 local Icons = {}
@@ -353,6 +353,7 @@ OrionLib.VisualPreferences = VisualPreferences
 -- immediately included in the background/transparency system.
 local RegisterBackgroundAwarePanel
 local RefreshBackgroundAwarePanels
+local RefreshBackgroundGeometry
 local BackgroundThemeTypes = {
 	Main = true,
 	Second = true,
@@ -412,6 +413,9 @@ local function ApplyCornerRadius()
 		else
 			Corner.CornerRadius = UDim.new(0, radius)
 		end
+	end
+	if type(RefreshBackgroundGeometry) == "function" then
+		pcall(RefreshBackgroundGeometry)
 	end
 end
 
@@ -796,31 +800,51 @@ local NotificationHolder = SetProps(SetChildren(MakeElement("TFrame"), {
 
 function OrionLib:GenTheme(mainColor)
 	local function mix(a, b, amount)
+		amount = math.clamp(amount, 0, 1)
 		return Color3.new(
 			a.R + (b.R - a.R) * amount,
 			a.G + (b.G - a.G) * amount,
 			a.B + (b.B - a.B) * amount
 		)
 	end
-	local lum = 0.2126 * mainColor.R + 0.7152 * mainColor.G + 0.0722 * mainColor.B
-	local dark = lum < 0.5
+
+	local function linear(channel)
+		return channel <= 0.04045 and (channel / 12.92) or (((channel + 0.055) / 1.055) ^ 2.4)
+	end
+
+	local function luminance(color)
+		return 0.2126 * linear(color.R) + 0.7152 * linear(color.G) + 0.0722 * linear(color.B)
+	end
+
+	local lum = luminance(mainColor)
+	local whiteContrast = 1.05 / (lum + 0.05)
+	local blackContrast = (lum + 0.05) / 0.05
+	local useLightText = whiteContrast >= blackContrast
 	local h, s, v = mainColor:ToHSV()
 	local t = {Main = mainColor}
 
-	if dark then
-		t.Second = mix(mainColor, Color3.new(1, 1, 1), 0.07)
-		t.Divider = mix(mainColor, Color3.new(1, 1, 1), 0.12)
-		t.Stroke = mix(mainColor, Color3.new(1, 1, 1), 0.2)
-		t.Text = Color3.fromRGB(241, 241, 245)
-		t.TextDark = Color3.fromRGB(158, 158, 168)
-		t.Accent = s < 0.16 and Color3.fromRGB(103, 132, 255) or Color3.fromHSV(h, math.clamp(s, 0.55, 0.85), math.max(v, 0.74))
+	if useLightText then
+		t.Second = mix(mainColor, Color3.new(1, 1, 1), 0.075)
+		t.Divider = mix(mainColor, Color3.new(1, 1, 1), 0.13)
+		t.Stroke = mix(mainColor, Color3.new(1, 1, 1), 0.23)
+		t.Text = Color3.fromRGB(246, 246, 249)
+		t.TextDark = mix(t.Text, mainColor, 0.46)
+		if s < 0.10 then
+			t.Accent = Color3.fromRGB(188, 188, 198)
+		else
+			t.Accent = Color3.fromHSV(h, math.clamp(s, 0.48, 0.88), math.max(v, 0.72))
+		end
 	else
-		t.Second = mix(mainColor, Color3.new(0, 0, 0), 0.04)
-		t.Divider = mix(mainColor, Color3.new(0, 0, 0), 0.09)
-		t.Stroke = mix(mainColor, Color3.new(0, 0, 0), 0.18)
-		t.Text = Color3.fromRGB(31, 31, 36)
-		t.TextDark = Color3.fromRGB(103, 103, 114)
-		t.Accent = s < 0.16 and Color3.fromRGB(72, 100, 220) or Color3.fromHSV(h, math.clamp(s, 0.5, 0.8), math.min(v, 0.62))
+		t.Second = mix(mainColor, Color3.new(0, 0, 0), 0.055)
+		t.Divider = mix(mainColor, Color3.new(0, 0, 0), 0.105)
+		t.Stroke = mix(mainColor, Color3.new(0, 0, 0), 0.19)
+		t.Text = Color3.fromRGB(24, 24, 29)
+		t.TextDark = mix(t.Text, mainColor, 0.46)
+		if s < 0.10 then
+			t.Accent = Color3.fromRGB(78, 78, 88)
+		else
+			t.Accent = Color3.fromHSV(h, math.clamp(s, 0.45, 0.82), math.min(v, 0.60))
+		end
 	end
 
 	return t
@@ -1094,9 +1118,11 @@ function OrionLib:MakeWindow(WindowConfig)
 		BackgroundImageEnabled = WindowConfig.BackgroundImage ~= "",
 		BackgroundImageSource = WindowConfig.BackgroundImage,
 		BackgroundImageVisibility = 100,
-		BackgroundImageDim = 18,
+		BackgroundImageDim = 10,
 		BackgroundPanelTransparency = 64,
-		BackgroundSurfaceVersion = 1,
+		BackgroundSmartTheme = true,
+		BackgroundTintStrength = 52,
+		BackgroundSurfaceVersion = 3,
 		BackgroundImageScaleType = "Crop",
 		ShowFPS = false,
 		ShowPing = false,
@@ -1123,14 +1149,18 @@ function OrionLib:MakeWindow(WindowConfig)
 		end)
 	end
 
-	-- v11 migration: the old 38% value left most components visually opaque.
-	-- Raise old configurations once; users can still move the slider anywhere.
-	if (tonumber(UIState.BackgroundSurfaceVersion) or 1) < 2 then
+	-- v12 migration: preserve old values, enable the smart themed image layer,
+	-- and prevent legacy configurations from recreating washed-out gray panels.
+	if (tonumber(UIState.BackgroundSurfaceVersion) or 1) < 3 then
 		UIState.BackgroundPanelTransparency = math.max(
 			tonumber(UIState.BackgroundPanelTransparency) or 0,
-			64
+			58
 		)
-		UIState.BackgroundSurfaceVersion = 2
+		if UIState.BackgroundSmartTheme == nil then
+			UIState.BackgroundSmartTheme = true
+		end
+		UIState.BackgroundTintStrength = tonumber(UIState.BackgroundTintStrength) or 52
+		UIState.BackgroundSurfaceVersion = 3
 	end
 
 	VisualPreferences.StrokeVisibility = math.clamp(tonumber(UIState.StrokeVisibility) or 0, 0, 100)
@@ -1648,10 +1678,24 @@ function OrionLib:MakeWindow(WindowConfig)
 		WindowStuff
 	}), "Main")
 
-	-- Obsidian-style background image system.
-	-- The public Window:SetBackgroundImage API accepts a Roblox image ID,
-	-- rbxassetid://ID, or a direct HTTP/HTTPS image URL. URL images are cached
-	-- locally and converted with getcustomasset/getsynasset when available.
+	-- Full-window background stack. The clip layer owns the exact same corner
+	-- geometry as the window, so changing Roundness or Border Thickness also
+	-- updates the image instead of leaving square pixels outside the border.
+	local BackgroundLayer = Instance.new("Frame")
+	BackgroundLayer.Name = "BackgroundLayer"
+	BackgroundLayer.Size = UDim2.fromScale(1, 1)
+	BackgroundLayer.Position = UDim2.fromScale(0, 0)
+	BackgroundLayer.BackgroundTransparency = 1
+	BackgroundLayer.BorderSizePixel = 0
+	BackgroundLayer.ClipsDescendants = true
+	BackgroundLayer.Active = false
+	BackgroundLayer.ZIndex = 1
+	BackgroundLayer:SetAttribute("OrionBackgroundExclude", true)
+	BackgroundLayer.Parent = MainWindow
+
+	local BackgroundLayerCorner = Instance.new("UICorner")
+	BackgroundLayerCorner.Parent = BackgroundLayer
+
 	local BackgroundImage = Instance.new("ImageLabel")
 	BackgroundImage.Name = "CustomBackgroundImage"
 	BackgroundImage.Size = UDim2.fromScale(1, 1)
@@ -1667,11 +1711,57 @@ function OrionLib:MakeWindow(WindowConfig)
 	BackgroundImage.Visible = false
 	BackgroundImage.Active = false
 	BackgroundImage.ZIndex = 1
-	BackgroundImage.Parent = MainWindow
+	BackgroundImage:SetAttribute("OrionBackgroundExclude", true)
+	BackgroundImage.Parent = BackgroundLayer
+
+	local BackgroundImageCorner = Instance.new("UICorner")
+	BackgroundImageCorner.Parent = BackgroundImage
+
+	-- Darkness is independent from the selected theme color.
+	local BackgroundDarken = Instance.new("Frame")
+	BackgroundDarken.Name = "BackgroundDarken"
+	BackgroundDarken.Size = UDim2.fromScale(1, 1)
+	BackgroundDarken.BackgroundColor3 = Color3.new(0, 0, 0)
+	BackgroundDarken.BackgroundTransparency = 1
+	BackgroundDarken.BorderSizePixel = 0
+	BackgroundDarken.ZIndex = 2
+	BackgroundDarken:SetAttribute("OrionBackgroundExclude", true)
+	BackgroundDarken.Parent = BackgroundLayer
+
+	local BackgroundDarkenCorner = Instance.new("UICorner")
+	BackgroundDarkenCorner.Parent = BackgroundDarken
+
+	-- Theme tint keeps colored themes readable over bright or high-contrast
+	-- images. It updates every time SetTheme is called.
+	local BackgroundTint = Instance.new("Frame")
+	BackgroundTint.Name = "BackgroundThemeTint"
+	BackgroundTint.Size = UDim2.fromScale(1, 1)
+	BackgroundTint.BackgroundTransparency = 1
+	BackgroundTint.BorderSizePixel = 0
+	BackgroundTint.ZIndex = 3
+	BackgroundTint:SetAttribute("OrionBackgroundExclude", true)
+	BackgroundTint.Parent = BackgroundLayer
+
+	local BackgroundTintCorner = Instance.new("UICorner")
+	BackgroundTintCorner.Parent = BackgroundTint
 
 	local BackgroundImageReady = false
 	local BackgroundAwarePanels = {}
 	local trimBackgroundSource
+
+	local function syncBackgroundGeometry()
+		local thickness = math.max(0, tonumber(mainWindowStroke and mainWindowStroke.Thickness) or 0)
+		local strokeRatio = math.clamp((tonumber(VisualPreferences.StrokeVisibility) or 0) / 100, 0, 1)
+		local inset = math.max(0, math.ceil(thickness * strokeRatio * 0.5))
+		local radius = math.max(0, math.clamp(tonumber(VisualPreferences.CornerRadius) or 0, 0, 32) - inset)
+		BackgroundLayer.Position = UDim2.fromOffset(inset, inset)
+		BackgroundLayer.Size = UDim2.new(1, -(inset * 2), 1, -(inset * 2))
+		for _, corner in ipairs({BackgroundLayerCorner, BackgroundImageCorner, BackgroundDarkenCorner, BackgroundTintCorner}) do
+			corner.CornerRadius = UDim.new(0, radius)
+		end
+	end
+	RefreshBackgroundGeometry = syncBackgroundGeometry
+	syncBackgroundGeometry()
 
 	local function isBackgroundActive()
 		return UIState.BackgroundImageEnabled == true
@@ -1690,7 +1780,10 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local function registerBackgroundAwarePanel(object, baseTransparency)
 		if not object or not object:IsA("GuiObject") then return object end
-		if object == BackgroundImage or object:GetAttribute("OrionBackgroundExclude") == true then
+		if object == BackgroundLayer
+			or object == BackgroundImage
+			or object:IsDescendantOf(BackgroundLayer)
+			or object:GetAttribute("OrionBackgroundExclude") == true then
 			return object
 		end
 		if object ~= MainWindow and not object:IsDescendantOf(MainWindow) then
@@ -1725,8 +1818,9 @@ function OrionLib:MakeWindow(WindowConfig)
 	-- The image is behind the complete window. Every interactive descendant is
 	-- kept above it so the image never intercepts input or covers controls.
 	local function keepContentAboveBackground(object)
-		if object ~= BackgroundImage and object:IsA("GuiObject") and object.ZIndex < 2 then
-			object.ZIndex = 2
+		if object == BackgroundLayer or object:IsDescendantOf(BackgroundLayer) then return end
+		if object:IsA("GuiObject") and object.ZIndex < 5 then
+			object.ZIndex = 5
 		end
 	end
 	for _, object in ipairs(MainWindow:GetDescendants()) do
@@ -1910,13 +2004,12 @@ function OrionLib:MakeWindow(WindowConfig)
 		local theme = OrionLib.Themes[OrionLib.SelectedTheme] or OrionLib.Themes.Default
 		local panelTransparency = currentBackgroundPanelTransparency()
 
-		-- Catch every surface already present and every component added by tabs.
-		-- Main/Second/Divider are semantic panel colors; functional Accent objects
-		-- such as slider fills remain visible and are themed separately.
 		registerExistingBackgroundPanels()
 
+		-- The window itself remains opaque. The image stack sits above this base,
+		-- preventing the 3D world from leaking through transparent pixels.
 		MainWindow.BackgroundColor3 = theme.Main
-		MainWindow.BackgroundTransparency = enabled and 1 or 0
+		MainWindow.BackgroundTransparency = 0
 
 		for index = #BackgroundAwarePanels, 1, -1 do
 			local panel = BackgroundAwarePanels[index]
@@ -1929,8 +2022,6 @@ function OrionLib:MakeWindow(WindowConfig)
 			end
 		end
 
-		-- Item containers must always stay transparent. Their children now handle
-		-- the tint, preventing the old white/gray full-page sheet from returning.
 		for _, tabData in pairs(Tabs) do
 			local container = tabData and tabData.Container
 			if container and container.Parent then
@@ -1944,14 +2035,31 @@ function OrionLib:MakeWindow(WindowConfig)
 
 	local function applyBackgroundVisuals()
 		local enabled = isBackgroundActive()
+		local theme = OrionLib.Themes[OrionLib.SelectedTheme] or OrionLib.Themes.Default
 		local visibility = math.clamp(tonumber(UIState.BackgroundImageVisibility) or 100, 0, 100)
-		local darkness = math.clamp(tonumber(UIState.BackgroundImageDim) or 18, 0, 100)
-		local brightness = math.floor(255 * (1 - darkness / 100) + 0.5)
+		local darkness = math.clamp(tonumber(UIState.BackgroundImageDim) or 10, 0, 90) / 100
+		local requestedTint = math.clamp(tonumber(UIState.BackgroundTintStrength) or 52, 0, 100) / 100
+		local panelTransparency = currentBackgroundPanelTransparency()
 
+		-- Smart mode increases tint only when panels become highly transparent.
+		-- This keeps every selected hue coherent without flattening the image.
+		local tintOpacity = requestedTint
+		if UIState.BackgroundSmartTheme ~= false then
+			local autoMinimum = 0.34 + (panelTransparency * 0.25)
+			tintOpacity = math.clamp(math.max(requestedTint, autoMinimum), 0, 0.82)
+		end
+
+		BackgroundLayer.Visible = enabled
 		BackgroundImage.Visible = enabled
 		BackgroundImage.ImageTransparency = VisibilityToTransparency(visibility)
-		BackgroundImage.ImageColor3 = Color3.fromRGB(brightness, brightness, brightness)
+		BackgroundImage.ImageColor3 = Color3.new(1, 1, 1)
 		BackgroundImage.ScaleType = backgroundScaleTypes[tostring(UIState.BackgroundImageScaleType)] or Enum.ScaleType.Crop
+		BackgroundDarken.Visible = enabled
+		BackgroundDarken.BackgroundTransparency = enabled and (1 - darkness) or 1
+		BackgroundTint.Visible = enabled
+		BackgroundTint.BackgroundColor3 = theme.Main
+		BackgroundTint.BackgroundTransparency = enabled and (1 - tintOpacity) or 1
+		syncBackgroundGeometry()
 		applyBackgroundPanels()
 	end
 
@@ -1973,6 +2081,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			BackgroundImage.Image = ""
 			BackgroundImage.ImageRectOffset = Vector2.zero
 			BackgroundImage.ImageRectSize = Vector2.zero
+			BackgroundLayer.Visible = false
 			applyBackgroundVisuals()
 			if not quiet then notifyBackground("Background cleared.", false) end
 			return
@@ -2030,7 +2139,7 @@ function OrionLib:MakeWindow(WindowConfig)
 	OrionLib.ImageManager = OrionLib.ImageManager or {}
 	OrionLib.ImageManager.Background = BackgroundImageManager
 	OrionLib._RefreshWindowBackground = function()
-		applyBackgroundPanels()
+		applyBackgroundVisuals()
 	end
 
 	registerExistingBackgroundPanels()
@@ -2239,7 +2348,8 @@ function OrionLib:MakeWindow(WindowConfig)
 	local localCountryCode = ""
 	local localInfoAlive = true
 	local smoothedFPS = 0
-	local currentPingMS = 0
+	local currentPingMS
+	local pingSamples = {}
 	local frameCounter = 0
 	local frameAccumulator = 0
 
@@ -2371,7 +2481,13 @@ function OrionLib:MakeWindow(WindowConfig)
 	local function updateLocalInfoText()
 		local pieces = {}
 		if UIState.ShowFPS then table.insert(pieces, string.format("%d FPS", math.max(0, math.floor(smoothedFPS + 0.5)))) end
-		if UIState.ShowPing then table.insert(pieces, string.format("%d ms", math.max(0, math.floor(currentPingMS + 0.5)))) end
+		if UIState.ShowPing then
+			if type(currentPingMS) == "number" then
+				table.insert(pieces, string.format("%d ms", math.max(0, math.floor(currentPingMS + 0.5))))
+			else
+				table.insert(pieces, "-- ms")
+			end
+		end
 		if UIState.ShowClock then table.insert(pieces, os.date("!%H:%M", os.time() + localUtcOffset)) end
 		if UIState.ShowTemperature then table.insert(pieces, formatTemperature()) end
 		LocalInfo.Text = table.concat(pieces, " | ")
@@ -2436,15 +2552,19 @@ function OrionLib:MakeWindow(WindowConfig)
 			local ok, ping = pcall(function()
 				return LocalPlayer:GetNetworkPing() * 1000
 			end)
-			if ok and type(ping) == "number" then
-				currentPingMS = ping
+			if ok and type(ping) == "number" and ping >= 0 and ping < 10000 then
+				table.insert(pingSamples, ping)
+				if #pingSamples > 5 then table.remove(pingSamples, 1) end
+				local ordered = table.clone(pingSamples)
+				table.sort(ordered)
+				currentPingMS = ordered[math.ceil(#ordered / 2)]
 			else
-				pcall(function()
-					currentPingMS = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-				end)
+				-- Do not substitute replication/Data Ping: it measures queueing and
+				-- reliable replication delay, not the isolated network RTT requested.
+				currentPingMS = nil
 			end
 			updateLocalInfoText()
-			task.wait(1)
+			task.wait(0.75)
 		end
 	end)
 
@@ -5975,6 +6095,9 @@ function OrionLib:MakeWindow(WindowConfig)
 			Callback = function(Value)
 				mainWindowStroke.Thickness = Value
 				UIState.BorderThickness = Value
+				if type(RefreshBackgroundGeometry) == "function" then
+					RefreshBackgroundGeometry()
+				end
 				scheduleUIConfigSave()
 			end,
 		})
@@ -6063,7 +6186,7 @@ function OrionLib:MakeWindow(WindowConfig)
 			Name = "Image Darkness",
 			Min = 0,
 			Max = 90,
-			Default = tonumber(UIState.BackgroundImageDim) or 18,
+			Default = tonumber(UIState.BackgroundImageDim) or 10,
 			Increment = 1,
 			ValueName = "%",
 			Callback = function(Value)
@@ -6082,7 +6205,31 @@ function OrionLib:MakeWindow(WindowConfig)
 			ValueName = "%",
 			Callback = function(Value)
 				UIState.BackgroundPanelTransparency = Value
-				applyBackgroundPanels()
+				applyBackgroundVisuals()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		config_tab:AddToggle({
+			Name = "Smart Background Theme",
+			Default = UIState.BackgroundSmartTheme ~= false,
+			Callback = function(Value)
+				UIState.BackgroundSmartTheme = Value == true
+				applyBackgroundVisuals()
+				scheduleUIConfigSave()
+			end,
+		})
+
+		config_tab:AddSlider({
+			Name = "Theme Tint Strength",
+			Min = 0,
+			Max = 85,
+			Default = tonumber(UIState.BackgroundTintStrength) or 52,
+			Increment = 1,
+			ValueName = "%",
+			Callback = function(Value)
+				UIState.BackgroundTintStrength = Value
+				applyBackgroundVisuals()
 				scheduleUIConfigSave()
 			end,
 		})
@@ -6133,7 +6280,7 @@ function OrionLib:MakeWindow(WindowConfig)
 		})
 
 		config_tab:AddToggle({
-			Name = "Show Ping",
+			Name = "Show Network Ping (RTT)",
 			Default = UIState.ShowPing == true,
 			Callback = function(Value)
 				UIState.ShowPing = Value == true
