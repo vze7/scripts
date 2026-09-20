@@ -13567,7 +13567,6 @@ function syde:MakeWindow(WindowConfig)
 	end
 
 	WindowFunctions.InitTab = WindowFunctions.MakeTab
-	WindowFunctions.Init = function(self) return syde:Init() end
 	syde.ActiveWindow = WindowFunctions
 
 	return WindowFunctions
