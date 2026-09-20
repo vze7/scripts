@@ -2375,12 +2375,12 @@ function AntiPerm(a)
     end)
 end
 --sep                                                                  
---# Orion Config
+--# Syde Config
 
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/vze7/scripts/main/syde.lua')))()
-OrionLib.UMouseMode = "ThirdPerson"
+local syde = syde or (rawget and rawget(getgenv and getgenv() or _G, "syde")) or loadstring(game:HttpGet("https://raw.githubusercontent.com/vze7/scripts/main/syde.lua", true))()
+syde.UMouseMode = "ThirdPerson"
 
-local Window = OrionLib:MakeWindow({
+local Window = syde:MakeWindow({
     TagText = var("Toggle").Isowner and "Owner" or "User",
     IntroIcon = "rbxassetid://114143041236784",
     Icon = "rbxassetid://114143041236784",
@@ -2397,7 +2397,7 @@ local Window = OrionLib:MakeWindow({
 
 ---@diagnostic disable-next-line: undefined-global
 function notify(N, C, I, T)
-    OrionLib:MakeNotification({
+    syde:MakeNotification({
         Name = N or "Note!",
         Content = C or "Message",
         Image = I or "rbxassetid://8798704474",     
@@ -3241,8 +3241,8 @@ Bind:AddBind({
         end
         var("UIS").MouseIconEnabled = var("Toggle").TPTg 
         var("UIS").MouseBehavior = var("Toggle").TPTg and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
-        var("p").CameraMaxZoomDistance = var("Toggle").TPTg and OrionLib.maxds or 0.5
-        var("p").CameraMinZoomDistance = var("Toggle").TPTg and OrionLib.minds or 0.5
+        var("p").CameraMaxZoomDistance = var("Toggle").TPTg and syde.maxds or 0.5
+        var("p").CameraMinZoomDistance = var("Toggle").TPTg and syde.minds or 0.5
         var("p").CameraMode = var("Toggle").TPTg and Enum.CameraMode.Classic or Enum.CameraMode.LockFirstPerson
     end
 })
@@ -3538,6 +3538,6 @@ Config:AddParagraph(
 Config:AddSection("Version 2.1", "Right", 10)
 Config:AddSection("DISCONTINUED", "Right", 10)
 cm("plradded", "Add", UPDDrops)
-OrionLib:Init() 
+syde:Init() 
 --! Creator :: firemax
 --todo order // dropdowns
