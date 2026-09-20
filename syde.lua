@@ -1267,9 +1267,8 @@ end
 
 
 function syde:updateLayout(container, spacing)
-	spacing = spacing or 5
-	local yOffset = 0
-	local containerWidth = container.AbsoluteSize.X 
+	spacing = spacing or 8
+	local yOffset = 8
 
 	for _, v in ipairs(container:GetChildren()) do
 		if v:IsA('UIListLayout') then
@@ -1280,16 +1279,16 @@ function syde:updateLayout(container, spacing)
 	if resizing == false then
 		for _, child in ipairs(container:GetChildren()) do
 			if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
-				--child.Size = UDim2.new(1, -10, 0, child.Size.Y.Offset) -- Full width, fixed height
-				-- child.Position = UDim2.new(0, 0, 0, yOffset)
-				tweenservice:Create(child, TweenInfo.new(0.45, Enum.EasingStyle.Exponential), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+				if child.Size.X.Offset ~= -16 or child.Size.X.Scale ~= 1 then
+					child.Size = UDim2.new(1, -16, 0, child.Size.Y.Offset)
+				end
+				tweenservice:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0, 8, 0, yOffset)}):Play()
 				yOffset = yOffset + child.AbsoluteSize.Y + spacing
 			end
 		end
 	end
 
-
-	container.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+	container.CanvasSize = UDim2.new(0, 0, 0, yOffset + 14)
 end
 
 local dragSpeed = 0.6
@@ -1625,22 +1624,20 @@ do
 			LOADER.loader.work.Position = UDim2.new(0.5, 0,1, -40)
 			LOADER.loader.work.Text = Text
 			LOADER.loader.work.ImageLabel.Image = icon
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -73) }):Play()
-			--	tweenservice:Create(game.Workspace.Camera, TweenInfo.new(1, Enum.EasingStyle.Exponential), { FieldOfView  = game.Workspace.Camera.FieldOfView - 3 }):Play()
-			task.wait(Finish)
-			tweenservice:Create(LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -100) }):Play()
-			task.wait(0.35)
-
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { TextTransparency = 0 }):Play()
+			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { ImageTransparency = 0 }):Play()
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -73) }):Play()
+			task.wait(Finish or 0.15)
+			tweenservice:Create(LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { TextTransparency = 1 }):Play()
+			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { ImageTransparency = 1 }):Play()
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -100) }):Play()
+			task.wait(0.1)
 			-- reset
 
 		end
 
 		local function load()
-			TweenWorkLabel(0.4,'rbxassetid://136002400178503', '')
+			TweenWorkLabel(0.18,'rbxassetid://136002400178503', '')
 
 			if Config.ConfigurationSaving and Config.ConfigurationSaving.Enabled then
 				local folderName = Config.ConfigurationSaving.FolderName or "SydeSec"
@@ -1684,7 +1681,7 @@ do
 			end
 
 
-			TweenWorkLabel(0.4,'rbxassetid://105810189969774', '')
+			TweenWorkLabel(0.18,'rbxassetid://105810189969774', '')
 
 			local UI_TAG = "sydeUILoader"
 			local MARKER_NAME = "SYDEUIDetector"
@@ -1740,7 +1737,7 @@ do
 				end
 			end)
 
-			TweenWorkLabel(0.4,'rbxassetid://108012241529487', '')
+			TweenWorkLabel(0.18,'rbxassetid://108012241529487', '')
 
 
 			if Config.AutoJoinDiscord and Config.AutoJoinDiscord.Enabled then
@@ -1807,7 +1804,7 @@ do
 				end
 			end
 
-			TweenWorkLabel(0.4,'rbxassetid://136405833725573', '')
+			TweenWorkLabel(0.18,'rbxassetid://136405833725573', '')
 			task.wait(0.4)
 			loaded = true
 			--	tweenservice:Create( LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 146,0, 25)}):Play()
@@ -1818,7 +1815,7 @@ do
 		task.wait(0.08)
 		load()
 
-		task.wait(0.6)
+		task.wait(0.15)
 
 		--	Library.Enabled = true
 		syde.theme.Accent = Config.Accent;
@@ -1845,14 +1842,44 @@ end
 local function ApplyFlag(Flag, Value)
 	if Value == nil then return false end
 
+	-- Keybind Handling
+	if type(Value) == "table" and Value._type == "Key" then
+		local keyItem
+		if Value.EnumType == "Enum.KeyCode" and Enum.KeyCode[Value.Name] then
+			keyItem = Enum.KeyCode[Value.Name]
+		elseif Value.EnumType == "Enum.UserInputType" and Enum.UserInputType[Value.Name] then
+			keyItem = Enum.UserInputType[Value.Name]
+		end
+		if keyItem and Flag.Set then
+			Flag:Set(keyItem)
+			return true
+		end
+	elseif typeof(Value) == "string" and Enum.KeyCode[Value] and Flag.Set then
+		Flag:Set(Enum.KeyCode[Value])
+		return true
+	end
+
+	-- Pbind Handling
+	if type(Value) == "table" and Value._type == "Pbind" then
+		if Flag.Set then
+			Flag:Set(Value.X, Value.Y, Value.Z)
+			return true
+		end
+	end
+
 	-- ColorPicker Handling
-	if Flag.Type == "ColorPicker" then
-		local unpacked = syde:ColorUnpack(Value)
+	if Flag.Type == "ColorPicker" or (type(Value) == "table" and Value._type == "Color") then
+		local col
+		if type(Value) == "table" and Value.R and Value.G and Value.B then
+			col = Color3.new(Value.R, Value.G, Value.B)
+		else
+			col = syde:ColorUnpack(Value)
+		end
 
 		if Flag.Set then
-			Flag:Set(unpacked, true)
+			Flag:Set(col, true)
 		elseif Flag.Color then
-			Flag.Color = unpacked
+			Flag.Color = col
 		end
 
 		return true
@@ -1875,7 +1902,6 @@ local function ApplyFlag(Flag, Value)
 		return true
 	end
 
-	warn("Syde 〡 Unsupported flag type for:", Flag)
 	return false
 end
 
@@ -1932,7 +1958,7 @@ end
 
 -- Internal Save Logic
 local function PerformSave()
-	if not syde.ConfigEnabled then return end
+	if not syde.ConfigEnabled then syde.ConfigEnabled = true end
 	if not writefile then return end
 
 	local Data = {
@@ -1940,42 +1966,54 @@ local function PerformSave()
 	}
 
 	for FlagName, Flag in pairs(syde.Flags) do
-		if Flag.Type == "ColorPicker" then
-			if Flag.Color then
-				Data[FlagName] = syde:ColorPack(Flag.Color)
+		if type(Flag) == "table" then
+			if Flag.Type == "ColorPicker" or (Flag.Color and Flag.Set) then
+				if Flag.Color then
+					Data[FlagName] = { _type = "Color", R = Flag.Color.R, G = Flag.Color.G, B = Flag.Color.B }
+				end
+			elseif Flag.Key and typeof(Flag.Key) == "EnumItem" then
+				Data[FlagName] = { _type = "Key", EnumType = tostring(Flag.Key.EnumType), Name = Flag.Key.Name }
+			elseif Flag.ValueX ~= nil and Flag.ValueY ~= nil and Flag.ValueZ ~= nil then
+				Data[FlagName] = { _type = "Pbind", X = tostring(Flag.ValueX), Y = tostring(Flag.ValueY), Z = tostring(Flag.ValueZ) }
+			elseif Flag.V ~= nil then
+				Data[FlagName] = Flag.V
+			elseif Flag.Value ~= nil then
+				if typeof(Flag.Value) == "EnumItem" then
+					Data[FlagName] = { _type = "Key", EnumType = tostring(Flag.Value.EnumType), Name = Flag.Value.Name }
+				else
+					Data[FlagName] = Flag.Value
+				end
+			elseif Flag.StarterValue ~= nil then
+				Data[FlagName] = Flag.StarterValue
+			elseif Flag._textBox and Flag._textBox.Text then
+				Data[FlagName] = Flag._textBox.Text
 			end
-		elseif Flag.V ~= nil then
-			Data[FlagName] = Flag.V
-		elseif Flag.Color then
-			Data[FlagName] = syde:ColorPack(Flag.Color)
-		elseif Flag.StarterValue ~= nil then
-			Data[FlagName] = Flag.StarterValue
 		end
 	end
 
-	-- Ensure folder exists
-	if makefolder and not isfolder(syde.ConfigFolder) then
-		makefolder(syde.ConfigFolder)
+	local folder = syde.ConfigFolder or "FireHub"
+	local file = syde.ConfigFile or "default"
+
+	if makefolder and isfolder and not isfolder(folder) then
+		pcall(makefolder, folder)
 	end
 
-	local path = string.format("%s/%s.json", syde.ConfigFolder, syde.ConfigFile)
-
-	local success, err = pcall(function()
+	local path = string.format("%s/%s.json", folder, file)
+	pcall(function()
 		writefile(path, HttpService:JSONEncode(Data))
 	end)
-
-	if not success then
-		warn("Syde 〡 Failed to save config:", err)
-	end
 end
 
--- Public Save (Debounced)
 function SaveConfig()
+	if not syde.ConfigEnabled then syde.ConfigEnabled = true end
 	if SaveDebounce then
 		task.cancel(SaveDebounce)
 	end
+	SaveDebounce = task.delay(SAVE_DELAY or 0.3, PerformSave)
+end
 
-	SaveDebounce = task.delay(SAVE_DELAY, PerformSave)
+function syde:AutoSave()
+	SaveConfig()
 end
 
 function syde:LoadSaveConfig(targetFile)
@@ -2562,6 +2600,29 @@ end
 
 function syde:MakeWindow(WindowConfig)
 	WindowConfig = WindowConfig or {}
+	local cfgFolder = WindowConfig.ConfigFolder or (WindowConfig.Name and WindowConfig.Name:gsub("[^%w_%-]", "") or "FireHub")
+	local cfgFile = "default"
+
+	syde.ConfigFolder = cfgFolder
+	syde.ConfigFile = cfgFile
+	syde.ConfigEnabled = true
+
+	pcall(function()
+		if isfolder and makefolder and not isfolder(cfgFolder) then
+			makefolder(cfgFolder)
+		end
+		local path = string.format("%s/%s.json", cfgFolder, cfgFile)
+		if isfile and isfile(path) then
+			local rawData = readfile(path)
+			if rawData and rawData ~= "" then
+				local decoded = https:JSONDecode(rawData)
+				if type(decoded) == "table" then
+					syde.LoadedConfig = decoded
+				end
+			end
+		end
+	end)
+
 	local libConfig = {
 		Title = WindowConfig.Name or WindowConfig.Title or "Syde",
 		SubText = WindowConfig.TagText or WindowConfig.SubText or "Hub",
@@ -2573,16 +2634,6 @@ function syde:MakeWindow(WindowConfig)
 	if WindowConfig.FreeMouse then
 		syde.FreeMouse = true
 		syde:UnlockMouse(true)
-	end
-
-	if WindowConfig.SaveConfig and WindowConfig.ConfigFolder then
-		syde.ConfigFolder = WindowConfig.ConfigFolder
-		syde.ConfigEnabled = true
-		pcall(function()
-			if isfolder and makefolder and not isfolder(WindowConfig.ConfigFolder) then
-				makefolder(WindowConfig.ConfigFolder)
-			end
-		end)
 	end
 
 	local windowObj = syde:Init(libConfig)
@@ -2691,124 +2742,109 @@ function openui()
 	window.Visible = true
 	uiclosed = false
 
+	local fastTween = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
 	if bluron then
 		syde:BindFrame(window, {
 			Transparency = 0.98;
 			BrickColor = BrickColor.new('Institutional white');
 		})
-		tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.45 }):Play()
+		tweenservice:Create(window, fastTween, {BackgroundTransparency = 0.45 }):Play()
 	else
-		tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
+		tweenservice:Create(window, fastTween, {BackgroundTransparency = 0 }):Play()
 	end
-	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 700,0, 560) }):Play()
+	tweenservice:Create(window, fastTween, {Size = UDim2.new(0, 700, 0, 560) }):Play()
 
-	tweenservice:Create(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
-	tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
+	tweenservice:Create(window.top.separator, fastTween, {BackgroundTransparency = 0 }):Play()
+	tweenservice:Create(window.top.title, fastTween, {TextTransparency = 0 }):Play()
+	tweenservice:Create(window.top.title.sub, fastTween, {TextTransparency = 0 }):Play()
+	tweenservice:Create(window.top.functions, fastTween, {BackgroundTransparency = 0 }):Play()
 
-	tweenservice:Create(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
-
-	if window.wallpaper.ison.Value  then
-		tweenservice:Create(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.84 }):Play()
+	if window.wallpaper.ison.Value then
+		tweenservice:Create(window.wallpaper, fastTween, {ImageTransparency = 0.84 }):Play()
 	end
-
 
 	for i,v in pairs(window.top.functions:GetChildren()) do
 		if v:IsA("Frame") then
-			tweenservice:Create(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.8 }):Play()
+			tweenservice:Create(v, fastTween, {BackgroundTransparency = 0.8 }):Play()
 			v.Visible = true
 			for i,v2 in pairs(v:GetChildren()) do
 				if v2:IsA("ImageLabel") then
-					tweenservice:Create(v2, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0 }):Play()
+					tweenservice:Create(v2, fastTween, {ImageTransparency = 0 }):Play()
 					v2.Visible = true
 				end
 			end
 			if v:FindFirstChild("rainbow") then
-				tweenservice:Create(v.rainbow, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+				tweenservice:Create(v.rainbow, fastTween, {ImageTransparency = 1 }):Play()
 			end
-
 		end
 	end
 
-	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.5 }):Play()
-	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.3}):Play()
+	tweenservice:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 0.5 }):Play()
+	tweenservice:Create(window.resize, fastTween, {ImageTransparency = 0.3}):Play()
 
 	if glow == true then
-		for i, glow in pairs(window.clipframe:GetChildren()) do
-			if glow:IsA("ImageLabel") then
-				tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
+		for i, g in pairs(window.clipframe:GetChildren()) do
+			if g:IsA("ImageLabel") then
+				tweenservice:Create(g, fastTween, {ImageTransparency = 0.8}):Play()
 			end
 		end
-
-		tweenservice:Create(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.9}):Play()
-		tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.9}):Play()
+		tweenservice:Create(window.shadow.glow, fastTween, {ImageTransparency = 0.9}):Play()
+		tweenservice:Create(window.shadow.glow1, fastTween, {ImageTransparency = 0.9}):Play()
 	end
-
-
 end
 
 function closeui()
+	local fastTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
 	pages.Visible = false
 	window.tabs.Visible = false
 	window.user.Visible = false
 
-	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200) }):Play()
+	tweenservice:Create(window, fastTween, {BackgroundTransparency = 1 }):Play()
+	tweenservice:Create(window, fastTween, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 120) }):Play()
+	tweenservice:Create(window.top.separator, fastTween, {BackgroundTransparency = 1 }):Play()
+	tweenservice:Create(window.top.title, fastTween, {TextTransparency = 1 }):Play()
+	tweenservice:Create(window.top.title.sub, fastTween, {TextTransparency = 1 }):Play()
 
-	tweenservice:Create(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
-
-	if window.wallpaper.ison.Value  then
-		tweenservice:Create(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+	if window.wallpaper.ison.Value then
+		tweenservice:Create(window.wallpaper, fastTween, {ImageTransparency = 1 }):Play()
 	end
 
-
 	syde:UnbindFrame(window)
+	tweenservice:Create(window.top.functions, fastTween, {BackgroundTransparency = 1 }):Play()
 
-
-	tweenservice:Create(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
 	for i,v in pairs(window.top.functions:GetChildren()) do
 		if v:IsA("Frame") then
-			tweenservice:Create(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
+			tweenservice:Create(v, fastTween, {BackgroundTransparency = 1 }):Play()
 			v.Visible = false
 			for i,v2 in pairs(v:GetChildren()) do
 				if v2:IsA("ImageLabel") then
-					tweenservice:Create(v2, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+					tweenservice:Create(v2, fastTween, {ImageTransparency = 1 }):Play()
 					v2.Visible = false
 				end
 			end
 		end
 	end
 
-	for i, glow in pairs(window.clipframe:GetChildren()) do
-		if glow:IsA("ImageLabel") then
-			tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
-		end
-	end
-
-	tweenservice:Create(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
-	tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
-
-	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
-	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+	tweenservice:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 1 }):Play()
+	tweenservice:Create(window.resize, fastTween, {ImageTransparency = 1 }):Play()
 
 	closesettings()
 	closesearch()
 	settingsOpen = false
 
+	task.delay(0.2, function()
+		if uiclosed then
+			window.Visible = false
+		end
+	end)
 
-
-	--task.wait(0.5)
-
-	window.Visible = false
 	uiclosed = true
 	syde:Toast({
 		Content = 'UI Hidden, Use '.. uitoggle.Name ..' To Open Back.',
 		Duration = 2,
 	})
-
-
 end
 
 local bounce = false
@@ -6807,99 +6843,9 @@ function syde:Init(library)
 			return syde.ConfigFile
 		end
 
-		a:Button({
-			Title = 'Save',
-			CallBack = function ()
-				local name = (currentConfigName and currentConfigName ~= "") and currentConfigName or syde.ConfigFile
-				syde:SaveConfigAs(name)
-				syde:SaveSettingsConfig()
-				refreshConfigList()
-			end
-		})
-		a:Button({
-			Title = 'Load',
-			CallBack = function ()
-				local name = resolveConfigName()
-				syde:LoadSaveConfig(name)
-				syde:LoadSettingsConfig()
-			end
-		})
-		a:Button({
-			Title = 'AutoLoad',
-			CallBack = function ()
-				autoloadEnabled = not autoloadEnabled
-				syde:SetAutoLoad(autoloadEnabled)
-				updateAutoLoadLabel()
-				if syde.Toast then
-					syde:Toast({ Content = 'AutoLoad: ' .. (autoloadEnabled and 'ON' or 'OFF'), Duration = 3 })
-				end
-			end
-		})
-		a:Button({
-			Title = 'Overwrite',
-			CallBack = function ()
-				local name = resolveConfigName()
-				if not name or name == "" then
-					if syde.Toast then syde:Toast({ Content = 'No config to overwrite', Duration = 3 }) end
-					return
-				end
-				syde:SaveConfigAs(name)
-				syde:SaveSettingsConfig()
-				if syde.Toast then syde:Toast({ Content = 'Overwrote: ' .. name, Duration = 3 }) end
-				refreshConfigList()
-			end
-		})
-
-		-- Arrange the four buttons in a 2x2 grid
-		do
-			local themePage = window.settings.pages:FindFirstChild('Theme')
-			if themePage then
-				local saveBtn = themePage:FindFirstChild('Save')
-				local loadBtn = themePage:FindFirstChild('Load')
-				local autoloadBtn = themePage:FindFirstChild('AutoLoad')
-				local overwriteBtn = themePage:FindFirstChild('Overwrite')
-				autoloadButtonRef = autoloadBtn
-				updateAutoLoadLabel()
-
-				local grid = Instance.new('Frame')
-				grid.Name = 'ConfigButtons'
-				grid.BackgroundTransparency = 1
-				grid.BorderSizePixel = 0
-				grid.Size = UDim2.new(1, -35, 0, 90)
-				grid.Parent = themePage
-
-				local gridLayout = Instance.new('UIGridLayout')
-				gridLayout.CellSize = UDim2.new(0.5, -5, 0, 40)
-				gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
-				gridLayout.FillDirectionMaxCells = 2
-				gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-				gridLayout.Parent = grid
-
-				for i, btn in ipairs({saveBtn, loadBtn, autoloadBtn, overwriteBtn}) do
-					if btn then
-						btn.Parent = grid
-						btn.LayoutOrder = i
-					end
-				end
-			end
-		end
-
-		a:TextInput({
-			Title = 'Config Name',
-			PlaceHolder = 'Enter config name',
-			ClearOnLost = false,
-			CallBack = function (v)
-				currentConfigName = v
-			end
-		})
-
-		configDropdownData = a:Dropdown({
-			Title = 'Saved Configs',
-			Options = syde:ListConfigs() or {},
-			PlaceHolder = 'Select a config',
-			CallBack = function (v)
-				selectedConfig = v
-			end
+		a:Paragraph({
+			Title = 'Auto-Save System',
+			Content = 'All toggles, sliders, dropdowns, binds and positions are saved automatically.'
 		})
 
 		b:Toggle({
@@ -7107,25 +7053,13 @@ function syde:Init(library)
 
 
 		local function ChangeName(Name)
-			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { TextTransparency = pages.clipframe.title.TextTransparency }):Play()
-			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { Position = pages.clipframe.title.Position }):Play()
-
-			local fadeOut = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 })
-			local moveUp = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, -25) })
-
+			local fadeOut = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 1, Position = UDim2.new(0, 5, 0.5, -12) })
 			fadeOut:Play()
-			moveUp:Play()
-			task.wait(0.2)
-
-			pages.clipframe.title.Position = UDim2.new(0, 5,0.5, 25)
-
-			pages.clipframe.title.Text = Name
-
-			local moveDown = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, 0) })
-			local fadeIn = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
-
-			moveDown:Play()
-			fadeIn:Play()
+			task.delay(0.1, function()
+				pages.clipframe.title.Text = Name
+				pages.clipframe.title.Position = UDim2.new(0, 5, 0.5, 12)
+				tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { TextTransparency = 0, Position = UDim2.new(0, 5, 0.5, 0) }):Play()
+			end)
 		end
 
 		if isFirstTab then
@@ -7134,27 +7068,26 @@ function syde:Init(library)
 			tbdata.first = tdata.Title
 		end
 
+		local tabInitTween = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 		if tbdata.first then
-			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0.52 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
-			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			tweenservice:Create(Tab.title, tabInitTween, { TextTransparency = 0.52 }):Play()
+			tweenservice:Create(Tab, tabInitTween, { BackgroundTransparency = 0.45 }):Play()
+			tweenservice:Create(Tab.indicator, tabInitTween, { BackgroundTransparency = 1 }):Play()
+			tweenservice:Create(Tab.indicator.glow, tabInitTween, { ImageTransparency = 1 }):Play()
+			tweenservice:Create(Tab, tabInitTween, { Size = UDim2.new(0, Tab.title.TextBounds.X + 30, 0, 35) }):Play()
 		else
 			tbdata.first = tdata.Title
-			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
-			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.6 }):Play()
+			tweenservice:Create(Tab.title, tabInitTween, { TextTransparency = 0 }):Play()
+			tweenservice:Create(Tab, tabInitTween, { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(Tab.indicator, tabInitTween, { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(Tab.indicator, tabInitTween, { BackgroundColor3 = syde.theme.Accent }):Play()
+			tweenservice:Create(Tab.indicator.glow, tabInitTween, { ImageColor3 = syde.theme.Accent }):Play()
+			tweenservice:Create(Tab, tabInitTween, { Size = UDim2.new(0, Tab.title.TextBounds.X + 80, 0, 35) }):Play()
 		end
 
 
-		local positionTweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Quart)
-		local colorTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential)
+		local positionTweenInfo = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		local colorTweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		local HomeButton = (window and window.tabs and window.tabs.Home) and window.tabs.Home or nil
 		local HomePage = (window and window.pages and window.pages.home) and window.pages.home or nil
 
@@ -10468,22 +10401,68 @@ function syde:Init(library)
 		--@@Orion Compatibility Methods
 		function initelement:AddToggle(ToggleConfig)
 			ToggleConfig = ToggleConfig or {}
+			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
+			local defVal = ToggleConfig.Default ~= nil and ToggleConfig.Default or (ToggleConfig.Value ~= nil and ToggleConfig.Value or false)
+
+			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
+				defVal = syde.LoadedConfig[flagName]
+			end
+
+			local userCb = ToggleConfig.Callback or ToggleConfig.CallBack
 			local data = self:Toggle({
 				Title = ToggleConfig.Name or ToggleConfig.Title or "Toggle",
 				Description = ToggleConfig.Description or ToggleConfig.Desc or "",
-				Value = ToggleConfig.Default ~= nil and ToggleConfig.Default or (ToggleConfig.Value ~= nil and ToggleConfig.Value or false),
-				Flag = ToggleConfig.Flag,
-				CallBack = ToggleConfig.Callback or ToggleConfig.CallBack
+				Value = defVal,
+				Flag = flagName,
+				CallBack = function(v)
+					if userCb then userCb(v) end
+					SaveConfig()
+				end
 			})
+
+			syde.Flags[flagName] = data
 			return data
 		end
 
 		function initelement:AddSlider(SliderConfig)
-			return self:Slider(SliderConfig)
+			SliderConfig = SliderConfig or {}
+			local flagName = SliderConfig.Flag or SliderConfig.ValueName or SliderConfig.Name or SliderConfig.Title or "Slider"
+			local userCb = SliderConfig.Callback or SliderConfig.CallBack
+
+			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
+				SliderConfig.Default = syde.LoadedConfig[flagName]
+			end
+
+			local origCb = SliderConfig.Callback or SliderConfig.CallBack
+			SliderConfig.Callback = function(val)
+				if origCb then origCb(val) end
+				SaveConfig()
+			end
+			SliderConfig.Flag = flagName
+
+			local sliderObj = self:Slider(SliderConfig)
+			syde.Flags[flagName] = sliderObj
+			return sliderObj
 		end
 
 		function initelement:AddDropdown(DropdownConfig)
-			return self:Dropdown(DropdownConfig)
+			DropdownConfig = DropdownConfig or {}
+			local flagName = DropdownConfig.Flag or DropdownConfig.Name or DropdownConfig.Title or "Dropdown"
+			local userCb = DropdownConfig.Callback or DropdownConfig.CallBack
+
+			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
+				DropdownConfig.Default = syde.LoadedConfig[flagName]
+			end
+
+			DropdownConfig.Flag = flagName
+			DropdownConfig.Callback = function(val)
+				if userCb then userCb(val) end
+				SaveConfig()
+			end
+
+			local dropObj = self:Dropdown(DropdownConfig)
+			syde.Flags[flagName] = dropObj
+			return dropObj
 		end
 
 		function initelement:AddButton(ButtonConfig)
@@ -10515,9 +10494,20 @@ function syde:Init(library)
 		function initelement:AddPbind(PBindConfig)
 			PBindConfig = PBindConfig or {}
 			local name = PBindConfig.Name or "Position"
+			local flagName = PBindConfig.Flag or name
 			local defX = tostring(PBindConfig.DefaultX or "")
 			local defY = tostring(PBindConfig.DefaultY or "")
 			local defZ = tostring(PBindConfig.DefaultZ or "")
+
+			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
+				local saved = syde.LoadedConfig[flagName]
+				if type(saved) == "table" then
+					defX = tostring(saved.X or defX)
+					defY = tostring(saved.Y or defY)
+					defZ = tostring(saved.Z or defZ)
+				end
+			end
+
 			local cb = PBindConfig.Callback or PBindConfig.CallBack or function() end
 
 			local pbindFrame = pages.page.Input:Clone()
@@ -10597,6 +10587,7 @@ function syde:Init(library)
 					pbindObj.ValueY = boxes.Y and boxes.Y.Text or ""
 					pbindObj.ValueZ = boxes.Z and boxes.Z.Text or ""
 					cb(pbindObj.ValueX, pbindObj.ValueY, pbindObj.ValueZ)
+					SaveConfig()
 				end
 
 				tb.FocusLost:Connect(fireCallback)
@@ -10617,6 +10608,7 @@ function syde:Init(library)
 				if y ~= nil and boxes.Y then boxes.Y.Text = tostring(y) pbindObj.ValueY = tostring(y) end
 				if z ~= nil and boxes.Z then boxes.Z.Text = tostring(z) pbindObj.ValueZ = tostring(z) end
 				cb(pbindObj.ValueX, pbindObj.ValueY, pbindObj.ValueZ)
+				SaveConfig()
 			end
 
 			function pbindObj:toggle()
@@ -10627,30 +10619,50 @@ function syde:Init(library)
 				pbindFrame:Destroy()
 			end
 
+			syde.Flags[flagName] = pbindObj
 			return pbindObj
 		end
 
 		function initelement:AddBind(BindConfig)
 			BindConfig = BindConfig or {}
+			local flagName = BindConfig.Flag or BindConfig.Name or BindConfig.Title or "Bind"
 			local key = BindConfig.Default or BindConfig.Key or Enum.KeyCode.Unknown
+
+			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
+				local saved = syde.LoadedConfig[flagName]
+				if type(saved) == "table" and saved._type == "Key" then
+					if saved.EnumType == "Enum.KeyCode" and Enum.KeyCode[saved.Name] then
+						key = Enum.KeyCode[saved.Name]
+					elseif saved.EnumType == "Enum.UserInputType" and Enum.UserInputType[saved.Name] then
+						key = Enum.UserInputType[saved.Name]
+					end
+				elseif typeof(saved) == "string" and Enum.KeyCode[saved] then
+					key = Enum.KeyCode[saved]
+				end
+			end
+
 			local cb = BindConfig.Callback or BindConfig.CallBack or function() end
 			local name = BindConfig.Name or BindConfig.Title or "Bind"
 
 			local bindData = self:Keybind({
 				Title = name,
 				Key = key,
+				Flag = flagName,
 				Description = BindConfig.Description or "",
 				CallBack = cb
 			})
 
 			local bindObj = {
 				Value = key,
+				Key = key,
 				_frame = bindData and bindData._frame or nil,
 				Set = function(self, newKey)
 					if bindData and bindData.Set then
 						bindData:Set(newKey)
 					end
 					self.Value = newKey
+					self.Key = newKey
+					SaveConfig()
 				end,
 				toggle = function(self)
 					if bindData and bindData._frame then
@@ -10663,13 +10675,21 @@ function syde:Init(library)
 					end
 				end
 			}
+
+			syde.Flags[flagName] = bindObj
 			return bindObj
 		end
 
 		function initelement:AddTextbox(TextboxConfig)
 			TextboxConfig = TextboxConfig or {}
 			local name = TextboxConfig.Name or TextboxConfig.Title or "Textbox"
+			local flagName = TextboxConfig.Flag or name
 			local def = TextboxConfig.Default ~= nil and tostring(TextboxConfig.Default) or ""
+
+			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
+				def = tostring(syde.LoadedConfig[flagName])
+			end
+
 			local placeholder = TextboxConfig.BackGrountText or TextboxConfig.PlaceHolder or TextboxConfig.Placeholder or "Enter..."
 			local clearOnLost = TextboxConfig.TextDisappear ~= false
 			local cb = TextboxConfig.Callback or TextboxConfig.CallBack or function() end
@@ -10679,7 +10699,11 @@ function syde:Init(library)
 				PlaceHolder = placeholder,
 				ClearOnLost = clearOnLost,
 				Default = def,
-				CallBack = cb
+				Flag = flagName,
+				CallBack = function(txt)
+					cb(txt)
+					SaveConfig()
+				end
 			})
 
 			local tbObj = {
@@ -10692,6 +10716,7 @@ function syde:Init(library)
 					else
 						cb(tostring(val))
 					end
+					SaveConfig()
 				end,
 				toggle = function(self)
 					if inputData and inputData._frame then
@@ -10704,21 +10729,36 @@ function syde:Init(library)
 					end
 				end
 			}
+
+			syde.Flags[flagName] = tbObj
 			return tbObj
 		end
 
 		function initelement:AddColorpicker(ColorpickerConfig)
 			ColorpickerConfig = ColorpickerConfig or {}
 			local name = ColorpickerConfig.Name or ColorpickerConfig.Title or "Color Picker"
+			local flagName = ColorpickerConfig.Flag or name
 			local defColor = ColorpickerConfig.Default or ColorpickerConfig.Color or Color3.fromRGB(255, 255, 255)
+
+			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
+				local saved = syde.LoadedConfig[flagName]
+				if type(saved) == "table" and saved._type == "Color" and saved.R and saved.G and saved.B then
+					defColor = Color3.new(saved.R, saved.G, saved.B)
+				end
+			end
+
 			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
 
 			local pickerData = self:ColorPicker({
 				Title = name,
 				Color = defColor,
-				Flag = ColorpickerConfig.Flag,
-				CallBack = cb
+				Flag = flagName,
+				CallBack = function(col)
+					cb(col)
+					SaveConfig()
+				end
 			})
+			syde.Flags[flagName] = pickerData
 			return pickerData
 		end
 
