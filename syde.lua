@@ -10870,7 +10870,7 @@ function syde:Init(library)
 				Callback = function()
 					if ToggleUI then ToggleUI() end
 				end
-			end)
+			})
 		end
 
 		function initelement:AddSmartTheme()

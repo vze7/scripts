@@ -2377,7 +2377,7 @@ end
 --sep                                                                  
 --# Syde Config
 
-local syde = syde or (rawget and rawget(getgenv and getgenv() or _G, "syde")) or loadstring(game:HttpGet("https://raw.githubusercontent.com/vze7/scripts/main/syde.lua", true))()
+local syde = syde or (rawget and rawget(getgenv and getgenv() or _G, "syde")) or assert(loadstring(game:HttpGet("https://raw.githubusercontent.com/vze7/scripts/main/syde.lua", true)))()
 syde.UMouseMode = "ThirdPerson"
 
 local Window = syde:MakeWindow({
