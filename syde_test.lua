@@ -345,6 +345,93 @@ Tab4:Button({
 })
 
 -- ============================================================
+-- ABA 5: RECURSOS E ELEMENTOS ORION
+-- ============================================================
+local Tab5 = Window:MakeTab({ Name = "Orion Elements", Title = "Elementos Orion" })
+
+Tab5:AddSection("Componentes Especiais Orion")
+
+local logElem = Tab5:AddLog("Log do Sistema: Ativo e Operando")
+local labelElem = Tab5:AddLabel("Texto com Suporte a Cores e Tags", "Left")
+local colorLabelElem = Tab5:ColorLabel("Status: Conectado com Sucesso", Color3.fromRGB(0, 255, 180), "Center")
+local playerPara = Tab5:AddPlayerParagraph(Players.LocalPlayer.UserId)
+local pbind = Tab5:AddPbind({ Name = "Posicao (X, Y, Z)", DefaultX = "100", DefaultY = "50", DefaultZ = "200" })
+
+Tab5:AddSection("Controles Orion (Auto-Save & Aliases)")
+
+Tab5:AddButton({
+	Name = "Disparar MakeNotification",
+	Callback = function()
+		syde:MakeNotification({
+			Name = "Orion Notification",
+			Content = "Notificacao do subsistema Orion disparada com sucesso!",
+			Time = 3,
+		})
+	end,
+})
+
+Tab5:AddButton({
+	Name = "Alternar Visibilidade do Log (:toggle)",
+	Callback = function()
+		logElem:toggle()
+	end,
+})
+
+Tab5:AddToggle({
+	Name = "Orion Toggle",
+	Default = true,
+	Flag = "OrionToggleFlag",
+	Callback = function(state)
+		print("[Orion Toggle] Estado:", state)
+	end,
+})
+
+Tab5:AddSlider({
+	Name = "Orion Slider",
+	Min = 0,
+	Max = 100,
+	Default = 50,
+	Flag = "OrionSliderFlag",
+	Callback = function(val)
+		print("[Orion Slider] Valor:", val)
+	end,
+})
+
+Tab5:AddDropdown({
+	Name = "Orion Dropdown",
+	Options = {"Opcao Alfa", "Opcao Beta", "Opcao Gama"},
+	Default = "Opcao Alfa",
+	Flag = "OrionDropdownFlag",
+	Callback = function(val)
+		print("[Orion Dropdown] Selecionado:", val)
+	end,
+})
+
+Tab5:AddBind({
+	Name = "Orion Keybind",
+	Default = Enum.KeyCode.G,
+	Flag = "OrionKeybindFlag",
+	Callback = function()
+		syde:MakeNotification({
+			Name = "Keybind Disparada",
+			Content = "Tecla G pressionada!",
+			Time = 2,
+		})
+	end,
+})
+
+Tab5:AddTextbox({
+	Name = "Orion Textbox",
+	Default = "Texto Inicial",
+	Callback = function(txt)
+		print("[Orion Textbox]:", txt)
+	end,
+})
+
+Tab5:AddSmartTheme()
+Tab5:FreeMouseDrp()
+
+-- ============================================================
 -- 3. CARREGAMENTO INICIAL & NOTIFICAÇÃO
 -- ============================================================
 syde:LoadSaveConfig()
