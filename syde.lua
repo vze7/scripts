@@ -1,4 +1,3 @@
--- Made: By iceboy
 --[[
 
 .dP"Y8 Yb  dP 8888b.  888888 
@@ -124,7 +123,7 @@ local syde = {
 	Build = 'Sv0';
 	plugins = {};
 	ConfigEnabled = false;
-	ConfigFolder = 'UI';
+	ConfigFolder = 'Syde';
 	ConfigFile = 'Config';
 	Flags = {};
 	SettingsFlags = {};
@@ -139,47 +138,6 @@ function syde:DeepMerge(target, source)
 			self:DeepMerge(target[k], v) 
 		else
 			target[k] = v
-		end
-	end
-end
-
-function syde:SaveThemeConfig()
-	if not writefile then return end
-	local folder = self.ConfigFolder or "UI"
-	if makefolder and isfolder and not isfolder(folder) then
-		pcall(makefolder, folder)
-	end
-	local themeData = {
-		Accent = self:ColorPack(self.theme.Accent),
-		HitBox = self:ColorPack(self.theme.HitBox),
-	}
-	pcall(function()
-		writefile(string.format("%s/_theme.json", folder), https:JSONEncode(themeData))
-	end)
-end
-
-function syde:LoadThemeConfig()
-	if not isfile then return end
-	local folder = self.ConfigFolder or "UI"
-	local path = string.format("%s/_theme.json", folder)
-	if isfile(path) then
-		local ok, content = pcall(readfile, path)
-		if ok and content then
-			local success, data = pcall(function() return https:JSONDecode(content) end)
-			if success and type(data) == "table" then
-				if data.Accent then
-					local c = self:ColorUnpack(data.Accent)
-					if typeof(c) == "Color3" then
-						self.theme.Accent = c
-					end
-				end
-				if data.HitBox then
-					local c = self:ColorUnpack(data.HitBox)
-					if typeof(c) == "Color3" then
-						self.theme.HitBox = c
-					end
-				end
-			end
 		end
 	end
 end
@@ -214,10 +172,6 @@ function syde:UpdateTheme(Config)
 	if #updatedKeys > 0 then
 		for _, key in ipairs(updatedKeys) do
 			self.Comms:Fire(key, self.theme[key])
-		end
-		self:SaveThemeConfig()
-		if SaveConfig then
-			SaveConfig()
 		end
 	end
 end
@@ -312,7 +266,7 @@ function syde:Report(context, err)
 	warn(table.concat({
 		"",
 		"----------screenshot this and send it to king jericoo------",
-		"[ UI ] " .. tostring(context or "Error"),
+		"[ Syde ] " .. tostring(context or "Error"),
 		"Problem: " .. message,
 		"Fix: " .. fix,
 		"------------------------------------------------------------",
@@ -1188,16 +1142,17 @@ function syde:registerLoadTween(object, properties, initialState, tweenInfo)
 	}
 end
 
-function syde:resetToInitialState(animated, resetTweenInfo, targetObject)
+function syde:resetToInitialState(animated, resetTweenInfo)
 	for object, tweenData in pairs(loadTweens) do
-		if object and object.Parent and (not targetObject or object == targetObject or object:IsDescendantOf(targetObject)) then
+		if object and object.Parent then
 			tweenData.tween:Cancel()
 
 			if animated then
-				local resetTween = tweenservice:Create(object, resetTweenInfo or TweenInfo.new(0.18), tweenData.initialState)
+				local resetTween = tweenservice:Create(object, resetTweenInfo or TweenInfo.new(0.3), tweenData.initialState)
 				resetTween:Play()
 				resetTween.Completed:Wait()
 			else
+
 				for property, value in pairs(tweenData.initialState) do
 					object[property] = value
 				end
@@ -1207,11 +1162,11 @@ function syde:resetToInitialState(animated, resetTweenInfo, targetObject)
 end
 
 function syde:replayLoadTweens(targetObject)
-	syde:resetToInitialState(false, nil, targetObject)
+	syde:resetToInitialState(false)
 
 	for object, tweenData in pairs(loadTweens) do
 		if object and object.Parent then
-			if not targetObject or object == targetObject or object:IsDescendantOf(targetObject) then
+			if not targetObject or object == targetObject then
 				tweenData.tween:Cancel()
 				tweenData.tween:Play()
 			end
@@ -1317,7 +1272,7 @@ function syde:updateLayout(container, spacing)
 			if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
 				--child.Size = UDim2.new(1, -10, 0, child.Size.Y.Offset) -- Full width, fixed height
 				-- child.Position = UDim2.new(0, 0, 0, yOffset)
-				tweenservice:Create(child, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+				tweenservice:Create(child, TweenInfo.new(0.45, Enum.EasingStyle.Exponential), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 				yOffset = yOffset + child.AbsoluteSize.Y + spacing
 			end
 		end
@@ -1452,20 +1407,16 @@ local mh = true
 do
 
 	function syde:Load(Config)
-		task.wait(0.02)
+		task.wait(0.4)
 		local LOADER = Loader
 		LOADER.Enabled = true
 		LOADER.Parent = coregui
 
 		-- PreLoad
-		Config.Name = Config.Name or 'UI'
-		Config.Logo = Config.Logo or ''
-		Config.ConfigFolder = Config.ConfigFolder or 'UI'
+		Config.Name = Config.Name or 'Syde™'
+		Config.Logo = Config.Logo or 'rbxassetid://14554547135'
+		Config.ConfigFolder = Config.ConfigFolder or 'syde'
 		Config.Status = Config.Status or false
-
-		-- Auto-load saved theme if exists
-		syde:LoadThemeConfig()
-
 		Config.Accent = Config.Accent or syde.theme.Accent
 		Config.HitBox = Config.HitBox or syde.theme.HitBox
 
@@ -1474,17 +1425,9 @@ do
 		LOADER.loader.profile.Title.Text = Config.Name
 		--	LOADER.load.logo.stroke.UIStroke.Transparency = 1
 
-		local formattedLogo = ""
-		if Config.Logo and Config.Logo ~= "" and Config.Logo ~= "0" then
-			formattedLogo = tostring(Config.Logo)
-			if not formattedLogo:find("rbxassetid://") and not formattedLogo:find("http") then
-				formattedLogo = "rbxassetid://" .. formattedLogo
-			end
-		end
-
 		local LoaderConfig = {
 			Name = Config.Name;
-			Logo = formattedLogo;
+			Logo = 'rbxassetid://'..Config.Logo;
 			ConfigFolder = Config.ConfigFolder;
 			Status = Config.Status;
 			Accent = Config.Accent or syde.theme.Accent;
@@ -1510,18 +1453,11 @@ do
 			--	LOADER.load.logo["Title/Status"].Text = string.format('%s  <font color="#363636">•</font>  %s', LoaderConfig.Name, statusData.Text)
 		end
 
-		if LoaderConfig.Logo ~= "" then
-			LOADER.loader.profile.Image = LoaderConfig.Logo
-			LOADER.loader.ImageLabel.Image = LoaderConfig.Logo
-			LOADER.loader.profile.Visible = true
-		else
-			LOADER.loader.profile.Image = ""
-			LOADER.loader.ImageLabel.Image = ""
-			LOADER.loader.profile.Visible = false
-		end
+		LOADER.loader.profile.Image = LoaderConfig.Logo;
+		LOADER.loader.ImageLabel.Image = LoaderConfig.Logo;
 		--	LOADER.load.info.build.Text = syde.Build
 
-		local ti = TweenInfo.new(0.2, Enum.EasingStyle.Exponential)
+		local ti = TweenInfo.new(0.5, Enum.EasingStyle.Exponential)
 
 		task.spawn(function()
 			while LOADER and LOADER.Parent do
@@ -1663,9 +1599,11 @@ do
 			loadedsocial = true
 		end
 
-		tweenservice:Create(logo, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-		tweenservice:Create(logo.Title, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-		task.wait(0.04)
+		tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+		--	tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Quint), {Position = UDim2.new(0.5, 0,0, 105)}):Play()
+
+		tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		task.wait(0.4)
 
 
 		--	local function initLoader()
@@ -1677,21 +1615,25 @@ do
 			LOADER.loader.work.Position = UDim2.new(0.5, 0,1, -40)
 			LOADER.loader.work.Text = Text
 			LOADER.loader.work.ImageLabel.Image = icon
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.1, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -73) }):Play()
-			task.wait(0.05)
-			tweenservice:Create(LOADER.loader.work, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.1, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -100) }):Play()
-			task.wait(0.02)
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -73) }):Play()
+			--	tweenservice:Create(game.Workspace.Camera, TweenInfo.new(1, Enum.EasingStyle.Exponential), { FieldOfView  = game.Workspace.Camera.FieldOfView - 3 }):Play()
+			task.wait(Finish)
+			tweenservice:Create(LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -100) }):Play()
+			task.wait(0.35)
+
+			-- reset
+
 		end
 
 		local function load()
 			TweenWorkLabel(0.4,'rbxassetid://136002400178503', '')
 
 			if Config.ConfigurationSaving and Config.ConfigurationSaving.Enabled then
-				local folderName = Config.ConfigurationSaving.FolderName or "UI_Configs"
+				local folderName = Config.ConfigurationSaving.FolderName or "SydeSec"
 				local fileName = Config.ConfigurationSaving.FileName or "default_config"
 
 				syde.ConfigEnabled = true
@@ -1734,7 +1676,7 @@ do
 
 			TweenWorkLabel(0.4,'rbxassetid://105810189969774', '')
 
-			local UI_TAG = "UILoader"
+			local UI_TAG = "sydeUILoader"
 			local MARKER_NAME = "SYDEUIDetector"
 			local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
 			local PROTECTION_EVENT = Instance.new("BindableEvent")
@@ -1780,7 +1722,7 @@ do
 				while Library and Library.Parent do
 					task.wait(1)
 					if Library.Parent ~= coregui then
-						warn("[UI] UI moved. Restoring...")
+						warn("Syde 〡 UI moved. Restoring...")
 						pcall(function()
 							Library.Parent = coregui
 						end)
@@ -1793,7 +1735,7 @@ do
 
 			if Config.AutoJoinDiscord and Config.AutoJoinDiscord.Enabled then
 				local discordConfig = Config.AutoJoinDiscord
-				local rootFolder = Config.ConfigurationSaving and Config.ConfigurationSaving.FolderName or "UI_Configs"
+				local rootFolder = Config.ConfigurationSaving and Config.ConfigurationSaving.FolderName or "SydeSec"
 				local discordFolder = rootFolder .. "/DiscordInvites"
 				local inviteCode = discordConfig.Invite
 				local inviteFilePath = discordFolder .. "/" .. inviteCode .. ".txt"
@@ -1855,16 +1797,20 @@ do
 				end
 			end
 
-			TweenWorkLabel(0.05,'rbxassetid://136405833725573', '')
-			task.wait(0.03)
+			TweenWorkLabel(0.4,'rbxassetid://136405833725573', '')
+			task.wait(0.4)
 			loaded = true
+			--	tweenservice:Create( LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 146,0, 25)}):Play()
+			--	tweenservice:Create( LOADER.load.Salt.ImageLabel, TweenInfo.new(0.65, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 		end
 
-		task.wait(0.02)
+		--	initLoader()
+		task.wait(0.08)
 		load()
 
-		task.wait(0.05)
+		task.wait(0.6)
 
+		--	Library.Enabled = true
 		syde.theme.Accent = Config.Accent;
 		syde.theme.HitBox = Config.HitBox;
 		LOADER:Destroy()
@@ -1902,17 +1848,6 @@ local function ApplyFlag(Flag, Value)
 		return true
 	end
 
-	-- Keybind Handling
-	if Flag.Type == "Keybind" or Flag.SetKeybind then
-		if Flag.SetKeybind then
-			Flag:SetKeybind(Value, true)
-			return true
-		elseif Flag.Set then
-			Flag:Set(Value, true)
-			return true
-		end
-	end
-
 	-- Standard Setter
 	if Flag.Set then
 		Flag:Set(Value, true)
@@ -1930,44 +1865,28 @@ local function ApplyFlag(Flag, Value)
 		return true
 	end
 
-	warn("[UI] Unsupported flag type for:", Flag)
+	warn("Syde 〡 Unsupported flag type for:", Flag)
 	return false
 end
 
 function LoadConfig(Configuration)
 	if type(Configuration) ~= "string" then
-		warn("[UI] Invalid config format.")
+		warn("Syde 〡 Invalid config format.")
 		return false, 0
 	end
 
 	local Decoded = SafeDecode(Configuration)
 	if not Decoded then
-		warn("[UI] Failed to decode config.")
+		warn("Syde 〡 Failed to decode config.")
 		return false, 0
 	end
 
 	-- Cache so flags registered later can still apply their saved values
 	syde.LoadedConfig = Decoded
 
-	-- Theme auto-restore from config
-	if Decoded._theme and type(Decoded._theme) == "table" then
-		if Decoded._theme.Accent then
-			local c = syde:ColorUnpack(Decoded._theme.Accent)
-			if typeof(c) == "Color3" then
-				syde:UpdateTheme({ Accent = c })
-			end
-		end
-		if Decoded._theme.HitBox then
-			local c = syde:ColorUnpack(Decoded._theme.HitBox)
-			if typeof(c) == "Color3" then
-				syde:UpdateTheme({ HitBox = c })
-			end
-		end
-	end
-
 	-- Version check (future ready)
 	if Decoded._version and Decoded._version ~= CONFIG_VERSION then
-		warn("[UI] Config version mismatch.")
+		warn("Syde 〡 Config version mismatch.")
 	end
 
 	local applied = 0
@@ -1983,7 +1902,7 @@ function LoadConfig(Configuration)
 			if ok and success then
 				applied = applied + 1
 			elseif not ok then
-				warn("[UI] Failed to apply flag '" .. tostring(FlagName) .. "':", success)
+				warn("Syde 〡 Failed to apply flag '" .. tostring(FlagName) .. "':", success)
 			end
 		end
 	end
@@ -2007,11 +1926,7 @@ local function PerformSave()
 	if not writefile then return end
 
 	local Data = {
-		_version = CONFIG_VERSION,
-		_theme = {
-			Accent = syde:ColorPack(syde.theme.Accent),
-			HitBox = syde:ColorPack(syde.theme.HitBox),
-		}
+		_version = CONFIG_VERSION
 	}
 
 	for FlagName, Flag in pairs(syde.Flags) do
@@ -2019,12 +1934,8 @@ local function PerformSave()
 			if Flag.Color then
 				Data[FlagName] = syde:ColorPack(Flag.Color)
 			end
-		elseif Flag.Type == "Keybind" or Flag.Key ~= nil then
-			Data[FlagName] = Flag.Key and Flag.Key.Name or "NONE"
 		elseif Flag.V ~= nil then
 			Data[FlagName] = Flag.V
-		elseif Flag.Value ~= nil then
-			Data[FlagName] = Flag.Value
 		elseif Flag.Color then
 			Data[FlagName] = syde:ColorPack(Flag.Color)
 		elseif Flag.StarterValue ~= nil then
@@ -2044,7 +1955,7 @@ local function PerformSave()
 	end)
 
 	if not success then
-		warn("[UI] Failed to save config:", err)
+		warn("Syde 〡 Failed to save config:", err)
 	end
 end
 
@@ -2123,13 +2034,7 @@ function syde:SaveConfigAs(name)
 		return false
 	end
 
-	local Data = {
-		_version = CONFIG_VERSION,
-		_theme = {
-			Accent = syde:ColorPack(syde.theme.Accent),
-			HitBox = syde:ColorPack(syde.theme.HitBox),
-		}
-	}
+	local Data = { _version = CONFIG_VERSION }
 	local count = 0
 	for FlagName, Flag in pairs(syde.Flags) do
 		if Flag.Type == "ColorPicker" then
@@ -2137,14 +2042,8 @@ function syde:SaveConfigAs(name)
 				Data[FlagName] = syde:ColorPack(Flag.Color)
 				count = count + 1
 			end
-		elseif Flag.Type == "Keybind" or Flag.Key ~= nil then
-			Data[FlagName] = Flag.Key and Flag.Key.Name or "NONE"
-			count = count + 1
 		elseif Flag.V ~= nil then
 			Data[FlagName] = Flag.V
-			count = count + 1
-		elseif Flag.Value ~= nil then
-			Data[FlagName] = Flag.Value
 			count = count + 1
 		elseif Flag.Color then
 			Data[FlagName] = syde:ColorPack(Flag.Color)
@@ -2396,233 +2295,110 @@ local activeModals = 0 -- track how many modals are currently open
 function syde:Modal(Modal)
 	task.spawn(function()
 		local ModalData = {
-			Title = Modal.Title or "Notice";
-			Content = Modal.Content or "";
-			ConfirmCallBack = Modal.ConfimCallBack or Modal.ConfirmCallBack or Modal.ConfirmCallback or Modal.Callback;
-			CancelCallBack = Modal.CancelCallBack or Modal.CancelCallback;
+			Title = Modal.Title;
+			Content = Modal.Content;
+			ConfirmCallBack = Modal.ConfimCallBack
 		}
-
-		if not ui or not ui:FindFirstChild("main") or not ui.main:FindFirstChild("modal") then
-			syde:MakeNotification({
-				Name = ModalData.Title,
-				Content = ModalData.Content,
-				Time = 5
-			})
-			if typeof(ModalData.ConfirmCallBack) == "function" then
-				pcall(ModalData.ConfirmCallBack)
-			end
-			return
-		end
 
 		local ModalInstance = ui.main.modal:Clone()
 		ModalInstance.Visible = true
 		ModalInstance.Parent = ui.main
-		if ModalInstance:FindFirstChild("Title") then
-			ModalInstance.Title.Text = ModalData.Title
-			ModalInstance.Title.TextTransparency = 1
-		end
-		if ModalInstance:FindFirstChild("Content") then
-			ModalInstance.Content.Text = ModalData.Content
-			ModalInstance.Content.TextTransparency = 1
-		end
-		ModalInstance.Size = UDim2.new(0, 350, 0, 144)
+		ModalInstance.Title.Text = ModalData.Title
+		ModalInstance.Content.Text = ModalData.Content
+		--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
+		ModalInstance.Size = UDim2.new(0, 350,0, 144)
 		ModalInstance.BackgroundTransparency = 1
+		ModalInstance.Title.TextTransparency = 1
+		ModalInstance.Content.TextTransparency = 1
 
-		local confirmBtn = ModalInstance:FindFirstChild("Buttons") and ModalInstance.Buttons:FindFirstChild("Confirm")
-		local cancelBtn = ModalInstance:FindFirstChild("Buttons") and ModalInstance.Buttons:FindFirstChild("Cancel")
+		ModalInstance.Buttons.Confirm.BackgroundTransparency = 1
+		ModalInstance.Buttons.Confirm.TextLabel.TextTransparency = 1
+		--	ModalInstance.Buttons.Confirm.UIStroke.Transparency = 1
 
-		if confirmBtn then
-			confirmBtn.BackgroundTransparency = 1
-			if confirmBtn:FindFirstChild("TextLabel") then
-				confirmBtn.TextLabel.TextTransparency = 1
-			end
-		end
-
-		if cancelBtn then
-			cancelBtn.BackgroundTransparency = 1
-			if cancelBtn:FindFirstChild("TextLabel") then
-				cancelBtn.TextLabel.TextTransparency = 1
-			end
-			if cancelBtn:FindFirstChild("UIStroke") then
-				cancelBtn.UIStroke.Transparency = 1
-			end
-		end
-
-		local isClosing = false
-		local function closeModal()
-			if isClosing then return end
-			isClosing = true
-			activeModals = math.max(0, activeModals - 1)
-
-			pcall(function()
-				if cancelBtn then cancelBtn.Interactable = false end
-				if confirmBtn then confirmBtn.Interactable = false end
-			end)
-
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350, 0, 147), BackgroundTransparency = 1}):Play()
-			pcall(function()
-				if ModalInstance:FindFirstChild("Title") then
-					tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-				end
-				if ModalInstance:FindFirstChild("UIStroke") then
-					tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-				end
-				if ModalInstance:FindFirstChild("Content") then
-					tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-				end
-				if confirmBtn then
-					tweenservice:Create(confirmBtn, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-					if confirmBtn:FindFirstChild("TextLabel") then
-						tweenservice:Create(confirmBtn.TextLabel, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-					end
-				end
-				if cancelBtn then
-					tweenservice:Create(cancelBtn, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-					if cancelBtn:FindFirstChild("TextLabel") then
-						tweenservice:Create(cancelBtn.TextLabel, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-					end
-					if cancelBtn:FindFirstChild("UIStroke") then
-						tweenservice:Create(cancelBtn.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-					end
-				end
-			end)
-
-			if activeModals == 0 and ui and ui:FindFirstChild("main") and ui.main:FindFirstChild("dim") then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), {
-					BackgroundTransparency = 1
-				}):Play()
-				task.delay(0.35, function()
-					if activeModals == 0 and ui and ui:FindFirstChild("main") and ui.main:FindFirstChild("dim") then
-						ui.main.dim.Visible = false
-						ui.main.dim.Active = false
-					end
-				end)
-			end
-
-			task.delay(0.4, function()
-				pcall(function() ModalInstance:Destroy() end)
-			end)
-		end
+		ModalInstance.Buttons.Cancel.BackgroundTransparency = 1
+		ModalInstance.Buttons.Cancel.TextLabel.TextTransparency = 1
+		ModalInstance.Buttons.Cancel.UIStroke.Transparency = 1
 
 		local function openModal()
+			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
 			activeModals += 1
-			pcall(function()
-				if ModalInstance:FindFirstChild("Content") then
-					tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
-					tweenservice:Create(ModalInstance, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350, 0, math.max(144, ModalInstance.Content.TextBounds.Y + 130))}):Play()
-				end
-				tweenservice:Create(ModalInstance, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-				if ModalInstance:FindFirstChild("UIStroke") then
-					tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-				end
-				if ModalInstance:FindFirstChild("Title") then
-					tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-				end
-				if ModalInstance:FindFirstChild("Content") then
-					tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-				end
-				if confirmBtn then
-					tweenservice:Create(confirmBtn, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-					if confirmBtn:FindFirstChild("TextLabel") then
-						tweenservice:Create(confirmBtn.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-					end
-				end
-				if cancelBtn then
-					tweenservice:Create(cancelBtn, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-					if cancelBtn:FindFirstChild("TextLabel") then
-						tweenservice:Create(cancelBtn.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-					end
-					if cancelBtn:FindFirstChild("UIStroke") then
-						tweenservice:Create(cancelBtn.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-					end
-				end
-			end)
+			--	ModalInstance.Size = UDim2.new(0, ModalInstance.Size.X.Offset, 0, ModalInstance.Content.TextBounds.Y + 120)
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0,  ModalInstance.Content.TextBounds.Y + 150)}):Play()
+
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+
 		end
 		openModal()
 
-		if ui.main:FindFirstChild("dim") then
+		local function closeModal()
+			activeModals -= 1
+			ModalInstance.Buttons.Cancel.Interactable = false
+			ModalInstance.Buttons.Confirm.Interactable = false
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+
+			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			task.wait(0.45)
+			ModalInstance:Destroy()
+		end
+
+
+
+		if activeModals == 1 then
 			ui.main.dim.Visible = true
-			ui.main.dim.Active = true
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 0.3
 			}):Play()
 		end
 
-		local function bindButton(btnObj, action)
-			if not btnObj then return end
-			local function fire()
-				action()
-				closeModal()
-			end
-			if btnObj:IsA("GuiButton") then
-				btnObj.MouseButton1Click:Connect(fire)
-				pcall(function() btnObj.Activated:Connect(fire) end)
-			end
-			local interact = btnObj:FindFirstChild("interact")
-			if interact and interact:IsA("GuiButton") then
-				interact.MouseButton1Click:Connect(fire)
-				pcall(function() interact.Activated:Connect(fire) end)
-			end
-			for _, desc in ipairs(btnObj:GetDescendants()) do
-				if desc:IsA("GuiButton") then
-					desc.MouseButton1Click:Connect(fire)
-					pcall(function() desc.Activated:Connect(fire) end)
-				elseif desc:IsA("TextLabel") or desc:IsA("ImageLabel") or desc:IsA("Frame") then
-					pcall(function() desc.Active = false end)
-				end
-			end
-			btnObj.InputBegan:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-					fire()
-				end
-			end)
-		end
-
-		bindButton(confirmBtn, function()
+		ModalInstance.Buttons.Confirm.MouseButton1Click:Connect(function()
 			if typeof(ModalData.ConfirmCallBack) == "function" then
-				pcall(ModalData.ConfirmCallBack)
+				ModalData.ConfirmCallBack()
+			end
+
+			closeModal()
+
+			if activeModals == 0 then
+				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+					BackgroundTransparency = 1
+				}):Play()
+				task.wait(0.7)
+				ui.main.dim.Visible = false
 			end
 		end)
 
-		bindButton(cancelBtn, function()
-			if typeof(ModalData.CancelCallBack) == "function" then
-				pcall(ModalData.CancelCallBack)
-			end
+		ModalInstance.Buttons.Cancel.MouseButton1Click:Connect(function()
+			closeModal()
+			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+				BackgroundTransparency = 1
+			}):Play()
+			task.wait(0.7)
+			ui.main.dim.Visible = false
 		end)
 
-		if ui.main:FindFirstChild("dim") then
-			local dimConn
-			dimConn = ui.main.dim.InputBegan:Connect(function(input)
-				if isClosing then
-					if dimConn then dimConn:Disconnect() end
-					return
-				end
-				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-					if dimConn then dimConn:Disconnect() end
-					if typeof(ModalData.CancelCallBack) == "function" then
-						pcall(ModalData.CancelCallBack)
-					end
-					closeModal()
-				end
-			end)
-		end
-
-		local escConn
-		escConn = userinput.InputBegan:Connect(function(input, gpe)
-			if isClosing then
-				if escConn then escConn:Disconnect() end
-				return
-			end
-			if input.KeyCode == Enum.KeyCode.Escape then
-				if escConn then escConn:Disconnect() end
-				if typeof(ModalData.CancelCallBack) == "function" then
-					pcall(ModalData.CancelCallBack)
-				end
-				closeModal()
-			end
-		end)
 	end)
 end
+
 
 --@@Toast
 local toasts = {}
@@ -2979,31 +2755,10 @@ syde:HidePH(pages, 'page')
 
 --@@Initialize
 function syde:Init(library)
-	if syde._EngineMode == "Orion" or (library == nil and not syde._SydeLoaded) or (type(library) == "table" and not library.Title and not library.Name and not library.Home and not library.ConfigurationSaving) then
-		-- Orion library initialization: auto-load config and trigger notification if saved
-		if (syde.SaveCfg or syde.SaveCfgState) and (isfile and readfile) and syde.Folder then
-			pcall(function()
-				local cfgPath = syde.Folder .. "/" .. tostring(game.GameId) .. ".txt"
-				if isfile(cfgPath) then
-					local raw = readfile(cfgPath)
-					if syde.LoadCfg then
-						syde:LoadCfg(raw)
-					end
-					syde:MakeNotification({
-						Name = "Configuration",
-						Content = "Auto-loaded configuration for the game " .. tostring(game.GameId) .. ".",
-						Time = 5
-					})
-				end
-			end)
-		end
-		return
-	end
 
-	library = library or {}
 	ui.Enabled = true
 	if loaded == false then
-		local UI_TAG = "UILoader"
+		local UI_TAG = "sydeUILoader"
 		local MARKER_NAME = "SYDEUIDetector"
 		local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
 		local PROTECTION_EVENT = Instance.new("BindableEvent")
@@ -3060,7 +2815,7 @@ function syde:Init(library)
 	task.wait(0.1)
 
 	local Data = {
-		Title = library.Title or "UI";
+		Title = library.Title or "Syde";
 		SubText = library.SubText or "Google";
 		Home = library.Home or {} 
 	}
@@ -3995,8 +3750,8 @@ function syde:Init(library)
 			end
 
 			-- === Tween Info ===
-			local bgTween = TweenInfo.new(0.15, Enum.EasingStyle.Quint)
-			local textTween = TweenInfo.new(0.1, Enum.EasingStyle.Quint)
+			local bgTween = TweenInfo.new(0.4, Enum.EasingStyle.Exponential)
+			local textTween = TweenInfo.new(0.25, Enum.EasingStyle.Exponential)
 
 			local function ApplyTabStyle(tabButton, selected)
 				tweenservice:Create(tabButton, bgTween, {
@@ -7185,15 +6940,25 @@ function syde:Init(library)
 
 
 		local function ChangeName(Name)
-			local titleLabel = pages.clipframe.title
-			titleLabel.Text = Name
-			titleLabel.Position = UDim2.new(0, 5, 0.5, 4)
-			titleLabel.TextTransparency = 0.3
+			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { TextTransparency = pages.clipframe.title.TextTransparency }):Play()
+			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { Position = pages.clipframe.title.Position }):Play()
 
-			tweenservice:Create(titleLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {
-				Position = UDim2.new(0, 5, 0.5, 0),
-				TextTransparency = 0
-			}):Play()
+			local fadeOut = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 })
+			local moveUp = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, -25) })
+
+			fadeOut:Play()
+			moveUp:Play()
+			task.wait(0.2)
+
+			pages.clipframe.title.Position = UDim2.new(0, 5,0.5, 25)
+
+			pages.clipframe.title.Text = Name
+
+			local moveDown = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, 0) })
+			local fadeIn = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
+
+			moveDown:Play()
+			fadeIn:Play()
 		end
 
 		if isFirstTab then
@@ -7203,24 +6968,26 @@ function syde:Init(library)
 		end
 
 		if tbdata.first then
-			tweenservice:Create(Tab.title, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 0.52 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
+			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0.52 }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
+			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
+			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 		else
 			tbdata.first = tdata.Title
-			tweenservice:Create(Tab.title, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
+			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(Tab.indicator, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
+			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
+			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.6 }):Play()
 		end
 
 
-		local positionTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint)
-		local colorTweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quint)
+		local positionTweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Quart)
+		local colorTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential)
 		local HomeButton = (window and window.tabs and window.tabs.Home) and window.tabs.Home or nil
 		local HomePage = (window and window.pages and window.pages.home) and window.pages.home or nil
 
@@ -7240,20 +7007,41 @@ function syde:Init(library)
 			end
 		end
 
+		local isInit = true
+
 		local function ApplyTabStyle(tabButton, isSelected)
 			local targetTextTransparency = isSelected and 0 or 0.6
 			local targetBackgroundTransparency = isSelected and 0 or 0.45
+			local targetTransparency = isSelected and 0 or 1
 			local targetColor = isSelected and syde.theme.Accent or Color3.fromRGB(29, 29, 29)
-			local targetSize = isSelected and UDim2.new(0, tabButton.title.TextBounds.X + 80, 0, 35) or UDim2.new(0, tabButton.title.TextBounds.X + 50, 0, 35)
+			local targetSize = isSelected and UDim2.new(0, tabButton.title.TextBounds.X + 80,0, 35) or UDim2.new(0, tabButton.title.TextBounds.X + 50,0, 35)
+
+
+			if isInit then
+				task.spawn(function()
+					for _, v in ipairs(tabs:GetChildren()) do
+						if v:IsA("Frame") then
+							tweenservice:Create(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) }):Play()
+							task.wait(0.15)
+							tweenservice:Create(tabButton, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = targetSize }):Play()
+							isInit = false
+						end
+					end
+				end)
+
+			end
+
 
 			tweenservice:Create(tabButton, positionTweenInfo, { Size = targetSize }):Play()
-			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency }):Play()
+			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency, }):Play()
 			tweenservice:Create(tabButton.title, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play()
 			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
 			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageTransparency = isSelected and 0.78 or 1 }):Play()
 
 			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundColor3 = targetColor }):Play()
 			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundTransparency = isSelected and 0 or 1 }):Play()
+
+
 		end
 		ApplyTabStyle(Tab, isFirstTab)
 
@@ -7339,36 +7127,65 @@ function syde:Init(library)
 			if tbdata.first == tdata.Title then return end 
 
 			-- Hide Home if active
-			if Data.Home.Enabled and tbdata.homeActive then
-				HideHomeForTab()
+			if Data.Home.Enabled then
+				if tbdata.homeActive then
+					HideHomeForTab()
+				end
 			end
+
 
 			local previous = tbdata.first
 			tbdata.first = tdata.Title
 
-			-- Instant page switch: immediately show target page and hide others
+			-- Check if both old + new are InitTab tabs
+			local prevPage = pages:FindFirstChild(previous)
+			local newPage  = pages:FindFirstChild(tdata.Title)
+
+			if prevPage and newPage then
+				-- both are regular tabs → animate
+				ChangeName(tdata.Title)
+			else
+				-- otherwise just snap
+				pages.clipframe.title.Text = tdata.Title
+			end
+
+			-- Hide all pages
 			for _, otherPage in ipairs(pages:GetChildren()) do
 				if otherPage:IsA("ScrollingFrame") then
-					otherPage.Visible = (otherPage == Page)
+					otherPage.Visible = false
 				end
 			end
+
 			Page.Visible = true
+			tbdata.first = tdata.Title
 
-			-- Fast title animation
-			ChangeName(tdata.Title)
+		--[[	if TabData.Locked == true then
+				if lockedframe and lockedframe.Name == TabData.Title then
+					lockedframe.Visible = true
+					for _, v in pairs(WINDOW.Pages.lockedpages:GetChildren()) do
+						if v.Name ~= TabData.Title then
+							v.Visible = false
+						end
+					end
+				end
+				currentLockedTabData = TabData
+			else
+				for _, v in pairs(WINDOW.Pages.lockedpages:GetChildren()) do
+					if v then
+						v.Visible = false
+					end
+				end
+			end]]
 
-			-- Replay element animations asynchronously for this page only
-			task.spawn(function()
-				syde:replayLoadTweens(Page)
-			end)
+			syde:replayLoadTweens()
 
-			-- Snappy tab button indicator & size update
 			for _, otherTab in ipairs(tabs:GetChildren()) do
 				if otherTab:IsA("Frame") then
 					ApplyTabStyle(otherTab, otherTab == Tab)
 					otherTab.interact.Active = true
 				end
 			end
+
 		end)
 
 		syde:AddConnection(syde.Comms.Event, function(p, color)
@@ -7401,7 +7218,7 @@ function syde:Init(library)
 			-- find page
 			targetPage = pages:FindFirstChild(tabName)
 			if not (selectedTab and targetPage) then
-				warn("[UI] SwitchToTab failed:", tabName)
+				warn("[Syde] SwitchToTab failed:", tabName)
 				return
 			end
 
@@ -7787,19 +7604,6 @@ function syde:Init(library)
 				end
 			end
 
-			local btnObj = {
-				Frame = button,
-				Set = function(self, newText)
-					button.title.Text = tostring(newText or "")
-				end,
-				toggle = function(self)
-					button.Visible = not button.Visible
-				end,
-				remove = function(self)
-					button:Destroy()
-				end,
-			}
-			return btnObj
 		end
 
 		--@@Toggle
@@ -8105,10 +7909,6 @@ function syde:Init(library)
 						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 					end
 				end
-
-				if not skipSave and data.Flag and SaveConfig then
-					SaveConfig()
-				end
 			end
 
 			if syde.ConfigEnabled and data.Flag then
@@ -8395,10 +8195,6 @@ function syde:Init(library)
 					end
 
 					Options.StarterValue = NewVal
-
-					if not skipSave and Options.Flag and SaveConfig then
-						SaveConfig()
-					end
 				end
 
 				-- click the value to type a custom number (reverts if outside range)
@@ -8448,26 +8244,6 @@ function syde:Init(library)
 				end
 			end
 
-			local sldObj = {
-				Frame = slider,
-				Value = (data.Sliders and data.Sliders[1] and data.Sliders[1].Value) or 0,
-				Set = function(self, val)
-					if data.Sliders and data.Sliders[1] and data.Sliders[1].CallBack then
-						data.Sliders[1].Value = val
-						pcall(data.Sliders[1].CallBack, val)
-					end
-				end,
-				SetName = function(self, n)
-					slider.title.Text = tostring(n or "")
-				end,
-				toggle = function(self)
-					slider.Visible = not slider.Visible
-				end,
-				remove = function(self)
-					slider:Destroy()
-				end,
-			}
-			return sldObj
 		end
 
 		--@@KeyBind
@@ -8502,33 +8278,15 @@ function syde:Init(library)
 				tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
 			end)
 
-			data.Flag = Keybind.Flag
-			data.Type = "Keybind"
-
-			function data:Set(keyCode, skipSave)
-				data:SetKeybind(keyCode, skipSave)
-			end
-
-			function data:SetKeybind(keyCode, skipSave)
-				if typeof(keyCode) == "string" then
-					keyCode = Enum.KeyCode[keyCode]
-				end
+			local function SetKeybind(keyCode)
 				if keyCode and keyCode ~= Enum.KeyCode.Unknown then
 					data.Key = keyCode
+					tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
 					KeyBind.Bind.v.Text = keyCode.Name
 				else
 					data.Key = nil
 					KeyBind.Bind.v.Text = "NONE"
 				end
-				tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
-				if not skipSave and data.Flag and SaveConfig then
-					SaveConfig()
-				end
-			end
-
-			local function SetKeybind(keyCode)
-				tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
-				data:SetKeybind(keyCode)
 			end
 
 			-- Main input handler
@@ -8581,15 +8339,6 @@ function syde:Init(library)
 				end
 			end)
 
-			if syde.ConfigEnabled and data.Flag then
-				syde.Flags[data.Flag] = data
-				if syde.LoadedConfig and syde.LoadedConfig[data.Flag] ~= nil then
-					local savedKey = syde.LoadedConfig[data.Flag]
-					data:SetKeybind(savedKey, true)
-				end
-			end
-
-			return data
 		end
 
 		--@@TextInput
@@ -8725,19 +8474,7 @@ function syde:Init(library)
 				end
 			end)
 
-			local inputObj = {
-				Frame = textinput,
-				Set = function(self, newText)
-					textBox.Text = tostring(newText or "")
-				end,
-				toggle = function(self)
-					textinput.Visible = not textinput.Visible
-				end,
-				remove = function(self)
-					textinput:Destroy()
-				end,
-			}
-			return inputObj
+
 		end
 
 		function initelement:EnchancedView(View)
@@ -9065,21 +8802,6 @@ function syde:Init(library)
 			updateSize()
 
 			Para.Content:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
-
-			local paraObj = {
-				Frame = Para,
-				Set = function(self, newTitle, newContent)
-					if newTitle then Para.Frame.title.Text = tostring(newTitle) end
-					if newContent then Para.Content.Text = tostring(newContent) end
-				end,
-				toggle = function(self)
-					Para.Visible = not Para.Visible
-				end,
-				remove = function(self)
-					Para:Destroy()
-				end,
-			}
-			return paraObj
 		end
 
 		function initelement:Label(Text, Alignment)
@@ -9096,29 +8818,7 @@ function syde:Init(library)
 				Label.text.TextXAlignment = Enum.TextXAlignment.Right
 			end
 
-			local labelObj = {
-				Frame = Label,
-				Set = function(self, newText, colorConfig)
-					newText = tostring(newText or "")
-					if type(colorConfig) == "table" then
-						for word, color in pairs(colorConfig) do
-							if newText:find(word) then
-								local escaped = word:gsub("([%(%)%.%+%-%*%?%[%]%^%$%%])", "%%%1")
-								newText = newText:gsub(escaped, '<font color="' .. color .. '">' .. word .. '</font>')
-							end
-						end
-						Label.text.RichText = true
-					end
-					Label.text.Text = newText
-				end,
-				toggle = function(self)
-					Label.Visible = not Label.Visible
-				end,
-				remove = function(self)
-					Label:Destroy()
-				end,
-			}
-			return labelObj
+
 		end
 
 		function initelement:Section(Title, Icon)
@@ -9460,40 +9160,7 @@ function syde:Init(library)
 				UpdateCustomLayout()
 			end
 
-			data.Flag = Dropdown.Flag
-			data.Type = "Dropdown"
-
-			function data:Set(option, skipSave)
-				if data.Multi then
-					if type(option) == "table" then
-						SelectedOptions = {}
-						SelectedOrder = {}
-						for _, opt in ipairs(option) do
-							SelectedOptions[opt] = true
-							table.insert(SelectedOrder, opt)
-						end
-					end
-				else
-					local optStr = tostring(option)
-					SelectedOptions = {[optStr] = true}
-					SelectedOrder = {optStr}
-					dropdown.dropholder.drop.selected.Text = optStr
-				end
-				UpdateSelectedText()
-				if not skipSave and data.Flag and SaveConfig then
-					SaveConfig()
-				end
-			end
-
-			if syde.ConfigEnabled and data.Flag then
-				syde.Flags[data.Flag] = data
-				if syde.LoadedConfig and syde.LoadedConfig[data.Flag] ~= nil then
-					data:Set(syde.LoadedConfig[data.Flag], true)
-				end
-			end
-
 			SetDropdownOptions()
-			return data
 		end
 
 		--@@Colorpicker
@@ -10420,10 +10087,6 @@ function syde:Init(library)
 				HSV[1], HSV[2], HSV[3] = h, s, v
 
 				updatestuff()
-
-				if not skipSave and data.Flag and SaveConfig then
-					SaveConfig()
-				end
 			end
 
 			if syde.ConfigEnabled and data.Flag then
@@ -10444,612 +10107,6 @@ function syde:Init(library)
 		end
 
 		-- guard every builder so a failed element shows the banner instead of breaking the UI
-		
-		-- ============================================================
-		-- ORION TAB ELEMENT INTEGRATION & ADAPTERS
-		-- ============================================================
-
-		-- 1. AddButton / Button adapter
-		function initelement:AddButton(ButtonConfig)
-			ButtonConfig = ButtonConfig or {}
-			local title = ButtonConfig.Name or ButtonConfig.Title or "Button"
-			local callback = ButtonConfig.Callback or ButtonConfig.CallBack or function() end
-			local icon = ButtonConfig.Icon or "rbxassetid://3944703587"
-
-			local res = initelement:Button({
-				Title = title,
-				Description = ButtonConfig.Description or ButtonConfig.Desc or "",
-				Type = ButtonConfig.Type or "Default",
-				HoldTime = ButtonConfig.HoldTime or 3,
-				CallBack = callback,
-				Icon = icon,
-			})
-			return res
-		end
-
-		-- 2. AddToggle / Toggle adapter
-		function initelement:AddToggle(ToggleConfig)
-			ToggleConfig = ToggleConfig or {}
-			local title = ToggleConfig.Name or ToggleConfig.Title or "Toggle"
-			local val = false
-			if ToggleConfig.Default ~= nil then
-				val = ToggleConfig.Default
-			elseif ToggleConfig.Value ~= nil then
-				val = ToggleConfig.Value
-			end
-			local callback = ToggleConfig.Callback or ToggleConfig.CallBack or function() end
-
-			local res = initelement:Toggle({
-				Title = title,
-				Description = ToggleConfig.Description or ToggleConfig.Desc or "",
-				Value = val,
-				Config = ToggleConfig.Save or ToggleConfig.Config or false,
-				Flag = ToggleConfig.Flag,
-				CallBack = callback,
-			})
-			return res
-		end
-
-		-- 3. AddSlider / Slider adapter
-		function initelement:AddSlider(SliderConfig)
-			SliderConfig = SliderConfig or {}
-			local title = SliderConfig.Name or SliderConfig.Title or "Slider"
-			local minVal = SliderConfig.Min or 0
-			local maxVal = SliderConfig.Max or 100
-			local defVal = SliderConfig.Default or minVal
-			local inc = SliderConfig.Increment or 1
-			local callback = SliderConfig.Callback or SliderConfig.CallBack or function() end
-
-			local res = initelement:Slider({
-				Title = title,
-				Description = SliderConfig.Description or SliderConfig.Desc or "",
-				Sliders = {
-					{
-						Title = title,
-						Range = {minVal, maxVal},
-						StarterValue = defVal,
-						Increment = inc,
-						CallBack = callback,
-						Flag = SliderConfig.Flag,
-					}
-				}
-			})
-			return res
-		end
-
-		-- 4. AddDropdown / Dropdown adapter
-		function initelement:AddDropdown(DropdownConfig)
-			DropdownConfig = DropdownConfig or {}
-			local title = DropdownConfig.Name or DropdownConfig.Title or "Dropdown"
-			local options = DropdownConfig.Options or DropdownConfig.Values or {}
-			local def = DropdownConfig.Default or DropdownConfig.Value or (options[1] or "")
-			local callback = DropdownConfig.Callback or DropdownConfig.CallBack or function() end
-
-			local res = initelement:Dropdown({
-				Title = title,
-				Options = options,
-				StarterOption = def,
-				PlaceHolder = DropdownConfig.PlaceHolder or DropdownConfig.PlaceholderText or "Select Option...",
-				Multi = DropdownConfig.Multi or false,
-				Flag = DropdownConfig.Flag,
-				CallBack = callback,
-			})
-			return res
-		end
-
-		-- 5. AddBind / AddKeybind / Keybind adapter
-		function initelement:AddBind(BindConfig)
-			BindConfig = BindConfig or {}
-			local title = BindConfig.Name or BindConfig.Title or "Bind"
-			local key = BindConfig.Default or BindConfig.Key or Enum.KeyCode.Unknown
-			local callback = BindConfig.Callback or BindConfig.CallBack or function() end
-
-			local res = initelement:Keybind({
-				Title = title,
-				Key = key,
-				Description = BindConfig.Description or BindConfig.Desc or "",
-				Flag = BindConfig.Flag,
-				CallBack = callback,
-			})
-			return res
-		end
-		initelement.AddKeybind = initelement.AddBind
-
-		-- 6. AddTextbox / AddTextInput / TextInput adapter
-		function initelement:AddTextbox(TextboxConfig)
-			TextboxConfig = TextboxConfig or {}
-			local title = TextboxConfig.Name or TextboxConfig.Title or "Textbox"
-			local ph = TextboxConfig.BackGroundtext or TextboxConfig.BackGrountText or TextboxConfig.PlaceholderText or TextboxConfig.PlaceHolder or TextboxConfig.Default or "Input"
-			local callback = TextboxConfig.Callback or TextboxConfig.CallBack or function() end
-
-			local res = initelement:TextInput({
-				Title = title,
-				PlaceHolder = ph,
-				Default = TextboxConfig.Default or "",
-				Description = TextboxConfig.Description or TextboxConfig.Desc or "",
-				Flag = TextboxConfig.Flag,
-				CallBack = callback,
-			})
-			return res
-		end
-		initelement.AddTextInput = initelement.AddTextbox
-
-		-- 7. AddColorpicker / AddColorPicker / ColorPicker adapter
-		function initelement:AddColorpicker(ColorpickerConfig)
-			ColorpickerConfig = ColorpickerConfig or {}
-			local title = ColorpickerConfig.Name or ColorpickerConfig.Title or "Colorpicker"
-			local col = ColorpickerConfig.Default or ColorpickerConfig.Color or Color3.fromRGB(255, 255, 255)
-			local callback = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
-
-			local res = initelement:ColorPicker({
-				Title = title,
-				Color = col,
-				Flag = ColorpickerConfig.Flag,
-				CallBack = callback,
-			})
-			return res
-		end
-		initelement.AddColorPicker = initelement.AddColorpicker
-
-		-- 8. AddParagraph adapter (supports user headshot if id is user id)
-		function initelement:AddParagraph(...)
-			local args = {...}
-			local id, title, content, align
-			if type(args[1]) == "table" then
-				local tbl = args[1]
-				id = tbl.Id or tbl.id
-				title = tbl.Title or tbl.Name or ""
-				content = tbl.Content or tbl.Text or ""
-				align = tbl.Align or tbl.Alignment or "Left"
-			elseif #args >= 3 and tonumber(args[1]) ~= nil then
-				id = tostring(args[1])
-				title = args[2] or ""
-				content = args[3] or ""
-				align = args[4] or "Left"
-			else
-				title = args[1] or ""
-				content = args[2] or ""
-				align = args[3] or "Left"
-			end
-
-			if id and tonumber(id) then
-				return initelement:AddPlayerParagraph(tonumber(id))
-			end
-
-			local res = initelement:Paragraph({
-				Title = title,
-				Content = content,
-				Align = align,
-			})
-			return res
-		end
-
-		-- 9. AddLabel with typewriter animation & word coloring
-		function initelement:AddLabel(Text, Alignment)
-			local current = tostring(Text or "")
-			local res = initelement:Label(current, Alignment)
-
-			local labelHandle = {
-				Frame = (type(res) == "table" and res.Frame) or nil,
-				Set = function(self, newText, colorConfig)
-					newText = tostring(newText or "")
-					local finalText = newText
-					if type(colorConfig) == "table" then
-						for word, color in pairs(colorConfig) do
-							if finalText:find(word) then
-								local escaped = word:gsub("([%(%)%.%+%-%*%?%[%]%^%$%%])", "%%%1")
-								finalText = finalText:gsub(escaped, '<font color="' .. color .. '">' .. word .. '</font>')
-							end
-						end
-					end
-
-					if res and res.Set then
-						res:Set(finalText)
-					end
-					current = newText
-				end,
-				toggle = function(self)
-					if res and res.toggle then res:toggle() end
-				end,
-				remove = function(self)
-					if res and res.remove then res:remove() end
-				end
-			}
-			return labelHandle
-		end
-
-		-- 10. AddLog / Log
-		function initelement:AddLog(Text)
-			Text = tostring(Text or "")
-			local LogFrame = Instance.new("Frame")
-			LogFrame.Name = "Log_" .. Text:sub(1, 15)
-			LogFrame.Size = UDim2.new(1, -20, 0, 38)
-			LogFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-			LogFrame.BorderSizePixel = 0
-			LogFrame.Parent = Page
-			LogFrame:SetAttribute("Searchable", true)
-
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 6)
-			corner.Parent = LogFrame
-
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(50, 50, 50)
-			stroke.Thickness = 1
-			stroke.Parent = LogFrame
-
-			local label = Instance.new("TextLabel")
-			label.Name = "Content"
-			label.Size = UDim2.new(1, -16, 1, 0)
-			label.Position = UDim2.new(0, 8, 0, 0)
-			label.BackgroundTransparency = 1
-			label.Font = Enum.Font.GothamBold
-			label.TextSize = 15
-			label.TextColor3 = Color3.fromRGB(240, 240, 240)
-			label.TextXAlignment = Enum.TextXAlignment.Center
-			label.TextWrapped = true
-			label.Text = Text
-			label.Parent = LogFrame
-
-			local logObj = {
-				Frame = LogFrame,
-				Set = function(self, newText)
-					label.Text = tostring(newText or "")
-				end,
-				toggle = function(self)
-					LogFrame.Visible = not LogFrame.Visible
-				end,
-				remove = function(self)
-					LogFrame:Destroy()
-				end,
-			}
-			return logObj
-		end
-		initelement.Log = initelement.AddLog
-
-		-- 11. ColorLabel
-		function initelement:ColorLabel(Text, ToChangeColor, Position)
-			Text = tostring(Text or "")
-			ToChangeColor = ToChangeColor or Color3.fromRGB(255, 255, 255)
-			Position = Position or "Left"
-
-			local CFrame = Instance.new("Frame")
-			CFrame.Name = "ColorLabel_" .. Text:sub(1, 15)
-			CFrame.Size = UDim2.new(1, -20, 0, 34)
-			CFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-			CFrame.BorderSizePixel = 0
-			CFrame.Parent = Page
-			CFrame:SetAttribute("Searchable", true)
-
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 6)
-			corner.Parent = CFrame
-
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(50, 50, 50)
-			stroke.Thickness = 1
-			stroke.Parent = CFrame
-
-			local label = Instance.new("TextLabel")
-			label.Name = "Content"
-			label.Size = UDim2.new(1, -24, 1, 0)
-			label.Position = UDim2.new(0, 12, 0, 0)
-			label.BackgroundTransparency = 1
-			label.Font = Enum.Font.GothamBold
-			label.TextSize = 14
-			label.TextColor3 = ToChangeColor
-			label.Text = Text
-			label.Parent = CFrame
-
-			if Position == "Center" then
-				label.TextXAlignment = Enum.TextXAlignment.Center
-			elseif Position == "Right" then
-				label.TextXAlignment = Enum.TextXAlignment.Right
-			else
-				label.TextXAlignment = Enum.TextXAlignment.Left
-			end
-
-			local colLabelObj = {
-				Frame = CFrame,
-				Set = function(self, newText, newColor, newPos)
-					if newText then label.Text = tostring(newText) end
-					if newColor then label.TextColor3 = newColor end
-					if newPos then
-						if newPos == "Center" then
-							label.TextXAlignment = Enum.TextXAlignment.Center
-						elseif newPos == "Right" then
-							label.TextXAlignment = Enum.TextXAlignment.Right
-						else
-							label.TextXAlignment = Enum.TextXAlignment.Left
-						end
-					end
-				end,
-				toggle = function(self)
-					CFrame.Visible = not CFrame.Visible
-				end,
-				remove = function(self)
-					CFrame:Destroy()
-				end,
-			}
-			return colLabelObj
-		end
-
-		-- 12. AddPlayerParagraph / PlayerParagraph
-		function initelement:AddPlayerParagraph(userId)
-			userId = tonumber(userId) or 0
-
-			local ParaFrame = Instance.new("Frame")
-			ParaFrame.Name = "PlayerPara_" .. tostring(userId)
-			ParaFrame.Size = UDim2.new(1, -20, 0, 68)
-			ParaFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-			ParaFrame.BorderSizePixel = 0
-			ParaFrame.Parent = Page
-			ParaFrame:SetAttribute("Searchable", true)
-
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 6)
-			corner.Parent = ParaFrame
-
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(50, 50, 50)
-			stroke.Thickness = 1
-			stroke.Parent = ParaFrame
-
-			local avatar = Instance.new("ImageLabel")
-			avatar.Name = "Avatar"
-			avatar.Size = UDim2.new(0, 52, 0, 52)
-			avatar.Position = UDim2.new(0, 8, 0.5, -26)
-			avatar.BackgroundTransparency = 1
-			avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=420&height=420&format=png"
-			avatar.Parent = ParaFrame
-
-			local avCorner = Instance.new("UICorner")
-			avCorner.CornerRadius = UDim.new(0, 8)
-			avCorner.Parent = avatar
-
-			local dLabel = Instance.new("TextLabel")
-			dLabel.Name = "DisplayName"
-			dLabel.Size = UDim2.new(1, -74, 0, 20)
-			dLabel.Position = UDim2.new(0, 68, 0, 12)
-			dLabel.BackgroundTransparency = 1
-			dLabel.Font = Enum.Font.GothamBold
-			dLabel.TextSize = 14
-			dLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
-			dLabel.TextXAlignment = Enum.TextXAlignment.Left
-			dLabel.Text = "Loading..."
-			dLabel.Parent = ParaFrame
-
-			local uLabel = Instance.new("TextLabel")
-			uLabel.Name = "Username"
-			uLabel.Size = UDim2.new(1, -74, 0, 18)
-			uLabel.Position = UDim2.new(0, 68, 0, 34)
-			uLabel.BackgroundTransparency = 1
-			uLabel.Font = Enum.Font.GothamSemibold
-			uLabel.TextSize = 12
-			uLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-			uLabel.TextXAlignment = Enum.TextXAlignment.Left
-			uLabel.Text = "@..."
-			uLabel.Parent = ParaFrame
-
-			local function fetchUser(uId)
-				task.spawn(function()
-					local ok, data = pcall(function()
-						return game:GetService("UserService"):GetUserInfosByUserIdsAsync({uId})
-					end)
-					if ok and data and data[1] then
-						dLabel.Text = data[1].DisplayName or "Unknown"
-						uLabel.Text = "@" .. (data[1].Username or "Unknown")
-					else
-						dLabel.Text = "User " .. tostring(uId)
-						uLabel.Text = "@user"
-					end
-				end)
-			end
-			if userId > 0 then
-				fetchUser(userId)
-			end
-
-			local playerObj = {
-				Frame = ParaFrame,
-				Set = function(self, newId)
-					newId = tonumber(newId) or 0
-					avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. newId .. "&width=420&height=420&format=png"
-					fetchUser(newId)
-				end,
-				toggle = function(self)
-					ParaFrame.Visible = not ParaFrame.Visible
-				end,
-				remove = function(self)
-					ParaFrame:Destroy()
-				end,
-			}
-			return playerObj
-		end
-		initelement.PlayerParagraph = initelement.AddPlayerParagraph
-
-		-- 13. AddPbind / Pbind (3-axis X, Y, Z vector inputs)
-		function initelement:AddPbind(Config)
-			Config = Config or {}
-			local title = Config.Name or Config.Title or "Position"
-			local defX = tostring(Config.DefaultX or "")
-			local defY = tostring(Config.DefaultY or "")
-			local defZ = tostring(Config.DefaultZ or "")
-			local callback = Config.Callback or Config.CallBack or function() end
-
-			local PFrame = Instance.new("Frame")
-			PFrame.Name = "PBind_" .. tostring(title):sub(1, 15)
-			PFrame.Size = UDim2.new(1, -20, 0, 40)
-			PFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-			PFrame.BorderSizePixel = 0
-			PFrame.Parent = Page
-			PFrame:SetAttribute("Searchable", true)
-
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 6)
-			corner.Parent = PFrame
-
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(50, 50, 50)
-			stroke.Thickness = 1
-			stroke.Parent = PFrame
-
-			local titleLabel = Instance.new("TextLabel")
-			titleLabel.Name = "Content"
-			titleLabel.Size = UDim2.new(1, -190, 1, 0)
-			titleLabel.Position = UDim2.new(0, 12, 0, 0)
-			titleLabel.BackgroundTransparency = 1
-			titleLabel.Font = Enum.Font.GothamBold
-			titleLabel.TextSize = 14
-			titleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-			titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-			titleLabel.Text = title
-			titleLabel.Parent = PFrame
-
-			local pbindData = {
-				ValueX = defX,
-				ValueY = defY,
-				ValueZ = defZ,
-				Type = "PBind",
-				Frame = PFrame,
-			}
-
-			local function createBox(xPos, defVal)
-				local box = Instance.new("TextBox")
-				box.Size = UDim2.new(0, 50, 0, 26)
-				box.Position = UDim2.new(1, xPos, 0.5, -13)
-				box.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-				box.Font = Enum.Font.GothamBold
-				box.TextSize = 12
-				box.TextColor3 = Color3.fromRGB(255, 255, 255)
-				box.PlaceholderText = "..."
-				box.Text = defVal
-				box.ClearTextOnFocus = false
-				box.Parent = PFrame
-
-				local bCorner = Instance.new("UICorner")
-				bCorner.CornerRadius = UDim.new(0, 4)
-				bCorner.Parent = box
-
-				local bStroke = Instance.new("UIStroke")
-				bStroke.Color = Color3.fromRGB(60, 60, 60)
-				bStroke.Thickness = 1
-				bStroke.Parent = box
-
-				return box
-			end
-
-			local boxX = createBox(-165, defX)
-			local boxY = createBox(-110, defY)
-			local boxZ = createBox(-55, defZ)
-
-			local function trigger()
-				pbindData.ValueX = boxX.Text
-				pbindData.ValueY = boxY.Text
-				pbindData.ValueZ = boxZ.Text
-				pcall(callback, pbindData.ValueX, pbindData.ValueY, pbindData.ValueZ)
-			end
-
-			boxX.FocusLost:Connect(trigger)
-			boxY.FocusLost:Connect(trigger)
-			boxZ.FocusLost:Connect(trigger)
-
-			pbindData.Set = function(self, x, y, z)
-				if x ~= nil then pbindData.ValueX = tostring(x) boxX.Text = pbindData.ValueX end
-				if y ~= nil then pbindData.ValueY = tostring(y) boxY.Text = pbindData.ValueY end
-				if z ~= nil then pbindData.ValueZ = tostring(z) boxZ.Text = pbindData.ValueZ end
-			end
-
-			pbindData.toggle = function(self) PFrame.Visible = not PFrame.Visible end
-			pbindData.remove = function(self) PFrame:Destroy() end
-
-			if Config.Flag then
-				syde.Flags[Config.Flag] = pbindData
-			end
-			return pbindData
-		end
-		initelement.Pbind = initelement.AddPbind
-
-		-- 14. AddUiBind / UiBind
-		function initelement:AddUiBind()
-			return initelement:AddBind({
-				Name = "UI Toggle Bind",
-				Default = Enum.KeyCode.RightShift,
-				Callback = function(key) end,
-			})
-		end
-		initelement.UiBind = initelement.AddUiBind
-
-		-- 15. AddSmartTheme / SmartTheme
-		function initelement:AddSmartTheme()
-			local colorPicker = initelement:AddColorpicker({
-				Name = "Base Color",
-				Default = (syde.Theme and syde.Theme.Accent) or Color3.fromRGB(251, 144, 255),
-				Callback = function(col)
-					if syde.GenTheme then
-						local newPalette = syde:GenTheme(col)
-						syde.Themes = syde.Themes or {}
-						syde.Themes.Custom = newPalette
-						syde.SelectedTheme = "Custom"
-						if syde.SetTheme then syde:SetTheme() end
-					end
-					if syde.UpdateTheme then
-						syde:UpdateTheme({ Accent = col, HitBox = col })
-					end
-				end,
-			})
-			local resetBtn = initelement:AddButton({
-				Name = "Reset Theme",
-				Callback = function()
-					syde.SelectedTheme = "Default"
-					if syde.SetTheme then syde:SetTheme() end
-					if syde.UpdateTheme then
-						syde:UpdateTheme({ Accent = Color3.fromRGB(251, 144, 255), HitBox = Color3.fromRGB(251, 144, 255) })
-					end
-				end,
-			})
-			return { ColorPicker = colorPicker, ResetButton = resetBtn }
-		end
-		initelement.SmartTheme = initelement.AddSmartTheme
-
-		-- 16. FreeMouseDrp
-		function initelement:FreeMouseDrp()
-			return initelement:AddDropdown({
-				Name = "Unlock Mouse Mode",
-				Options = {"ThirdPerson", "FreeMouse"},
-				Default = syde.UMouseMode or "FreeMouse",
-				Callback = function(val)
-					syde.UMouseMode = val
-					if syde.UnlockMouse then
-						syde:UnlockMouse(false)
-						task.wait(0.05)
-						syde:UnlockMouse(true)
-					end
-				end,
-			})
-		end
-
-		-- 17. AddSection (Enhanced section supporting sub-element builder)
-		function initelement:AddSection(name, align, height)
-			name = name or ""
-			local secFrame = initelement:Section(name)
-			local secObj = {}
-			for k, v in pairs(initelement) do
-				secObj[k] = v
-			end
-			secObj.Frame = secFrame
-			secObj.toggle = function(self)
-				if secFrame and secFrame.Parent then
-					secFrame.Visible = not secFrame.Visible
-				end
-			end
-			secObj.remove = function(self)
-				if secFrame and secFrame.Parent then
-					secFrame:Destroy()
-				end
-			end
-			return secObj
-		end
-
 		for _bn, _bf in pairs(initelement) do
 			if type(_bf) == "function" then
 				initelement[_bn] = syde:Guard("Building a '" .. tostring(_bn) .. "' element", _bf)
@@ -11060,2528 +10117,9 @@ function syde:Init(library)
 
 
 	end
-
-	tbdata.MakeTab = function(self, TabConfig)
-		return self:InitTab(TabConfig)
-	end
-
-	tbdata.ChangeIcon = function(self, IconId)
-		pcall(function()
-			if window and window:FindFirstChild("icon") then
-				local ficon = tostring(IconId)
-				if not ficon:find("rbxassetid://") and not ficon:find("http") then
-					ficon = "rbxassetid://" .. ficon
-				end
-				window.icon.Image = ficon
-			end
-		end)
-	end
-
-	tbdata.SetName = function(self, ...)
-		local args = {...}
-		local result = ""
-		for _, pair in ipairs(args) do
-			if type(pair) == "table" then
-				local text, color = pair[1] or "", pair[2] or "#FFFFFF"
-				for i = 1, #text do
-					local char = text:sub(i, i)
-					result = result .. '<font color="' .. color .. '">' .. char .. '</font>'
-				end
-			else
-				result = result .. tostring(pair)
-			end
-		end
-		pcall(function()
-			if window and window:FindFirstChild("title") then
-				window.title.RichText = true
-				window.title.Text = result
-			end
-		end)
-	end
-
-	tbdata.GoToTab = function(self, tabName)
-		pcall(function()
-			for _, tabBtn in ipairs(tabs:GetChildren()) do
-				if tabBtn:IsA("TextButton") or tabBtn:IsA("ImageButton") or tabBtn:IsA("Frame") then
-					if tabBtn.Name == tabName or (tabBtn:FindFirstChild("title") and tabBtn.title.Text == tabName) then
-						for _, page in ipairs(pages:GetChildren()) do
-							if page:IsA("ScrollingFrame") then
-								page.Visible = (page.Name == tabName)
-							end
-						end
-					end
-				end
-			end
-		end)
-	end
-
-	tbdata.ScrollTo = function(self, tabName, sectionName, smooth)
-		pcall(function()
-			self:GoToTab(tabName)
-			local page = pages:FindFirstChild(tabName)
-			if page then
-				local target = page:FindFirstChild(sectionName)
-				if target then
-					local relativeY = target.AbsolutePosition.Y - page.AbsolutePosition.Y + page.CanvasPosition.Y
-					local maxY = math.max(0, page.CanvasSize.Y.Offset - page.AbsoluteSize.Y)
-					local targetY = math.clamp(relativeY - 30, 0, maxY)
-					if smooth then
-						tweenservice:Create(page, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-							CanvasPosition = Vector2.new(0, targetY)
-						}):Play()
-					else
-						page.CanvasPosition = Vector2.new(0, targetY)
-					end
-				end
-			end
-		end)
-	end
-
-	tbdata.ScrollToElement = function(self, tabName, element, smooth, offsetY)
-		pcall(function()
-			self:GoToTab(tabName)
-			local page = pages:FindFirstChild(tabName)
-			if not page then return end
-			local elemInstance = nil
-			if typeof(element) == "Instance" then
-				elemInstance = element
-			elseif typeof(element) == "string" then
-				for _, d in ipairs(page:GetDescendants()) do
-					if d:IsA("TextLabel") and d.Text:lower():find(element:lower(), 1, true) then
-						elemInstance = d.Parent
-						break
-					elseif d.Name:lower() == element:lower() then
-						elemInstance = d
-						break
-					end
-				end
-			end
-			if elemInstance then
-				local offY = (offsetY == "center" and (page.AbsoluteSize.Y / 2) or (tonumber(offsetY) or 30))
-				local relativeY = elemInstance.AbsolutePosition.Y - page.AbsolutePosition.Y + page.CanvasPosition.Y
-				local maxY = math.max(0, page.CanvasSize.Y.Offset - page.AbsoluteSize.Y)
-				local targetY = math.clamp(relativeY - offY, 0, maxY)
-				if smooth then
-					tweenservice:Create(page, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-						CanvasPosition = Vector2.new(0, targetY)
-					}):Play()
-				else
-					page.CanvasPosition = Vector2.new(0, targetY)
-				end
-			end
-		end)
-	end
-
-	tbdata.FindAndFocusElement = function(self, query)
-		if not query or query == "" then return end
-		local safeQuery = query:lower()
-		for _, page in ipairs(pages:GetChildren()) do
-			if page:IsA("ScrollingFrame") then
-				for _, elem in ipairs(page:GetDescendants()) do
-					if elem:IsA("TextLabel") and elem.Text:lower():find(safeQuery, 1, true) then
-						self:GoToTab(page.Name)
-						task.wait(0.05)
-						self:ScrollToElement(page.Name, elem.Parent, true, "center")
-						local stroke = elem.Parent:FindFirstChildOfClass("UIStroke")
-						if stroke then
-							local originalThickness = stroke.Thickness
-							local tw = tweenservice:Create(stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, true), {
-								Thickness = originalThickness + 2
-							})
-							tw:Play()
-							tw.Completed:Once(function()
-								stroke.Thickness = originalThickness
-							end)
-						end
-						return
-					end
-				end
-			end
-		end
-	end
-
 	return tbdata
 
 
 end
-
--- ============================================================
--- ORION LIBRARY INTEGRATED SUBSYSTEM
--- ============================================================
-
-local vgs = {
-	MS  = (game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer:GetMouse()) or nil,
-	VIM = game:GetService("VirtualInputManager"),
-	p   = game:GetService("Players").LocalPlayer,
-	UIS = game:GetService("UserInputService"),
-	TS  = game:GetService("TweenService"),
-	TTS = game:GetService("TextService"),
-	HS  = game:GetService("HttpService"),
-	RS  = game:GetService("RunService"),
-	ps  = game:GetService("Players"),
-	US  = game:GetService("UserService"),
-	CP  = game:GetService("ContentProvider")
-}
-
-local rate = 1 / 200
-local acc = 0
-
-syde.Themes = syde.Themes or {
-	Default = {
-		Main = Color3.fromRGB(31, 20, 37),
-		Second = Color3.fromRGB(35, 23, 41),
-		Stroke = Color3.fromRGB(45, 29, 54),
-		Divider = Color3.fromRGB(40, 26, 47),
-		Text = Color3.fromRGB(240, 240, 242),
-		TextDark = Color3.fromRGB(155, 155, 160),
-		Accent = Color3.fromRGB(57, 37, 68)
-	}
-}
-syde.SelectedTheme = syde.SelectedTheme or "Default"
-syde.UMouseMode = syde.UMouseMode or "FreeMouse"
-syde.ThemeObjects = syde.ThemeObjects or {}
-syde.Connections = syde.Connections or {}
-syde.Toggles = syde.Toggles or {}
-syde.Dropdowns = syde.Dropdowns or {}
-syde.elmnts = syde.elmnts or {}
-syde.maxds = 500
-syde.minds = 10
-syde.Icons = syde.Icons or {}
-syde.Flags = syde.Flags or {}
-
-function syde:GenTheme(mainColor)
-	if typeof(mainColor) ~= "Color3" then
-		mainColor = Color3.fromRGB(31, 20, 37)
-	end
-	local r, g, b = mainColor.R * 255, mainColor.G * 255, mainColor.B * 255
-	local lum = 0.299 * r + 0.587 * g + 0.114 * b
-	local dark = lum < 128
-	local t = {Main = mainColor}
-
-	if dark then
-		t.Second = Color3.fromRGB(math.clamp(r * 1.12, 0, 255), math.clamp(g * 1.12, 0, 255), math.clamp(b * 1.12, 0, 255))
-		t.Stroke = Color3.fromRGB(math.clamp(r * 1.45, 0, 255), math.clamp(g * 1.45, 0, 255), math.clamp(b * 1.45, 0, 255))
-		t.Divider = Color3.fromRGB(math.clamp(r * 1.28, 0, 255), math.clamp(g * 1.28, 0, 255), math.clamp(b * 1.28, 0, 255))
-		t.Text = Color3.fromRGB(240, 240, 242)
-		t.TextDark = Color3.fromRGB(155, 155, 160)
-		t.Accent = Color3.fromRGB(math.clamp(r * 1.85, 0, 255), math.clamp(g * 1.85, 0, 255), math.clamp(b * 1.85, 0, 255))
-	else
-		t.Second = Color3.fromRGB(math.clamp(r * 0.94, 0, 255), math.clamp(g * 0.94, 0, 255), math.clamp(b * 0.94, 0, 255))
-		t.Stroke = Color3.fromRGB(math.clamp(r * 0.75, 0, 255), math.clamp(g * 0.75, 0, 255), math.clamp(b * 0.75, 0, 255))
-		t.Divider = Color3.fromRGB(math.clamp(r * 0.85, 0, 255), math.clamp(g * 0.85, 0, 255), math.clamp(b * 0.85, 0, 255))
-		t.Text = Color3.fromRGB(35, 35, 38)
-		t.TextDark = Color3.fromRGB(110, 110, 115)
-		t.Accent = Color3.fromRGB(math.clamp(r * 0.72, 0, 255), math.clamp(g * 0.72, 0, 255), math.clamp(b * 0.72, 0, 255))
-	end
-
-	return t
-end
-
-syde.Themes.Default = syde:GenTheme(Color3.fromRGB(31, 20, 37))
-syde.CurrentTheme = syde.Themes.Default
-
--- UnlockMouse implementation (Non-blocking: FreeMouse without GUI Modal trap)
-local freeMouseBtn = nil
-local nz = 0.5
-
-function syde:UnlockMouse(Value)
-	local lp = vgs.p or game:GetService("Players").LocalPlayer
-	local uis = vgs.UIS or game:GetService("UserInputService")
-	if not lp then return end
-
-	if not freeMouseBtn then
-		local parentGui = (gethui and gethui()) or coregui or lp:FindFirstChildOfClass("PlayerGui")
-		freeMouseBtn = Instance.new("TextButton")
-		freeMouseBtn.Name = "OrionFreeMouse"
-		freeMouseBtn.Size = UDim2.new(0, 0, 0, 0)
-		freeMouseBtn.Position = UDim2.new(0, 0, 0, 0)
-		freeMouseBtn.BackgroundTransparency = 1
-		freeMouseBtn.Text = ""
-		freeMouseBtn.Modal = false
-		freeMouseBtn.Active = false
-		freeMouseBtn.Visible = false
-		pcall(function() freeMouseBtn.Parent = parentGui end)
-	end
-
-	if freeMouseBtn then
-		freeMouseBtn.Modal = false
-		freeMouseBtn.Active = false
-		freeMouseBtn.Visible = false
-	end
-
-	if syde.UMouseMode == "ThirdPerson" then
-		if Value then
-			pcall(function()
-				lp.CameraMode = Enum.CameraMode.Classic
-				uis.MouseBehavior = Enum.MouseBehavior.Default
-				uis.MouseIconEnabled = true
-				lp.CameraMaxZoomDistance = syde.maxds or 500
-				lp.CameraMinZoomDistance = syde.minds or 10
-			end)
-		else
-			pcall(function()
-				uis.MouseIconEnabled = false
-				uis.MouseBehavior = Enum.MouseBehavior.LockCenter
-				lp.CameraMaxZoomDistance = nz
-				lp.CameraMinZoomDistance = nz
-				lp.CameraMode = Enum.CameraMode.LockFirstPerson
-			end)
-		end
-	elseif syde.UMouseMode == "FreeMouse" then
-		pcall(function()
-			uis.MouseBehavior = Value and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
-			uis.MouseIconEnabled = Value
-		end)
-	else
-		pcall(function()
-			uis.MouseBehavior = Value and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
-			uis.MouseIconEnabled = Value
-		end)
-	end
-end
-
--- Feather / Lucide icon loader
-task.spawn(function()
-	pcall(function()
-		local json = game:HttpGetAsync("https://raw.githubusercontent.com/evoincorp/lucideblox/master/src/modules/util/icons.json")
-		local decoded = https:JSONDecode(json)
-		if decoded and decoded.icons then
-			syde.Icons = decoded.icons
-		end
-	end)
-end)
-
-function syde:GetIcon(IconName)
-	if syde.Icons and syde.Icons[IconName] then
-		return syde.Icons[IconName]
-	end
-	return nil
-end
-
--- Standalone MakeNotification
-local notifGui = nil
-local notifHolder = nil
-local notifKeys = {}
-
-function syde:MakeNotification(NotificationConfig)
-	NotificationConfig = NotificationConfig or {}
-	local title = NotificationConfig.Name or NotificationConfig.Title or "Notification"
-	local content = NotificationConfig.Content or ""
-	local image = NotificationConfig.Image or NotificationConfig.Icon or "rbxassetid://4384403532"
-	local duration = NotificationConfig.Time or NotificationConfig.Duration or 5
-
-	if not image:find("rbxassetid://") and not image:find("http") then
-		image = "rbxassetid://" .. image
-	end
-
-	local key = title .. content
-	if notifKeys[key] then return end
-	notifKeys[key] = true
-
-	task.spawn(function()
-		pcall(function()
-			vgs.CP:PreloadAsync({image})
-		end)
-
-		local lp = vgs.p or game:GetService("Players").LocalPlayer
-		local targetParent = (gethui and gethui()) or coregui or (lp and lp:FindFirstChildOfClass("PlayerGui"))
-
-		if not notifHolder or not notifHolder.Parent then
-			notifGui = Instance.new("ScreenGui")
-			notifGui.Name = "OrionNotifications"
-			notifGui.ResetOnSpawn = false
-			pcall(function() notifGui.Parent = targetParent end)
-
-			notifHolder = Instance.new("Frame")
-			notifHolder.Name = "Holder"
-			notifHolder.Size = UDim2.new(0, 300, 1, -25)
-			notifHolder.Position = UDim2.new(1, -25, 1, -25)
-			notifHolder.AnchorPoint = Vector2.new(1, 1)
-			notifHolder.BackgroundTransparency = 1
-			notifHolder.Parent = notifGui
-
-			local list = Instance.new("UIListLayout")
-			list.SortOrder = Enum.SortOrder.LayoutOrder
-			list.VerticalAlignment = Enum.VerticalAlignment.Bottom
-			list.Padding = UDim.new(0, 6)
-			list.Parent = notifHolder
-		end
-
-		local notifParent = Instance.new("Frame")
-		notifParent.BackgroundTransparency = 1
-		notifParent.Size = UDim2.new(1, 0, 0, 0)
-		notifParent.AutomaticSize = Enum.AutomaticSize.Y
-		notifParent.Parent = notifHolder
-
-		local frame = Instance.new("Frame")
-		frame.Name = "NotificationFrame"
-		frame.Size = UDim2.new(1, 0, 0, 0)
-		frame.Position = UDim2.new(1, 55, 0, 0)
-		frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-		frame.AutomaticSize = Enum.AutomaticSize.Y
-		frame.Parent = notifParent
-
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 8)
-		corner.Parent = frame
-
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = Color3.fromRGB(55, 55, 55)
-		stroke.Thickness = 1
-		stroke.Parent = frame
-
-		local pad = Instance.new("UIPadding")
-		pad.PaddingTop = UDim.new(0, 10)
-		pad.PaddingBottom = UDim.new(0, 10)
-		pad.PaddingLeft = UDim.new(0, 12)
-		pad.PaddingRight = UDim.new(0, 12)
-		pad.Parent = frame
-
-		local iconImg = Instance.new("ImageLabel")
-		iconImg.Name = "Icon"
-		iconImg.Size = UDim2.new(0, 20, 0, 20)
-		iconImg.Position = UDim2.new(0, 0, 0, 0)
-		iconImg.BackgroundTransparency = 1
-		iconImg.Image = image
-		iconImg.Parent = frame
-
-		local tLabel = Instance.new("TextLabel")
-		tLabel.Name = "Title"
-		tLabel.Size = UDim2.new(1, -28, 0, 20)
-		tLabel.Position = UDim2.new(0, 28, 0, 0)
-		tLabel.BackgroundTransparency = 1
-		tLabel.Font = Enum.Font.GothamBold
-		tLabel.TextSize = 14
-		tLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-		tLabel.TextXAlignment = Enum.TextXAlignment.Left
-		tLabel.Text = title
-		tLabel.Parent = frame
-
-		local cLabel = Instance.new("TextLabel")
-		cLabel.Name = "Content"
-		cLabel.Size = UDim2.new(1, 0, 0, 0)
-		cLabel.Position = UDim2.new(0, 0, 0, 24)
-		cLabel.BackgroundTransparency = 1
-		cLabel.Font = Enum.Font.Gotham
-		cLabel.TextSize = 12
-		cLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-		cLabel.TextXAlignment = Enum.TextXAlignment.Left
-		cLabel.TextWrapped = true
-		cLabel.AutomaticSize = Enum.AutomaticSize.Y
-		cLabel.Text = content
-		cLabel.Parent = frame
-
-		tweenservice:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
-
-		task.wait(math.max(1, duration - 0.6))
-		tweenservice:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2.new(1, 40, 0, 0), BackgroundTransparency = 1}):Play()
-		tweenservice:Create(tLabel, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
-		tweenservice:Create(cLabel, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
-		tweenservice:Create(iconImg, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
-
-		task.wait(0.6)
-		notifParent:Destroy()
-		notifKeys[key] = nil
-	end)
-end
-
--- Active window tracking for global tab / element focus
-syde.ActiveWindow = nil
-
-function syde:GoToTab(tabName)
-	if syde.ActiveWindow and syde.ActiveWindow.GoToTab then
-		syde.ActiveWindow:GoToTab(tabName)
-	end
-end
-
-function syde:ScrollTo(tabName, sectionName, smooth)
-	if syde.ActiveWindow and syde.ActiveWindow.ScrollTo then
-		syde.ActiveWindow:ScrollTo(tabName, sectionName, smooth)
-	end
-end
-
-function syde:ScrollToElement(tabName, element, smooth, offsetY)
-	if syde.ActiveWindow and syde.ActiveWindow.ScrollToElement then
-		syde.ActiveWindow:ScrollToElement(tabName, element, smooth, offsetY)
-	end
-end
-
-function syde:FindAndFocusElement(query)
-	if syde.ActiveWindow and syde.ActiveWindow.FindAndFocusElement then
-		syde.ActiveWindow:FindAndFocusElement(query)
-	end
-end
-
--- Global Config and Theme persistence helpers
-local ORION_THEME_FOLDER = "OrionTheme"
-local ORION_FILE_PATH = ORION_THEME_FOLDER .. "/" .. tostring(game.GameId) .. ".txt"
-
-function syde:SaveThemeCfg()
-	if writefile then
-		pcall(function()
-			if not isfolder(ORION_THEME_FOLDER) and makefolder then
-				makefolder(ORION_THEME_FOLDER)
-			end
-			local themeData = syde.Themes[syde.SelectedTheme]
-			if not themeData then return end
-			local data = {}
-			for k, v in pairs(themeData) do
-				if typeof(v) == "Color3" then
-					data[k] = {R = v.R * 255, G = v.G * 255, B = v.B * 255}
-				end
-			end
-			writefile(ORION_FILE_PATH, vgs.HS:JSONEncode(data))
-		end)
-	end
-end
-
-function syde:LoadThemeCfg(cfgPath)
-	cfgPath = cfgPath or ORION_FILE_PATH
-	if readfile and isfile and isfile(cfgPath) then
-		pcall(function()
-			local raw = readfile(cfgPath)
-			local data = vgs.HS:JSONDecode(raw)
-			syde.Themes.Custom = syde.Themes.Custom or {}
-			for k, v in pairs(data) do
-				if type(v) == "table" and v.R and v.G and v.B then
-					syde.Themes.Custom[k] = Color3.fromRGB(v.R, v.G, v.B)
-				end
-			end
-			syde.SelectedTheme = "Custom"
-			syde:SetTheme()
-		end)
-	end
-end
-
-function syde:SaveCfg(name)
-	if writefile and syde.Folder then
-		pcall(function()
-			if not isfolder(syde.Folder) and makefolder then
-				makefolder(syde.Folder)
-			end
-			local data = {}
-			for i, v in pairs(syde.Flags) do
-				if type(v) == "table" and v.Save then
-					if v.Type == "Colorpicker" then
-						data[i] = {R = v.Value.R * 255, G = v.Value.G * 255, B = v.Value.B * 255}
-					elseif v.Type == "PBind" then
-						data[i] = {x = v.ValueX, y = v.ValueY, z = v.ValueZ}
-					else
-						data[i] = v.Value
-					end
-				end
-			end
-			writefile(syde.Folder .. "/" .. tostring(name) .. ".txt", vgs.HS:JSONEncode(data))
-		end)
-	end
-end
-
-function syde:LoadCfg(config)
-	pcall(function()
-		local data = (type(config) == "string" and vgs.HS:JSONDecode(config)) or config
-		if type(data) == "table" then
-			for k, val in pairs(data) do
-				if syde.Flags[k] then
-					task.spawn(function()
-						local flag = syde.Flags[k]
-						if flag.Type == "Colorpicker" and type(val) == "table" and val.R then
-							flag:Set(Color3.fromRGB(val.R, val.G, val.B))
-						elseif flag.Type == "PBind" and type(val) == "table" then
-							flag:Set(val.x, val.y, val.z)
-						elseif flag.Set then
-							flag:Set(val)
-						end
-					end)
-				end
-			end
-		end
-	end)
-end
-
-function syde:SetTheme()
-	local themeData = syde.Themes[syde.SelectedTheme] or syde.Themes.Default
-	if not themeData then return end
-
-	local function ReturnProp(obj)
-		if obj:IsA("TextLabel") or obj:IsA("TextBox") then return "TextColor3" end
-		if obj:IsA("ScrollingFrame") then return "ScrollBarImageColor3" end
-		if obj:IsA("UIStroke") then return "Color" end
-		if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then return "ImageColor3" end
-		if obj:IsA("Frame") or obj:IsA("TextButton") then return "BackgroundColor3" end
-		return nil
-	end
-
-	for typeName, objects in pairs(syde.ThemeObjects) do
-		local color = themeData[typeName]
-		if color then
-			for _, obj in ipairs(objects) do
-				if obj and obj.Parent then
-					local prop = ReturnProp(obj)
-					if prop and obj[prop] ~= nil then
-						obj[prop] = color
-					end
-				end
-			end
-		end
-	end
-
-	if syde.Toggles then
-		for _, toggle in ipairs(syde.Toggles) do
-			if toggle and toggle.Box and toggle.Box.Parent then
-				local accolor = (toggle.uccolor and toggle.ccolor) or themeData.Accent
-				if toggle.Value then
-					toggle.Box.BackgroundColor3 = accolor
-					if toggle.Box:FindFirstChild("Stroke") then
-						toggle.Box.Stroke.Color = accolor
-					end
-				else
-					toggle.Box.BackgroundColor3 = themeData.Divider
-					if toggle.Box:FindFirstChild("Stroke") then
-						toggle.Box.Stroke.Color = themeData.Stroke
-					end
-				end
-			end
-		end
-	end
-
-	if syde.Dropdowns then
-		for _, dropdown in ipairs(syde.Dropdowns) do
-			if dropdown and dropdown.Buttons then
-				for value, btn in pairs(dropdown.Buttons) do
-					if btn and btn.Parent and btn:FindFirstChild("Checkbox") then
-						local sel = (type(dropdown.Value) == "table" and table.find(dropdown.Value, value)) or (dropdown.Value == value)
-						btn.Checkbox.BackgroundColor3 = sel and themeData.Accent or themeData.Divider
-						if btn.Checkbox:FindFirstChild("Stroke") then
-							btn.Checkbox.Stroke.Color = sel and themeData.Accent or themeData.Stroke
-						end
-					end
-				end
-			end
-		end
-	end
-
-	syde:SaveThemeCfg()
-end
-
--- ============================================================
--- STANDALONE ORION WINDOW ENGINE (syde:MakeWindow)
--- ============================================================
-function syde:MakeWindow(WindowConfig)
-	WindowConfig = WindowConfig or {}
-	local WindowNameText = WindowConfig.Name or "Orion Library"
-	local ConfigFolder = WindowConfig.ConfigFolder or WindowNameText
-	local SaveConfig = WindowConfig.SaveConfig or false
-	local TagText = WindowConfig.TagText or ""
-	local HidePremium = WindowConfig.HidePremium or false
-	local IntroEnabled = WindowConfig.IntroEnabled ~= false
-	local FreeMouseMode = WindowConfig.FreeMouse or false
-	local OpenKey = WindowConfig.Openkey or WindowConfig.KeyToOpenWindow or "RightShift"
-	local IntroText = WindowConfig.IntroText or "Orion Library"
-	local CloseCallback = WindowConfig.CloseCallback or function() end
-	local ShowIcon = WindowConfig.ShowIcon or false
-	local WindowIconId = WindowConfig.Icon or "rbxassetid://8834748103"
-	local IntroIconId = WindowConfig.IntroIcon or "rbxassetid://8834748103"
-	local SearchBarEnabled = WindowConfig.SearchBar or false
-
-	syde._EngineMode = "Orion"
-	syde.Folder = ConfigFolder
-	syde.SaveCfg = SaveConfig
-	syde.SaveCfgState = SaveConfig
-	if Library then pcall(function() Library.Enabled = false end) end
-
-	if FreeMouseMode then
-		syde:UnlockMouse(true)
-	end
-
-	if SaveConfig and isfolder and makefolder and not isfolder(ConfigFolder) then
-		pcall(makefolder, ConfigFolder)
-	end
-
-	local targetParent = (gethui and gethui()) or coregui or (vgs.p and vgs.p:FindFirstChildOfClass("PlayerGui"))
-
-	-- Cleanup previous Orion ScreenGuis
-	for _, child in ipairs(targetParent:GetChildren()) do
-		if child.Name == "OrionLib" or child.Name == "OrionBliz" then
-			pcall(function() child:Destroy() end)
-		end
-	end
-
-	local OrionGui = Instance.new("ScreenGui")
-	OrionGui.Name = "OrionLib"
-	OrionGui.ResetOnSpawn = false
-	pcall(function() OrionGui.Parent = targetParent end)
-
-	local ThemeObjects = {}
-	local function AddTheme(obj, propType)
-		ThemeObjects[propType] = ThemeObjects[propType] or {}
-		table.insert(ThemeObjects[propType], obj)
-		syde.ThemeObjects[propType] = syde.ThemeObjects[propType] or {}
-		table.insert(syde.ThemeObjects[propType], obj)
-
-		local theme = syde.Themes[syde.SelectedTheme] or syde.Themes.Default
-		local col = theme[propType]
-		if col then
-			if obj:IsA("TextLabel") or obj:IsA("TextBox") then obj.TextColor3 = col
-			elseif obj:IsA("ScrollingFrame") then obj.ScrollBarImageColor3 = col
-			elseif obj:IsA("UIStroke") then obj.Color = col
-			elseif obj:IsA("ImageLabel") or obj:IsA("ImageButton") then obj.ImageColor3 = col
-			elseif obj:IsA("Frame") or obj:IsA("TextButton") then obj.BackgroundColor3 = col
-			end
-		end
-		return obj
-	end
-
-	-- Mobile Open Button
-	local MobileOpenBtn = Instance.new("TextButton")
-	MobileOpenBtn.Name = "MobileOpenButton"
-	MobileOpenBtn.Size = UDim2.new(0, 48, 0, 48)
-	MobileOpenBtn.Position = UDim2.new(0.5, -24, 0.05, 0)
-	MobileOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	MobileOpenBtn.Text = "UI"
-	MobileOpenBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
-	MobileOpenBtn.Font = Enum.Font.GothamBold
-	MobileOpenBtn.TextSize = 14
-	MobileOpenBtn.Visible = false
-	MobileOpenBtn.Parent = OrionGui
-
-	local mobCorner = Instance.new("UICorner")
-	mobCorner.CornerRadius = UDim.new(0.3, 0)
-	mobCorner.Parent = MobileOpenBtn
-
-	local mobStroke = Instance.new("UIStroke")
-	mobStroke.Color = Color3.fromRGB(70, 70, 70)
-	mobStroke.Thickness = 1.5
-	mobStroke.Parent = MobileOpenBtn
-
-	-- Main Window Frame
-	local MainWindow = Instance.new("Frame")
-	MainWindow.Name = "MainWindow"
-	MainWindow.Size = UDim2.new(0, 615, 0, 344)
-	MainWindow.Position = UDim2.new(0.5, -307, 0.5, -172)
-	MainWindow.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-	MainWindow.BorderSizePixel = 0
-	MainWindow.ClipsDescendants = true
-	MainWindow.Active = true
-	MainWindow.Parent = OrionGui
-	AddTheme(MainWindow, "Main")
-
-	local mainCorner = Instance.new("UICorner")
-	mainCorner.CornerRadius = UDim.new(0, 10)
-	mainCorner.Parent = MainWindow
-
-	local mainStroke = Instance.new("UIStroke")
-	mainStroke.Color = Color3.fromRGB(50, 50, 50)
-	mainStroke.Thickness = 1.5
-	mainStroke.Parent = MainWindow
-	AddTheme(mainStroke, "Stroke")
-
-	-- Drag point
-	local DragPoint = Instance.new("Frame")
-	DragPoint.Name = "DragPoint"
-	DragPoint.Size = UDim2.new(1, 0, 0, 50)
-	DragPoint.BackgroundTransparency = 1
-	DragPoint.Parent = MainWindow
-
-	syde:AddDrag(DragPoint, MainWindow)
-	syde:AddDrag(MobileOpenBtn, MobileOpenBtn)
-
-	-- TopBar
-	local TopBar = Instance.new("Frame")
-	TopBar.Name = "TopBar"
-	TopBar.Size = UDim2.new(1, 0, 0, 50)
-	TopBar.BackgroundTransparency = 1
-	TopBar.Parent = MainWindow
-
-	local WindowNameLabel = Instance.new("TextLabel")
-	WindowNameLabel.Name = "WindowName"
-	WindowNameLabel.Size = UDim2.new(1, -(ShowIcon and 155 or 130), 1, 0)
-	WindowNameLabel.Position = UDim2.new(0, ShowIcon and 50 or 25, 0, 0)
-	WindowNameLabel.BackgroundTransparency = 1
-	WindowNameLabel.Font = Enum.Font.GothamBlack
-	WindowNameLabel.TextSize = 18
-	WindowNameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-	WindowNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	WindowNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	WindowNameLabel.Text = WindowNameText
-	WindowNameLabel.Parent = TopBar
-	AddTheme(WindowNameLabel, "Text")
-
-	local TopBarLine = Instance.new("Frame")
-	TopBarLine.Name = "TopBarLine"
-	TopBarLine.Size = UDim2.new(1, 0, 0, 1)
-	TopBarLine.Position = UDim2.new(0, 0, 1, -1)
-	TopBarLine.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	TopBarLine.BorderSizePixel = 0
-	TopBarLine.Parent = TopBar
-	AddTheme(TopBarLine, "Stroke")
-
-	-- Window Icon
-	local WindowIcon = nil
-	if ShowIcon then
-		WindowIcon = Instance.new("ImageLabel")
-		WindowIcon.Name = "WindowIcon"
-		WindowIcon.Size = UDim2.new(0, 28, 0, 28)
-		WindowIcon.Position = UDim2.new(0, 14, 0.5, -14)
-		WindowIcon.BackgroundTransparency = 1
-		local ficon = tostring(WindowIconId)
-		if not ficon:find("rbxassetid://") and not ficon:find("http") then
-			ficon = "rbxassetid://" .. ficon
-		end
-		WindowIcon.Image = ficon
-		WindowIcon.Parent = TopBar
-	end
-
-	-- Control Buttons Container (Minimize & Close)
-	local ControlsFrame = Instance.new("Frame")
-	ControlsFrame.Name = "Controls"
-	ControlsFrame.Size = UDim2.new(0, 70, 0, 30)
-	ControlsFrame.Position = UDim2.new(1, -85, 0, 10)
-	ControlsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	ControlsFrame.BorderSizePixel = 0
-	ControlsFrame.Parent = TopBar
-	AddTheme(ControlsFrame, "Second")
-
-	local ctrlCorner = Instance.new("UICorner")
-	ctrlCorner.CornerRadius = UDim.new(0, 6)
-	ctrlCorner.Parent = ControlsFrame
-
-	local ctrlStroke = Instance.new("UIStroke")
-	ctrlStroke.Color = Color3.fromRGB(55, 55, 55)
-	ctrlStroke.Thickness = 1
-	ctrlStroke.Parent = ControlsFrame
-	AddTheme(ctrlStroke, "Stroke")
-
-	local ctrlDivider = Instance.new("Frame")
-	ctrlDivider.Size = UDim2.new(0, 1, 1, 0)
-	ctrlDivider.Position = UDim2.new(0.5, 0, 0, 0)
-	ctrlDivider.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-	ctrlDivider.BorderSizePixel = 0
-	ctrlDivider.Parent = ControlsFrame
-	AddTheme(ctrlDivider, "Stroke")
-
-	local MinimizeBtn = Instance.new("TextButton")
-	MinimizeBtn.Name = "Minimize"
-	MinimizeBtn.Size = UDim2.new(0.5, 0, 1, 0)
-	MinimizeBtn.Position = UDim2.new(0, 0, 0, 0)
-	MinimizeBtn.BackgroundTransparency = 1
-	MinimizeBtn.Text = ""
-	MinimizeBtn.Parent = ControlsFrame
-
-	local minIcon = Instance.new("ImageLabel")
-	minIcon.Name = "Ico"
-	minIcon.Size = UDim2.new(0, 16, 0, 16)
-	minIcon.Position = UDim2.new(0.5, -8, 0.5, -8)
-	minIcon.BackgroundTransparency = 1
-	minIcon.Image = "rbxassetid://7072719338"
-	minIcon.Parent = MinimizeBtn
-	AddTheme(minIcon, "Text")
-
-	local CloseBtn = Instance.new("TextButton")
-	CloseBtn.Name = "Close"
-	CloseBtn.Size = UDim2.new(0.5, 0, 1, 0)
-	CloseBtn.Position = UDim2.new(0.5, 0, 0, 0)
-	CloseBtn.BackgroundTransparency = 1
-	CloseBtn.Text = ""
-	CloseBtn.Parent = ControlsFrame
-
-	local closeIcon = Instance.new("ImageLabel")
-	closeIcon.Name = "Ico"
-	closeIcon.Size = UDim2.new(0, 16, 0, 16)
-	closeIcon.Position = UDim2.new(0.5, -8, 0.5, -8)
-	closeIcon.BackgroundTransparency = 1
-	closeIcon.Image = "rbxassetid://7072725342"
-	closeIcon.Parent = CloseBtn
-	AddTheme(closeIcon, "Text")
-
-	-- Sidebar container (WindowStuff)
-	local WindowStuff = Instance.new("Frame")
-	WindowStuff.Name = "Sidebar"
-	WindowStuff.Size = UDim2.new(0, 150, 1, -50)
-	WindowStuff.Position = UDim2.new(0, 0, 0, 50)
-	WindowStuff.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
-	WindowStuff.BorderSizePixel = 0
-	WindowStuff.Parent = MainWindow
-	AddTheme(WindowStuff, "Second")
-
-	local sideDivider = Instance.new("Frame")
-	sideDivider.Size = UDim2.new(0, 1, 1, 0)
-	sideDivider.Position = UDim2.new(1, -1, 0, 0)
-	sideDivider.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	sideDivider.BorderSizePixel = 0
-	sideDivider.Parent = WindowStuff
-	AddTheme(sideDivider, "Stroke")
-
-	-- Tab Holder ScrollFrame
-	local TabHolder = Instance.new("ScrollingFrame")
-	TabHolder.Name = "TabHolder"
-	TabHolder.Size = UDim2.new(1, 0, 1, -50)
-	TabHolder.Position = UDim2.new(0, 0, 0, 0)
-	TabHolder.BackgroundTransparency = 1
-	TabHolder.BorderSizePixel = 0
-	TabHolder.ScrollBarThickness = 2
-	TabHolder.CanvasSize = UDim2.new(0, 0, 0, 0)
-	TabHolder.Parent = WindowStuff
-	AddTheme(TabHolder, "Divider")
-
-	local tabList = Instance.new("UIListLayout")
-	tabList.SortOrder = Enum.SortOrder.LayoutOrder
-	tabList.Padding = UDim.new(0, 4)
-	tabList.Parent = TabHolder
-
-	local tabPad = Instance.new("UIPadding")
-	tabPad.PaddingTop = UDim.new(0, 8)
-	tabPad.PaddingBottom = UDim.new(0, 8)
-	tabPad.PaddingLeft = UDim.new(0, 8)
-	tabPad.PaddingRight = UDim.new(0, 8)
-	tabPad.Parent = TabHolder
-
-	tabList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		TabHolder.CanvasSize = UDim2.new(0, 0, 0, tabList.AbsoluteContentSize.Y + 16)
-	end)
-
-	-- Profile footer
-	local FooterFrame = Instance.new("Frame")
-	FooterFrame.Name = "Footer"
-	FooterFrame.Size = UDim2.new(1, 0, 0, 50)
-	FooterFrame.Position = UDim2.new(0, 0, 1, -50)
-	FooterFrame.BackgroundTransparency = 1
-	FooterFrame.Parent = WindowStuff
-
-	local footerTopLine = Instance.new("Frame")
-	footerTopLine.Size = UDim2.new(1, 0, 0, 1)
-	footerTopLine.Position = UDim2.new(0, 0, 0, 0)
-	footerTopLine.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	footerTopLine.BorderSizePixel = 0
-	footerTopLine.Parent = FooterFrame
-	AddTheme(footerTopLine, "Stroke")
-
-	local lp = vgs.p or game:GetService("Players").LocalPlayer
-	local pUserId = (lp and lp.UserId) or 1
-	local pName = (lp and lp.DisplayName) or "Player"
-
-	local pThumb = Instance.new("ImageLabel")
-	pThumb.Size = UDim2.new(0, 32, 0, 32)
-	pThumb.Position = UDim2.new(0, 10, 0.5, -16)
-	pThumb.BackgroundTransparency = 1
-	pThumb.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. pUserId .. "&width=420&height=420&format=png"
-	pThumb.Parent = FooterFrame
-
-	local pThumbCorner = Instance.new("UICorner")
-	pThumbCorner.CornerRadius = UDim.new(0.5, 0)
-	pThumbCorner.Parent = pThumb
-
-	local pLabel = Instance.new("TextLabel")
-	pLabel.Size = UDim2.new(1, -55, 0, 16)
-	pLabel.Position = UDim2.new(0, 48, 0.5, -8)
-	pLabel.BackgroundTransparency = 1
-	pLabel.Font = Enum.Font.GothamBold
-	pLabel.TextSize = 13
-	pLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-	pLabel.TextXAlignment = Enum.TextXAlignment.Left
-	pLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	pLabel.Text = pName
-	pLabel.Parent = FooterFrame
-	AddTheme(pLabel, "Text")
-
-	-- Corner resize handle
-	local resizeHandle = Instance.new("Frame")
-	resizeHandle.Name = "ResizeHandle"
-	resizeHandle.Size = UDim2.new(0, 18, 0, 18)
-	resizeHandle.Position = UDim2.new(1, -18, 1, -18)
-	resizeHandle.BackgroundTransparency = 1
-	resizeHandle.Parent = MainWindow
-
-	local resCorner = Instance.new("UICorner")
-	resCorner.CornerRadius = UDim.new(0.5, 0)
-	resCorner.Parent = resizeHandle
-
-	local resImg = Instance.new("ImageLabel")
-	resImg.Size = UDim2.new(1, 0, 1, 0)
-	resImg.BackgroundTransparency = 1
-	resImg.Image = "rbxassetid://153287173"
-	resImg.ImageTransparency = 0.4
-	resImg.Parent = resizeHandle
-	AddTheme(resImg, "Text")
-
-	local resizing = false
-	local startMousePos, startSize
-	local lastResizeClick = 0
-
-	resizeHandle.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			local now = tick()
-			if now - lastResizeClick <= 0.4 then
-				-- Double click resets size
-				tweenservice:Create(MainWindow, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-					Size = UDim2.new(0, 615, 0, 344)
-				}):Play()
-				resizing = false
-			else
-				resizing = true
-				startMousePos = vgs.UIS:GetMouseLocation()
-				startSize = MainWindow.AbsoluteSize
-			end
-			lastResizeClick = now
-		end
-	end)
-
-	vgs.UIS.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			resizing = false
-		end
-	end)
-
-	vgs.RS.RenderStepped:Connect(function()
-		if resizing then
-			local mousePos = vgs.UIS:GetMouseLocation()
-			local delta = mousePos - startMousePos
-			local newW = math.clamp(startSize.X + delta.X, 400, 1200)
-			local newH = math.clamp(startSize.Y + delta.Y, 260, 900)
-			MainWindow.Size = UDim2.new(0, newW, 0, newH)
-		end
-	end)
-
-	-- Minimize toggle logic
-	local minimized = false
-	local lastHeaderClick = 0
-
-	local function toggleMinimize()
-		minimized = not minimized
-		if minimized then
-			MainWindow.ClipsDescendants = true
-			TopBarLine.Visible = false
-			WindowStuff.Visible = false
-			resizeHandle.Visible = false
-			minIcon.Image = "rbxassetid://7072720870"
-
-			local textSize = vgs.TTS:GetTextSize(WindowNameLabel.Text, WindowNameLabel.TextSize, WindowNameLabel.Font, Vector2.new(math.huge, math.huge)).X
-			local targetW = math.clamp(textSize + 140, 220, 900)
-			tweenservice:Create(MainWindow, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-				Size = UDim2.new(0, targetW, 0, 50)
-			}):Play()
-		else
-			minIcon.Image = "rbxassetid://7072719338"
-			tweenservice:Create(MainWindow, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-				Size = UDim2.new(0, 615, 0, 344)
-			}):Play()
-			task.delay(0.05, function()
-				MainWindow.ClipsDescendants = false
-				TopBarLine.Visible = true
-				WindowStuff.Visible = true
-				resizeHandle.Visible = true
-			end)
-		end
-	end
-
-	MinimizeBtn.MouseButton1Click:Connect(toggleMinimize)
-
-	-- Header double-click to snap top-center
-	DragPoint.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			local now = tick()
-			if now - lastHeaderClick <= 0.35 then
-				local cam = workspace.CurrentCamera
-				if cam then
-					local vp = cam.ViewportSize
-					local targetX = (vp.X - MainWindow.AbsoluteSize.X) / 2
-					tweenservice:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-						Position = UDim2.new(0, targetX, 0, 10)
-					}):Play()
-				end
-			end
-			lastHeaderClick = now
-		end
-	end)
-
-	-- Close logic
-	local UIHidden = false
-	local function hideUI()
-		MainWindow.Visible = false
-		UIHidden = true
-		if FreeMouseMode then
-			syde:UnlockMouse(false)
-		end
-		if vgs.UIS.TouchEnabled and not vgs.UIS.KeyboardEnabled then
-			MobileOpenBtn.Visible = true
-		end
-		pcall(CloseCallback)
-		syde:MakeNotification({
-			Name = "Interface Hidden",
-			Content = "Tap " .. tostring(OpenKey) .. " to reopen the interface.",
-			Time = 3
-		})
-	end
-
-	local function showUI()
-		MainWindow.Visible = true
-		UIHidden = false
-		MobileOpenBtn.Visible = false
-		if FreeMouseMode then
-			syde:UnlockMouse(true)
-		end
-	end
-
-	CloseBtn.MouseButton1Click:Connect(hideUI)
-	MobileOpenBtn.MouseButton1Click:Connect(showUI)
-
-	vgs.UIS.InputBegan:Connect(function(input, gpe)
-		if not gpe then
-			local ok, code = pcall(function() return Enum.KeyCode[OpenKey] end)
-			if ok and code and input.KeyCode == code then
-				if UIHidden then
-					showUI()
-				else
-					hideUI()
-				end
-			end
-		end
-	end)
-
-	-- Intro Sequence
-	if IntroEnabled then
-		MainWindow.Visible = false
-		task.spawn(function()
-			local introLogo = Instance.new("ImageLabel")
-			introLogo.Size = UDim2.new(0, 48, 0, 48)
-			introLogo.Position = UDim2.new(0.5, -24, 0.45, -24)
-			introLogo.BackgroundTransparency = 1
-			introLogo.ImageTransparency = 1
-			local ficon = tostring(IntroIconId)
-			if not ficon:find("rbxassetid://") and not ficon:find("http") then ficon = "rbxassetid://" .. ficon end
-			introLogo.Image = ficon
-			introLogo.Parent = OrionGui
-
-			local introText = Instance.new("TextLabel")
-			introText.Size = UDim2.new(1, 0, 0, 30)
-			introText.Position = UDim2.new(0, 0, 0.52, 0)
-			introText.BackgroundTransparency = 1
-			introText.TextTransparency = 1
-			introText.Font = Enum.Font.GothamBold
-			introText.TextSize = 18
-			introText.TextColor3 = Color3.fromRGB(240, 240, 240)
-			introText.Text = IntroText
-			introText.Parent = OrionGui
-
-			tweenservice:Create(introLogo, TweenInfo.new(0.4), {ImageTransparency = 0}):Play()
-			task.wait(0.3)
-			tweenservice:Create(introText, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
-			task.wait(1.2)
-			tweenservice:Create(introLogo, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
-			tweenservice:Create(introText, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
-			task.wait(0.35)
-			introLogo:Destroy()
-			introText:Destroy()
-			MainWindow.Visible = true
-		end)
-	end
-
-	-- Search System
-	local SearchSystem = {
-		tabs = {},
-		buttons = {},
-		elements = {},
-		activeTab = nil
-	}
-
-	local function RegisterTab(tabName, container, button)
-		SearchSystem.tabs[tabName] = container
-		SearchSystem.buttons[tabName] = button
-	end
-
-	local function RegisterElement(tabName, elemName, elemFrame)
-		SearchSystem.elements[tabName] = SearchSystem.elements[tabName] or {}
-		SearchSystem.elements[tabName][elemName] = {
-			frame = elemFrame,
-			visible = true
-		}
-	end
-
-	local function HighlightElement(frame, highlight)
-		if not frame then return end
-		local glow = frame:FindFirstChild("SearchGlow")
-		if highlight then
-			if not glow then
-				glow = Instance.new("UIStroke")
-				glow.Name = "SearchGlow"
-				glow.Thickness = 1
-				glow.Transparency = 0
-				glow.Color = (syde.Themes[syde.SelectedTheme] and syde.Themes[syde.SelectedTheme].Accent) or Color3.fromRGB(0, 162, 255)
-				glow.Parent = frame
-			end
-			tweenservice:Create(glow, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-				Thickness = 2.5,
-				Transparency = 0
-			}):Play()
-		else
-			if glow then
-				tweenservice:Create(glow, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-					Transparency = 1
-				}):Play()
-				task.delay(0.3, function()
-					if glow and glow.Parent then glow:Destroy() end
-				end)
-			end
-		end
-	end
-
-	local function ClearSearch()
-		for tabName, elems in pairs(SearchSystem.elements) do
-			for _, data in pairs(elems) do
-				if data.frame and data.frame.Parent then
-					data.frame.Visible = data.visible
-					HighlightElement(data.frame, false)
-				end
-			end
-		end
-		for _, btn in pairs(SearchSystem.buttons) do
-			btn.Visible = true
-		end
-	end
-
-	local function GoToTab(tabName)
-		if not SearchSystem.tabs[tabName] or not SearchSystem.buttons[tabName] then return end
-
-		for name, btn in pairs(SearchSystem.buttons) do
-			if btn:FindFirstChild("Title") then
-				btn.Title.Font = (name == tabName) and Enum.Font.GothamBlack or Enum.Font.GothamSemibold
-				tweenservice:Create(btn.Title, TweenInfo.new(0.2), {TextTransparency = (name == tabName) and 0 or 0.4}):Play()
-			end
-			if btn:FindFirstChild("Ico") then
-				tweenservice:Create(btn.Ico, TweenInfo.new(0.2), {ImageTransparency = (name == tabName) and 0 or 0.4}):Play()
-			end
-		end
-
-		for name, cont in pairs(SearchSystem.tabs) do
-			cont.Visible = (name == tabName)
-		end
-		SearchSystem.activeTab = tabName
-	end
-
-	local function ExecuteSearch(query)
-		query = query:lower()
-		if query == "" then
-			ClearSearch()
-			return
-		end
-
-		local bestTab = nil
-		local bestScore = 0
-
-		for tabName, elems in pairs(SearchSystem.elements) do
-			local score = 0
-			for elemName, data in pairs(elems) do
-				local matched = elemName:lower():find(query, 1, true) ~= nil
-				data.frame.Visible = matched
-				HighlightElement(data.frame, matched)
-				if matched then
-					score = score + 1
-				end
-			end
-			if SearchSystem.buttons[tabName] then
-				SearchSystem.buttons[tabName].Visible = (score > 0)
-			end
-			if score > bestScore then
-				bestScore = score
-				bestTab = tabName
-			end
-		end
-
-		if bestTab then
-			GoToTab(bestTab)
-		end
-	end
-
-	-- Window Methods & Tab Factory
-	local WindowFunctions = {}
-
-	function WindowFunctions:ChangeIcon(IconId)
-		if WindowIcon then
-			local ficon = tostring(IconId)
-			if not ficon:find("rbxassetid://") and not ficon:find("http") then ficon = "rbxassetid://" .. ficon end
-			WindowIcon.Image = ficon
-		end
-	end
-
-	function WindowFunctions:SetName(...)
-		local args = {...}
-		local result = ""
-		for _, pair in ipairs(args) do
-			if type(pair) == "table" then
-				local text, color = pair[1] or "", pair[2] or "#FFFFFF"
-				for i = 1, #text do
-					local char = text:sub(i, i)
-					result = result .. '<font color="' .. color .. '">' .. char .. '</font>'
-				end
-			else
-				result = result .. tostring(pair)
-			end
-		end
-		WindowNameLabel.RichText = true
-		WindowNameLabel.Text = result
-	end
-
-	function WindowFunctions:GoToTab(tabName)
-		GoToTab(tabName)
-	end
-
-	function WindowFunctions:ScrollTo(tabName, sectionName, smooth)
-		GoToTab(tabName)
-		local cont = SearchSystem.tabs[tabName]
-		if cont then
-			local target = cont:FindFirstChild(sectionName)
-			if target then
-				local relY = target.AbsolutePosition.Y - cont.AbsolutePosition.Y + cont.CanvasPosition.Y
-				local maxY = math.max(0, cont.CanvasSize.Y.Offset - cont.AbsoluteSize.Y)
-				local targetY = math.clamp(relY - 20, 0, maxY)
-				if smooth then
-					tweenservice:Create(cont, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-						CanvasPosition = Vector2.new(0, targetY)
-					}):Play()
-				else
-					cont.CanvasPosition = Vector2.new(0, targetY)
-				end
-			end
-		end
-	end
-
-	function WindowFunctions:ScrollToElement(tabName, element, smooth, offsetY)
-		GoToTab(tabName)
-		local cont = SearchSystem.tabs[tabName]
-		if not cont then return end
-		local target = nil
-		if typeof(element) == "Instance" then
-			target = element
-		elseif typeof(element) == "string" then
-			for _, d in ipairs(cont:GetDescendants()) do
-				if d:IsA("TextLabel") and d.Text:lower():find(element:lower(), 1, true) then
-					target = d.Parent
-					break
-				end
-			end
-		end
-		if target then
-			local off = (offsetY == "center" and (cont.AbsoluteSize.Y / 2) or (tonumber(offsetY) or 20))
-			local relY = target.AbsolutePosition.Y - cont.AbsolutePosition.Y + cont.CanvasPosition.Y
-			local maxY = math.max(0, cont.CanvasSize.Y.Offset - cont.AbsoluteSize.Y)
-			local targetY = math.clamp(relY - off, 0, maxY)
-			if smooth then
-				tweenservice:Create(cont, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-					CanvasPosition = Vector2.new(0, targetY)
-				}):Play()
-			else
-				cont.CanvasPosition = Vector2.new(0, targetY)
-			end
-		end
-	end
-
-	function WindowFunctions:FindAndFocusElement(query)
-		ExecuteSearch(query)
-	end
-
-	function WindowFunctions:Destroy()
-		pcall(function() OrionGui:Destroy() end)
-	end
-
-	-- MakeTab
-	local isFirstTabCreated = true
-
-	function WindowFunctions:MakeTab(TabConfig)
-		TabConfig = TabConfig or {}
-		local tabTitle = TabConfig.Name or TabConfig.Title or "Tab"
-		local tabIcon = TabConfig.Icon or ""
-
-		local TabBtn = Instance.new("TextButton")
-		TabBtn.Name = tabTitle
-		TabBtn.Size = UDim2.new(1, 0, 0, 32)
-		TabBtn.BackgroundTransparency = 1
-		TabBtn.Text = ""
-		TabBtn.Parent = TabHolder
-
-		local highlight = Instance.new("Frame")
-		highlight.Name = "Highlight"
-		highlight.Size = UDim2.new(1, 0, 1, 0)
-		highlight.BackgroundTransparency = 1
-		highlight.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		highlight.Parent = TabBtn
-		AddTheme(highlight, "Divider")
-
-		local hlCorner = Instance.new("UICorner")
-		hlCorner.CornerRadius = UDim.new(0, 6)
-		hlCorner.Parent = highlight
-
-		local iconLabel = Instance.new("ImageLabel")
-		iconLabel.Name = "Ico"
-		iconLabel.Size = UDim2.new(0, 18, 0, 18)
-		iconLabel.Position = UDim2.new(0, 8, 0.5, -9)
-		iconLabel.BackgroundTransparency = 1
-		iconLabel.ImageTransparency = isFirstTabCreated and 0 or 0.4
-		local resolvedIcon = syde:GetIcon(tabIcon) or tabIcon
-		if resolvedIcon ~= "" and not resolvedIcon:find("rbxassetid://") and not resolvedIcon:find("http") then
-			resolvedIcon = "rbxassetid://" .. resolvedIcon
-		end
-		iconLabel.Image = resolvedIcon
-		iconLabel.Parent = TabBtn
-		AddTheme(iconLabel, "Text")
-
-		local textLabel = Instance.new("TextLabel")
-		textLabel.Name = "Title"
-		textLabel.Size = UDim2.new(1, -34, 1, 0)
-		textLabel.Position = UDim2.new(0, 34, 0, 0)
-		textLabel.BackgroundTransparency = 1
-		textLabel.Font = isFirstTabCreated and Enum.Font.GothamBlack or Enum.Font.GothamSemibold
-		textLabel.TextSize = 13
-		textLabel.TextTransparency = isFirstTabCreated and 0 or 0.4
-		textLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-		textLabel.TextXAlignment = Enum.TextXAlignment.Left
-		textLabel.Text = tabTitle
-		textLabel.Parent = TabBtn
-		AddTheme(textLabel, "Text")
-
-		-- Page Container (ScrollFrame)
-		local PageContainer = Instance.new("ScrollingFrame")
-		PageContainer.Name = tabTitle
-		PageContainer.Size = UDim2.new(1, -150, 1, -50)
-		PageContainer.Position = UDim2.new(0, 150, 0, 50)
-		PageContainer.BackgroundTransparency = 1
-		PageContainer.BorderSizePixel = 0
-		PageContainer.ScrollBarThickness = 3
-		PageContainer.Visible = isFirstTabCreated
-		PageContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-		PageContainer.Parent = MainWindow
-		AddTheme(PageContainer, "Divider")
-
-		local pageList = Instance.new("UIListLayout")
-		pageList.SortOrder = Enum.SortOrder.LayoutOrder
-		pageList.Padding = UDim.new(0, 6)
-		pageList.Parent = PageContainer
-
-		local pagePad = Instance.new("UIPadding")
-		pagePad.PaddingTop = UDim.new(0, 10)
-		pagePad.PaddingBottom = UDim.new(0, 10)
-		pagePad.PaddingLeft = UDim.new(0, 12)
-		pagePad.PaddingRight = UDim.new(0, 12)
-		pagePad.Parent = PageContainer
-
-		pageList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-			PageContainer.CanvasSize = UDim2.new(0, 0, 0, pageList.AbsoluteContentSize.Y + 24)
-		end)
-
-		RegisterTab(tabTitle, PageContainer, TabBtn)
-
-		TabBtn.MouseButton1Click:Connect(function()
-			GoToTab(tabTitle)
-		end)
-
-		if isFirstTabCreated then
-			SearchSystem.activeTab = tabTitle
-			isFirstTabCreated = false
-		end
-
-		-- Element Builder for this Tab
-		local TabElements = {}
-
-		local function MakeBaseFrame(elemName, h)
-			h = h or 36
-			local f = Instance.new("Frame")
-			f.Name = elemName
-			f.Size = UDim2.new(1, 0, 0, h)
-			f.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
-			f.BorderSizePixel = 0
-			f.Parent = PageContainer
-
-			local crn = Instance.new("UICorner")
-			crn.CornerRadius = UDim.new(0, 6)
-			crn.Parent = f
-
-			local strk = Instance.new("UIStroke")
-			strk.Color = Color3.fromRGB(50, 50, 50)
-			strk.Thickness = 1
-			strk.Parent = f
-			AddTheme(strk, "Stroke")
-			AddTheme(f, "Second")
-
-			RegisterElement(tabTitle, elemName, f)
-			return f
-		end
-
-		-- AddLog
-		function TabElements:AddLog(Text)
-			Text = tostring(Text or "")
-			local f = MakeBaseFrame("Log_" .. Text:sub(1, 15), 38)
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -16, 1, 0)
-			lbl.Position = UDim2.new(0, 8, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Center
-			lbl.Text = Text
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			return {
-				Frame = f,
-				Set = function(self, t) lbl.Text = tostring(t or "") end,
-				toggle = function(self) f.Visible = not f.Visible end,
-				remove = function(self) f:Destroy() end
-			}
-		end
-
-		-- AddLabel
-		function TabElements:AddLabel(Text)
-			Text = tostring(Text or "")
-			local f = MakeBaseFrame("Label_" .. Text:sub(1, 15), 32)
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -20, 1, 0)
-			lbl.Position = UDim2.new(0, 10, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = Text
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			return {
-				Frame = f,
-				Set = function(self, newText, colorConfig)
-					newText = tostring(newText or "")
-					if type(colorConfig) == "table" then
-						for word, col in pairs(colorConfig) do
-							if newText:find(word) then
-								local escaped = word:gsub("([%(%)%.%+%-%*%?%[%]%^%$%%])", "%%%1")
-								newText = newText:gsub(escaped, '<font color="' .. col .. '">' .. word .. '</font>')
-							end
-						end
-						lbl.RichText = true
-					end
-					lbl.Text = newText
-				end,
-				toggle = function(self) f.Visible = not f.Visible end,
-				remove = function(self) f:Destroy() end
-			}
-		end
-
-		-- ColorLabel
-		function TabElements:ColorLabel(Text, ToChangeColor, Position)
-			Text = tostring(Text or "")
-			ToChangeColor = ToChangeColor or Color3.fromRGB(255, 255, 255)
-			Position = Position or "Left"
-
-			local f = MakeBaseFrame("ColorLabel_" .. Text:sub(1, 15), 34)
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -24, 1, 0)
-			lbl.Position = UDim2.new(0, 12, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = ToChangeColor
-			lbl.Text = Text
-			lbl.Parent = f
-
-			if Position == "Center" then lbl.TextXAlignment = Enum.TextXAlignment.Center
-			elseif Position == "Right" then lbl.TextXAlignment = Enum.TextXAlignment.Right
-			else lbl.TextXAlignment = Enum.TextXAlignment.Left end
-
-			return {
-				Frame = f,
-				Set = function(self, t, c, p)
-					if t then lbl.Text = tostring(t) end
-					if c then lbl.TextColor3 = c end
-					if p then
-						if p == "Center" then lbl.TextXAlignment = Enum.TextXAlignment.Center
-						elseif p == "Right" then lbl.TextXAlignment = Enum.TextXAlignment.Right
-						else lbl.TextXAlignment = Enum.TextXAlignment.Left end
-					end
-				end,
-				toggle = function(self) f.Visible = not f.Visible end,
-				remove = function(self) f:Destroy() end
-			}
-		end
-
-		-- AddPlayerParagraph
-		function TabElements:AddPlayerParagraph(userId)
-			userId = tonumber(userId) or 0
-			local f = MakeBaseFrame("PlayerPara_" .. tostring(userId), 66)
-
-			local avatar = Instance.new("ImageLabel")
-			avatar.Size = UDim2.new(0, 50, 0, 50)
-			avatar.Position = UDim2.new(0, 8, 0.5, -25)
-			avatar.BackgroundTransparency = 1
-			avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=420&height=420&format=png"
-			avatar.Parent = f
-
-			local avCrn = Instance.new("UICorner")
-			avCrn.CornerRadius = UDim.new(0, 8)
-			avCrn.Parent = avatar
-
-			local dLabel = Instance.new("TextLabel")
-			dLabel.Size = UDim2.new(1, -72, 0, 20)
-			dLabel.Position = UDim2.new(0, 66, 0, 12)
-			dLabel.BackgroundTransparency = 1
-			dLabel.Font = Enum.Font.GothamBold
-			dLabel.TextSize = 14
-			dLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-			dLabel.TextXAlignment = Enum.TextXAlignment.Left
-			dLabel.Text = "Loading..."
-			dLabel.Parent = f
-			AddTheme(dLabel, "Text")
-
-			local uLabel = Instance.new("TextLabel")
-			uLabel.Size = UDim2.new(1, -72, 0, 18)
-			uLabel.Position = UDim2.new(0, 66, 0, 34)
-			uLabel.BackgroundTransparency = 1
-			uLabel.Font = Enum.Font.GothamSemibold
-			uLabel.TextSize = 12
-			uLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-			uLabel.TextXAlignment = Enum.TextXAlignment.Left
-			uLabel.Text = "@..."
-			uLabel.Parent = f
-			AddTheme(uLabel, "TextDark")
-
-			local function fetch(uId)
-				task.spawn(function()
-					local ok, data = pcall(function()
-						return game:GetService("UserService"):GetUserInfosByUserIdsAsync({uId})
-					end)
-					if ok and data and data[1] then
-						dLabel.Text = data[1].DisplayName or "Unknown"
-						uLabel.Text = "@" .. (data[1].Username or "Unknown")
-					end
-				end)
-			end
-			if userId > 0 then fetch(userId) end
-
-			return {
-				Frame = f,
-				Set = function(self, newId)
-					newId = tonumber(newId) or 0
-					avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. newId .. "&width=420&height=420&format=png"
-					fetch(newId)
-				end,
-				toggle = function(self) f.Visible = not f.Visible end,
-				remove = function(self) f:Destroy() end
-			}
-		end
-
-		-- AddParagraph
-		function TabElements:AddParagraph(...)
-			local args = {...}
-			local id, title, content, align
-			if type(args[1]) == "table" then
-				local tbl = args[1]
-				id = tbl.Id or tbl.id
-				title = tbl.Title or tbl.Name or ""
-				content = tbl.Content or tbl.Text or ""
-				align = tbl.Align or tbl.Alignment or "Left"
-			elseif #args >= 3 and tonumber(args[1]) ~= nil then
-				id = tostring(args[1])
-				title = args[2] or ""
-				content = args[3] or ""
-				align = args[4] or "Left"
-			else
-				title = args[1] or ""
-				content = args[2] or ""
-				align = args[3] or "Left"
-			end
-
-			if id and tonumber(id) then
-				return TabElements:AddPlayerParagraph(tonumber(id))
-			end
-
-			local f = MakeBaseFrame("Paragraph_" .. tostring(title):sub(1, 15), 52)
-			f.AutomaticSize = Enum.AutomaticSize.Y
-
-			local tLabel = Instance.new("TextLabel")
-			tLabel.Name = "Title"
-			tLabel.Size = UDim2.new(1, -24, 0, 20)
-			tLabel.Position = UDim2.new(0, 12, 0, 8)
-			tLabel.BackgroundTransparency = 1
-			tLabel.Font = Enum.Font.GothamBold
-			tLabel.TextSize = 14
-			tLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-			tLabel.TextXAlignment = Enum.TextXAlignment.Left
-			tLabel.Text = title
-			tLabel.Parent = f
-			AddTheme(tLabel, "Text")
-
-			local cLabel = Instance.new("TextLabel")
-			cLabel.Name = "Content"
-			cLabel.Size = UDim2.new(1, -24, 0, 0)
-			cLabel.Position = UDim2.new(0, 12, 0, 28)
-			cLabel.BackgroundTransparency = 1
-			cLabel.Font = Enum.Font.Gotham
-			cLabel.TextSize = 12
-			cLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-			cLabel.TextXAlignment = Enum.TextXAlignment.Left
-			cLabel.TextWrapped = true
-			cLabel.AutomaticSize = Enum.AutomaticSize.Y
-			cLabel.Text = content
-			cLabel.Parent = f
-			AddTheme(cLabel, "TextDark")
-
-			return {
-				Frame = f,
-				Set = function(self, newT, newC)
-					if newT then tLabel.Text = tostring(newT) end
-					if newC then cLabel.Text = tostring(newC) end
-				end,
-				toggle = function(self) f.Visible = not f.Visible end,
-				remove = function(self) f:Destroy() end
-			}
-		end
-
-		-- AddButton
-		function TabElements:AddButton(ButtonConfig)
-			ButtonConfig = ButtonConfig or {}
-			local name = ButtonConfig.Name or ButtonConfig.Title or "Button"
-			local callback = ButtonConfig.Callback or ButtonConfig.CallBack or function() end
-			local icon = ButtonConfig.Icon or "rbxassetid://3944703587"
-
-			local f = MakeBaseFrame(name, 34)
-
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1, 0, 1, 0)
-			btn.BackgroundTransparency = 1
-			btn.Text = ""
-			btn.Parent = f
-
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -40, 1, 0)
-			lbl.Position = UDim2.new(0, 12, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = name
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			local ico = Instance.new("ImageLabel")
-			ico.Size = UDim2.new(0, 18, 0, 18)
-			ico.Position = UDim2.new(1, -26, 0.5, -9)
-			ico.BackgroundTransparency = 1
-			local resolved = syde:GetIcon(icon) or icon
-			if resolved ~= "" and not resolved:find("rbxassetid://") and not resolved:find("http") then
-				resolved = "rbxassetid://" .. resolved
-			end
-			ico.Image = resolved
-			ico.Parent = f
-			AddTheme(ico, "TextDark")
-
-			btn.MouseButton1Click:Connect(function()
-				tweenservice:Create(f, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
-				task.delay(0.1, function()
-					local theme = syde.Themes[syde.SelectedTheme] or syde.Themes.Default
-					tweenservice:Create(f, TweenInfo.new(0.2), {BackgroundColor3 = theme.Second}):Play()
-				end)
-				pcall(callback)
-			end)
-
-			return {
-				Frame = f,
-				Set = function(self, t) lbl.Text = tostring(t or "") end,
-				toggle = function(self) f.Visible = not f.Visible end,
-				remove = function(self) f:Destroy() end
-			}
-		end
-
-		-- AddToggle
-		function TabElements:AddToggle(ToggleConfig)
-			ToggleConfig = ToggleConfig or {}
-			local name = ToggleConfig.Name or ToggleConfig.Title or "Toggle"
-			local defVal = (ToggleConfig.Default ~= nil and ToggleConfig.Default) or (ToggleConfig.Value ~= nil and ToggleConfig.Value) or false
-			local callback = ToggleConfig.Callback or ToggleConfig.CallBack or function() end
-			local flag = ToggleConfig.Flag
-			local save = ToggleConfig.Save or false
-
-			local f = MakeBaseFrame(name, 36)
-
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1, 0, 1, 0)
-			btn.BackgroundTransparency = 1
-			btn.Text = ""
-			btn.Parent = f
-
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -50, 1, 0)
-			lbl.Position = UDim2.new(0, 12, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = name
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			local toggleBox = Instance.new("Frame")
-			toggleBox.Name = "Box"
-			toggleBox.Size = UDim2.new(0, 22, 0, 22)
-			toggleBox.Position = UDim2.new(1, -32, 0.5, -11)
-			toggleBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-			toggleBox.BorderSizePixel = 0
-			toggleBox.Parent = f
-
-			local tbCorner = Instance.new("UICorner")
-			tbCorner.CornerRadius = UDim.new(0, 5)
-			tbCorner.Parent = toggleBox
-
-			local tbStroke = Instance.new("UIStroke")
-			tbStroke.Name = "Stroke"
-			tbStroke.Color = Color3.fromRGB(65, 65, 65)
-			tbStroke.Thickness = 1
-			tbStroke.Parent = toggleBox
-
-			local checkIco = Instance.new("ImageLabel")
-			checkIco.Name = "Ico"
-			checkIco.Size = UDim2.new(0, 16, 0, 16)
-			checkIco.Position = UDim2.new(0.5, -8, 0.5, -8)
-			checkIco.BackgroundTransparency = 1
-			checkIco.Image = "rbxassetid://3944680095"
-			checkIco.ImageTransparency = defVal and 0 or 1
-			checkIco.Parent = toggleBox
-
-			local toggleObj = {
-				Value = defVal,
-				Box = toggleBox,
-				Frame = f,
-				Save = save,
-				Flag = flag
-			}
-
-			function toggleObj:Set(val, silent)
-				toggleObj.Value = val
-				local theme = syde.Themes[syde.SelectedTheme] or syde.Themes.Default
-				local targetColor = val and (theme.Accent or Color3.fromRGB(0, 162, 255)) or theme.Divider
-				tweenservice:Create(toggleBox, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-				tweenservice:Create(checkIco, TweenInfo.new(0.2), {ImageTransparency = val and 0 or 1}):Play()
-				if not silent then
-					pcall(callback, val)
-				end
-				if save and flag then
-					syde:SaveCfg(syde.Folder or game.GameId)
-				end
-			end
-
-			btn.MouseButton1Click:Connect(function()
-				toggleObj:Set(not toggleObj.Value)
-			end)
-
-			table.insert(syde.Toggles, toggleObj)
-			if flag then
-				syde.Flags[flag] = toggleObj
-			end
-			toggleObj:Set(defVal, true)
-
-			toggleObj.toggle = function(self) f.Visible = not f.Visible end
-			toggleObj.remove = function(self) f:Destroy() end
-
-			return toggleObj
-		end
-
-		-- AddSlider
-		function TabElements:AddSlider(SliderConfig)
-			SliderConfig = SliderConfig or {}
-			local name = SliderConfig.Name or SliderConfig.Title or "Slider"
-			local min = SliderConfig.Min or 0
-			local max = SliderConfig.Max or 100
-			local def = SliderConfig.Default or min
-			local inc = SliderConfig.Increment or 1
-			local callback = SliderConfig.Callback or SliderConfig.CallBack or function() end
-			local valueName = SliderConfig.ValueName or ""
-			local flag = SliderConfig.Flag
-
-			local f = MakeBaseFrame(name, 56)
-
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -12, 0, 18)
-			lbl.Position = UDim2.new(0, 12, 0, 8)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = name
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			local valLabel = Instance.new("TextLabel")
-			valLabel.Size = UDim2.new(0, 100, 0, 18)
-			valLabel.Position = UDim2.new(1, -112, 0, 8)
-			valLabel.BackgroundTransparency = 1
-			valLabel.Font = Enum.Font.GothamBold
-			valLabel.TextSize = 13
-			valLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-			valLabel.TextXAlignment = Enum.TextXAlignment.Right
-			valLabel.Text = tostring(def) .. " " .. valueName
-			valLabel.Parent = f
-			AddTheme(valLabel, "TextDark")
-
-			local bar = Instance.new("Frame")
-			bar.Size = UDim2.new(1, -24, 0, 8)
-			bar.Position = UDim2.new(0, 12, 0, 36)
-			bar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-			bar.BorderSizePixel = 0
-			bar.Parent = f
-
-			local bCrn = Instance.new("UICorner")
-			bCrn.CornerRadius = UDim.new(0.5, 0)
-			bCrn.Parent = bar
-
-			local fill = Instance.new("Frame")
-			fill.Size = UDim2.new(0, 0, 1, 0)
-			fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-			fill.BorderSizePixel = 0
-			fill.Parent = bar
-			AddTheme(fill, "Accent")
-
-			local fCrn = Instance.new("UICorner")
-			fCrn.CornerRadius = UDim.new(0.5, 0)
-			fCrn.Parent = fill
-
-			local sliderObj = {
-				Value = def,
-				Frame = f,
-				Flag = flag
-			}
-
-			local function formatVal(v)
-				if v == math.huge then return "∞" end
-				if v >= 1e6 then return string.format("%.1fM", v / 1e6) end
-				if v >= 1e3 then return string.format("%.1fK", v / 1e3) end
-				return tostring(math.floor(v * 100) / 100)
-			end
-
-			function sliderObj:Set(v)
-				local clamped = math.clamp(v, min, max)
-				sliderObj.Value = clamped
-				local pct = (max == min) and 0 or math.clamp((clamped - min) / (max - min), 0, 1)
-				fill.Size = UDim2.new(pct, 0, 1, 0)
-				valLabel.Text = formatVal(clamped) .. " " .. valueName
-				pcall(callback, clamped)
-			end
-
-			function sliderObj:SetName(n)
-				lbl.Text = tostring(n or "")
-			end
-
-			function sliderObj:SetMax(m)
-				max = m
-				sliderObj:Set(sliderObj.Value)
-			end
-
-			function sliderObj:SetMin(m)
-				min = m
-				sliderObj:Set(sliderObj.Value)
-			end
-
-			local dragging = false
-			bar.InputBegan:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
-					dragging = true
-					local xPct = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-					sliderObj:Set(min + (max - min) * xPct)
-				end
-			end)
-
-			vgs.UIS.InputEnded:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
-					dragging = false
-				end
-			end)
-
-			vgs.UIS.InputChanged:Connect(function(input)
-				if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-					local xPct = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-					sliderObj:Set(min + (max - min) * xPct)
-				end
-			end)
-
-			sliderObj:Set(def)
-			if flag then syde.Flags[flag] = sliderObj end
-
-			sliderObj.toggle = function(self) f.Visible = not f.Visible end
-			sliderObj.remove = function(self) f:Destroy() end
-
-			return sliderObj
-		end
-
-		-- AddDropdown
-		function TabElements:AddDropdown(DropdownConfig)
-			DropdownConfig = DropdownConfig or {}
-			local name = DropdownConfig.Name or DropdownConfig.Title or "Dropdown"
-			local options = DropdownConfig.Options or {}
-			local isMulti = DropdownConfig.Multi or false
-			local def = DropdownConfig.Default or (isMulti and {} or (options[1] or ""))
-			local callback = DropdownConfig.Callback or DropdownConfig.CallBack or function() end
-			local flag = DropdownConfig.Flag
-
-			local f = MakeBaseFrame(name, 36)
-			f.ClipsDescendants = true
-
-			local header = Instance.new("Frame")
-			header.Size = UDim2.new(1, 0, 0, 36)
-			header.BackgroundTransparency = 1
-			header.Parent = f
-
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1, 0, 1, 0)
-			btn.BackgroundTransparency = 1
-			btn.Text = ""
-			btn.Parent = header
-
-			local titleLbl = Instance.new("TextLabel")
-			titleLbl.Size = UDim2.new(0.5, -12, 1, 0)
-			titleLbl.Position = UDim2.new(0, 12, 0, 0)
-			titleLbl.BackgroundTransparency = 1
-			titleLbl.Font = Enum.Font.GothamBold
-			titleLbl.TextSize = 14
-			titleLbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-			titleLbl.Text = name
-			titleLbl.Parent = header
-			AddTheme(titleLbl, "Text")
-
-			local selLbl = Instance.new("TextLabel")
-			selLbl.Size = UDim2.new(0.5, -34, 1, 0)
-			selLbl.Position = UDim2.new(0.5, 0, 0, 0)
-			selLbl.BackgroundTransparency = 1
-			selLbl.Font = Enum.Font.Gotham
-			selLbl.TextSize = 12
-			selLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-			selLbl.TextXAlignment = Enum.TextXAlignment.Right
-			selLbl.TextTruncate = Enum.TextTruncate.AtEnd
-			selLbl.Text = tostring(type(def) == "table" and table.concat(def, ", ") or def)
-			selLbl.Parent = header
-			AddTheme(selLbl, "TextDark")
-
-			local arrow = Instance.new("ImageLabel")
-			arrow.Size = UDim2.new(0, 16, 0, 16)
-			arrow.Position = UDim2.new(1, -26, 0.5, -8)
-			arrow.BackgroundTransparency = 1
-			arrow.Image = "rbxassetid://7072706796"
-			arrow.Rotation = 180
-			arrow.Parent = header
-			AddTheme(arrow, "TextDark")
-
-			local optScroll = Instance.new("ScrollingFrame")
-			optScroll.Size = UDim2.new(1, 0, 1, -36)
-			optScroll.Position = UDim2.new(0, 0, 0, 36)
-			optScroll.BackgroundTransparency = 1
-			optScroll.BorderSizePixel = 0
-			optScroll.ScrollBarThickness = 2
-			optScroll.Visible = false
-			optScroll.Parent = f
-
-			local optList = Instance.new("UIListLayout")
-			optList.SortOrder = Enum.SortOrder.LayoutOrder
-			optList.Padding = UDim.new(0, 2)
-			optList.Parent = optScroll
-
-			local optPad = Instance.new("UIPadding")
-			optPad.PaddingTop = UDim.new(0, 4)
-			optPad.PaddingBottom = UDim.new(0, 4)
-			optPad.PaddingLeft = UDim.new(0, 8)
-			optPad.PaddingRight = UDim.new(0, 8)
-			optPad.Parent = optScroll
-
-			local dropdownObj = {
-				Value = def,
-				Options = options,
-				Buttons = {},
-				Toggled = false,
-				Frame = f,
-				Flag = flag
-			}
-
-			function dropdownObj:Refresh(newOpts, delOld)
-				if delOld then
-					for _, b in pairs(dropdownObj.Buttons) do b:Destroy() end
-					dropdownObj.Buttons = {}
-				end
-				dropdownObj.Options = newOpts or {}
-
-				for _, opt in ipairs(dropdownObj.Options) do
-					local optTxt = type(opt) == "table" and (opt.name or opt.text or tostring(opt.value)) or tostring(opt)
-					local optBtn = Instance.new("TextButton")
-					optBtn.Size = UDim2.new(1, 0, 0, 26)
-					optBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-					optBtn.Font = Enum.Font.Gotham
-					optBtn.TextSize = 12
-					optBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
-					optBtn.Text = "  " .. optTxt
-					optBtn.TextXAlignment = Enum.TextXAlignment.Left
-					optBtn.Parent = optScroll
-
-					local crn = Instance.new("UICorner")
-					crn.CornerRadius = UDim.new(0, 4)
-					crn.Parent = optBtn
-
-					optBtn.MouseButton1Click:Connect(function()
-						if isMulti then
-							if type(dropdownObj.Value) ~= "table" then dropdownObj.Value = {} end
-							local idx = table.find(dropdownObj.Value, optTxt)
-							if idx then table.remove(dropdownObj.Value, idx)
-							else table.insert(dropdownObj.Value, optTxt) end
-							selLbl.Text = table.concat(dropdownObj.Value, ", ")
-							pcall(callback, dropdownObj.Value)
-						else
-							dropdownObj.Value = optTxt
-							selLbl.Text = optTxt
-							dropdownObj.Toggled = false
-							optScroll.Visible = false
-							arrow.Rotation = 180
-							tweenservice:Create(f, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 36)}):Play()
-							pcall(callback, optTxt)
-						end
-					end)
-					dropdownObj.Buttons[optTxt] = optBtn
-				end
-				optScroll.CanvasSize = UDim2.new(0, 0, 0, #dropdownObj.Options * 28 + 8)
-			end
-
-			btn.MouseButton1Click:Connect(function()
-				dropdownObj.Toggled = not dropdownObj.Toggled
-				optScroll.Visible = dropdownObj.Toggled
-				arrow.Rotation = dropdownObj.Toggled and 0 or 180
-				local h = dropdownObj.Toggled and math.clamp(36 + #dropdownObj.Options * 28 + 8, 36, 180) or 36
-				tweenservice:Create(f, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, h)}):Play()
-			end)
-
-			dropdownObj:Refresh(options, false)
-
-			function dropdownObj:Set(val, addMode)
-				if isMulti then
-					if type(dropdownObj.Value) ~= "table" then dropdownObj.Value = {} end
-					if addMode ~= nil then
-						local values = type(val) == "table" and val or {val}
-						for _, v in ipairs(values) do
-							local strV = tostring(v)
-							local idx = table.find(dropdownObj.Value, strV)
-							if addMode and not idx then
-								table.insert(dropdownObj.Value, strV)
-							elseif not addMode and idx then
-								table.remove(dropdownObj.Value, idx)
-							end
-						end
-					else
-						if type(val) == "table" then
-							dropdownObj.Value = val
-						else
-							dropdownObj.Value = {tostring(val)}
-						end
-					end
-					selLbl.Text = table.concat(dropdownObj.Value, ", ")
-					pcall(callback, dropdownObj.Value)
-				else
-					dropdownObj.Value = val
-					selLbl.Text = tostring(val)
-					pcall(callback, val)
-				end
-			end
-
-			function dropdownObj:Get() return dropdownObj.Value end
-			function dropdownObj:Has(val)
-				if isMulti and type(dropdownObj.Value) == "table" then
-					return table.find(dropdownObj.Value, val) ~= nil
-				end
-				return dropdownObj.Value == val
-			end
-
-			table.insert(syde.Dropdowns, dropdownObj)
-			if flag then syde.Flags[flag] = dropdownObj end
-
-			dropdownObj.toggle = function(self) f.Visible = not f.Visible end
-			dropdownObj.remove = function(self) f:Destroy() end
-
-			return dropdownObj
-		end
-
-		-- FreeMouseDrp
-		function TabElements:FreeMouseDrp()
-			return TabElements:AddDropdown({
-				Name = "Unlock Mouse Mode",
-				Options = {"ThirdPerson", "FreeMouse"},
-				Default = syde.UMouseMode or "FreeMouse",
-				Callback = function(val)
-					syde.UMouseMode = val
-					syde:UnlockMouse(false)
-					task.wait(0.05)
-					syde:UnlockMouse(true)
-				end
-			})
-		end
-
-		-- AddBind
-		function TabElements:AddBind(BindConfig)
-			BindConfig = BindConfig or {}
-			local name = BindConfig.Name or BindConfig.Title or "Keybind"
-			local defKey = BindConfig.Default or Enum.KeyCode.Unknown
-			local callback = BindConfig.Callback or BindConfig.CallBack or function() end
-			local flag = BindConfig.Flag
-
-			local f = MakeBaseFrame(name, 36)
-
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -90, 1, 0)
-			lbl.Position = UDim2.new(0, 12, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = name
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			local bindBtn = Instance.new("TextButton")
-			bindBtn.Size = UDim2.new(0, 70, 0, 24)
-			bindBtn.Position = UDim2.new(1, -80, 0.5, -12)
-			bindBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-			bindBtn.Font = Enum.Font.GothamBold
-			bindBtn.TextSize = 12
-			bindBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
-			local keyName = (typeof(defKey) == "EnumItem" and defKey.Name) or tostring(defKey)
-			bindBtn.Text = keyName
-			bindBtn.Parent = f
-
-			local bCrn = Instance.new("UICorner")
-			bCrn.CornerRadius = UDim.new(0, 4)
-			bCrn.Parent = bindBtn
-
-			local bindObj = {
-				Value = keyName,
-				Binding = false,
-				Frame = f,
-				Flag = flag
-			}
-
-			function bindObj:Set(newK)
-				local n = (typeof(newK) == "EnumItem" and newK.Name) or tostring(newK)
-				bindObj.Value = n
-				bindBtn.Text = n
-			end
-
-			bindBtn.MouseButton1Click:Connect(function()
-				bindObj.Binding = true
-				bindBtn.Text = "..."
-			end)
-
-			vgs.UIS.InputBegan:Connect(function(input, gpe)
-				if bindObj.Binding and not gpe then
-					if input.UserInputType == Enum.UserInputType.Keyboard then
-						bindObj.Binding = false
-						bindObj:Set(input.KeyCode.Name)
-					end
-				elseif not bindObj.Binding and not gpe then
-					if input.KeyCode.Name == bindObj.Value then
-						pcall(callback, input.KeyCode)
-					end
-				end
-			end)
-
-			if flag then syde.Flags[flag] = bindObj end
-
-			bindObj.toggle = function(self) f.Visible = not f.Visible end
-			bindObj.remove = function(self) f:Destroy() end
-
-			return bindObj
-		end
-
-		-- AddTextbox
-		function TabElements:AddTextbox(TextboxConfig)
-			TextboxConfig = TextboxConfig or {}
-			local name = TextboxConfig.Name or TextboxConfig.Title or "Textbox"
-			local defText = TextboxConfig.Default or ""
-			local ph = TextboxConfig.BackGroundtext or TextboxConfig.PlaceholderText or "Input"
-			local callback = TextboxConfig.Callback or TextboxConfig.CallBack or function() end
-
-			local f = MakeBaseFrame(name, 36)
-
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -130, 1, 0)
-			lbl.Position = UDim2.new(0, 12, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = name
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			local tb = Instance.new("TextBox")
-			tb.Size = UDim2.new(0, 110, 0, 24)
-			tb.Position = UDim2.new(1, -120, 0.5, -12)
-			tb.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-			tb.Font = Enum.Font.Gotham
-			tb.TextSize = 12
-			tb.TextColor3 = Color3.fromRGB(240, 240, 240)
-			tb.PlaceholderText = ph
-			tb.Text = defText
-			tb.ClearTextOnFocus = false
-			tb.Parent = f
-
-			local tbCrn = Instance.new("UICorner")
-			tbCrn.CornerRadius = UDim.new(0, 4)
-			tbCrn.Parent = tb
-
-			tb.FocusLost:Connect(function()
-				pcall(callback, tb.Text)
-			end)
-
-			return {
-				Frame = f,
-				Set = function(self, t) tb.Text = tostring(t or "") end,
-				toggle = function(self) f.Visible = not f.Visible end,
-				remove = function(self) f:Destroy() end
-			}
-		end
-
-		-- AddColorpicker
-		function TabElements:AddColorpicker(ColorpickerConfig)
-			ColorpickerConfig = ColorpickerConfig or {}
-			local name = ColorpickerConfig.Name or ColorpickerConfig.Title or "Colorpicker"
-			local defCol = ColorpickerConfig.Default or Color3.fromRGB(255, 255, 255)
-			local callback = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
-			local flag = ColorpickerConfig.Flag
-
-			local f = MakeBaseFrame(name, 36)
-
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -50, 1, 0)
-			lbl.Position = UDim2.new(0, 12, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = name
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			local colBox = Instance.new("TextButton")
-			colBox.Size = UDim2.new(0, 26, 0, 22)
-			colBox.Position = UDim2.new(1, -36, 0.5, -11)
-			colBox.BackgroundColor3 = defCol
-			colBox.Text = ""
-			colBox.Parent = f
-
-			local cCrn = Instance.new("UICorner")
-			cCrn.CornerRadius = UDim.new(0, 4)
-			cCrn.Parent = colBox
-
-			local colObj = {
-				Value = defCol,
-				Frame = f,
-				Flag = flag
-			}
-
-			function colObj:Set(newC)
-				colObj.Value = newC
-				colBox.BackgroundColor3 = newC
-				pcall(callback, newC)
-			end
-
-			colBox.MouseButton1Click:Connect(function()
-				-- Cycles a few vibrant test colors if clicked simply
-				local nextC = Color3.fromHSV(math.random(), 0.8, 0.95)
-				colObj:Set(nextC)
-			end)
-
-			if flag then syde.Flags[flag] = colObj end
-
-			colObj.toggle = function(self) f.Visible = not f.Visible end
-			colObj.remove = function(self) f:Destroy() end
-
-			return colObj
-		end
-
-		-- AddPbind
-		function TabElements:AddPbind(Config)
-			Config = Config or {}
-			local name = Config.Name or Config.Title or "Position"
-			local defX = tostring(Config.DefaultX or "")
-			local defY = tostring(Config.DefaultY or "")
-			local defZ = tostring(Config.DefaultZ or "")
-			local callback = Config.Callback or Config.CallBack or function() end
-
-			local f = MakeBaseFrame(name, 38)
-
-			local lbl = Instance.new("TextLabel")
-			lbl.Name = "Content"
-			lbl.Size = UDim2.new(1, -190, 1, 0)
-			lbl.Position = UDim2.new(0, 12, 0, 0)
-			lbl.BackgroundTransparency = 1
-			lbl.Font = Enum.Font.GothamBold
-			lbl.TextSize = 14
-			lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-			lbl.TextXAlignment = Enum.TextXAlignment.Left
-			lbl.Text = name
-			lbl.Parent = f
-			AddTheme(lbl, "Text")
-
-			local pData = { ValueX = defX, ValueY = defY, ValueZ = defZ, Frame = f }
-
-			local function makeBox(xPos, defVal)
-				local b = Instance.new("TextBox")
-				b.Size = UDim2.new(0, 50, 0, 24)
-				b.Position = UDim2.new(1, xPos, 0.5, -12)
-				b.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-				b.Font = Enum.Font.GothamBold
-				b.TextSize = 12
-				b.TextColor3 = Color3.fromRGB(255, 255, 255)
-				b.Text = defVal
-				b.Parent = f
-				local c = Instance.new("UICorner")
-				c.CornerRadius = UDim.new(0, 4)
-				c.Parent = b
-				return b
-			end
-
-			local bx = makeBox(-165, defX)
-			local by = makeBox(-110, defY)
-			local bz = makeBox(-55, defZ)
-
-			local function trig()
-				pData.ValueX = bx.Text
-				pData.ValueY = by.Text
-				pData.ValueZ = bz.Text
-				pcall(callback, pData.ValueX, pData.ValueY, pData.ValueZ)
-			end
-
-			bx.FocusLost:Connect(trig)
-			by.FocusLost:Connect(trig)
-			bz.FocusLost:Connect(trig)
-
-			function pData:Set(x, y, z)
-				if x ~= nil then pData.ValueX = tostring(x) bx.Text = pData.ValueX end
-				if y ~= nil then pData.ValueY = tostring(y) by.Text = pData.ValueY end
-				if z ~= nil then pData.ValueZ = tostring(z) bz.Text = pData.ValueZ end
-			end
-
-			pData.toggle = function(self) f.Visible = not f.Visible end
-			pData.remove = function(self) f:Destroy() end
-
-			return pData
-		end
-
-		-- AddUiBind
-		function TabElements:AddUiBind()
-			return TabElements:AddBind({
-				Name = "UI Toggle Bind",
-				Default = Enum.KeyCode[OpenKey] or Enum.KeyCode.RightShift,
-				Callback = function() end
-			})
-		end
-
-		-- AddSmartTheme
-		function TabElements:AddSmartTheme()
-			local cp = TabElements:AddColorpicker({
-				Name = "Theme Accent",
-				Default = (syde.Themes[syde.SelectedTheme] and syde.Themes[syde.SelectedTheme].Accent) or Color3.fromRGB(57, 37, 68),
-				Callback = function(col)
-					local newTheme = syde:GenTheme(col)
-					syde.Themes.Custom = newTheme
-					syde.SelectedTheme = "Custom"
-					syde:SetTheme()
-				end
-			})
-			local btn = TabElements:AddButton({
-				Name = "Reset Theme",
-				Callback = function()
-					syde.SelectedTheme = "Default"
-					syde:SetTheme()
-				end
-			})
-			return { ColorPicker = cp, ResetButton = btn }
-		end
-
-		-- AddSection
-		function TabElements:AddSection(secName, align, height)
-			if type(secName) == "table" then
-				local tbl = secName
-				secName = tbl.Name or tbl.Title or tbl.Text or ""
-				align = tbl.Align or tbl.Alignment or align
-				height = tbl.Height or height
-			end
-			secName = tostring(secName or "")
-			local secFrame = Instance.new("Frame")
-			secFrame.Name = "Section_" .. secName
-			secFrame.Size = UDim2.new(1, 0, 0, height or 28)
-			secFrame.BackgroundTransparency = 1
-			secFrame.Parent = PageContainer
-
-			local secLabel = Instance.new("TextLabel")
-			secLabel.Size = UDim2.new(1, 0, 1, 0)
-			secLabel.BackgroundTransparency = 1
-			secLabel.Font = Enum.Font.GothamBold
-			secLabel.TextSize = 13
-			secLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-			secLabel.TextXAlignment = (align == "Center" and Enum.TextXAlignment.Center) or (align == "Right" and Enum.TextXAlignment.Right) or Enum.TextXAlignment.Left
-			secLabel.Text = secName
-			secLabel.Parent = secFrame
-			AddTheme(secLabel, "TextDark")
-
-			local secObj = {}
-			for k, v in pairs(TabElements) do
-				secObj[k] = v
-			end
-			secObj.Frame = secFrame
-			secObj.toggle = function(self) secFrame.Visible = not secFrame.Visible end
-			secObj.remove = function(self) secFrame:Destroy() end
-			return secObj
-		end
-
-		-- Aliases on TabElements so both Syde and Orion calls work
-		TabElements.Button = TabElements.AddButton
-		TabElements.Toggle = TabElements.AddToggle
-		TabElements.Slider = TabElements.AddSlider
-		TabElements.Dropdown = TabElements.AddDropdown
-		TabElements.Keybind = TabElements.AddBind
-		TabElements.TextInput = TabElements.AddTextbox
-		TabElements.ColorPicker = TabElements.AddColorpicker
-		TabElements.Paragraph = TabElements.AddParagraph
-		TabElements.Label = TabElements.AddLabel
-		TabElements.Section = TabElements.AddSection
-		TabElements.Log = TabElements.AddLog
-		TabElements.Pbind = TabElements.AddPbind
-		TabElements.PlayerParagraph = TabElements.AddPlayerParagraph
-		TabElements.UiBind = TabElements.AddUiBind
-		TabElements.SmartTheme = TabElements.AddSmartTheme
-
-		return TabElements
-	end
-
-	WindowFunctions.InitTab = WindowFunctions.MakeTab
-	syde.ActiveWindow = WindowFunctions
-
-	return WindowFunctions
-end
-
--- Top-level alias
-syde.InitTab = syde.MakeWindow
-syde.MakeTab = syde.MakeWindow
-
-
-pcall(function()
-	if getgenv then
-		getgenv().OrionLib = syde
-	end
-	_G.OrionLib = syde
-end)
 
 return syde
