@@ -124,7 +124,7 @@ local syde = {
 	Build = 'Sv0';
 	plugins = {};
 	ConfigEnabled = false;
-	ConfigFolder = 'Syde';
+	ConfigFolder = 'UI';
 	ConfigFile = 'Config';
 	Flags = {};
 	SettingsFlags = {};
@@ -139,6 +139,47 @@ function syde:DeepMerge(target, source)
 			self:DeepMerge(target[k], v) 
 		else
 			target[k] = v
+		end
+	end
+end
+
+function syde:SaveThemeConfig()
+	if not writefile then return end
+	local folder = self.ConfigFolder or "UI"
+	if makefolder and isfolder and not isfolder(folder) then
+		pcall(makefolder, folder)
+	end
+	local themeData = {
+		Accent = self:ColorPack(self.theme.Accent),
+		HitBox = self:ColorPack(self.theme.HitBox),
+	}
+	pcall(function()
+		writefile(string.format("%s/_theme.json", folder), https:JSONEncode(themeData))
+	end)
+end
+
+function syde:LoadThemeConfig()
+	if not isfile then return end
+	local folder = self.ConfigFolder or "UI"
+	local path = string.format("%s/_theme.json", folder)
+	if isfile(path) then
+		local ok, content = pcall(readfile, path)
+		if ok and content then
+			local success, data = pcall(function() return https:JSONDecode(content) end)
+			if success and type(data) == "table" then
+				if data.Accent then
+					local c = self:ColorUnpack(data.Accent)
+					if typeof(c) == "Color3" then
+						self.theme.Accent = c
+					end
+				end
+				if data.HitBox then
+					local c = self:ColorUnpack(data.HitBox)
+					if typeof(c) == "Color3" then
+						self.theme.HitBox = c
+					end
+				end
+			end
 		end
 	end
 end
@@ -173,6 +214,10 @@ function syde:UpdateTheme(Config)
 	if #updatedKeys > 0 then
 		for _, key in ipairs(updatedKeys) do
 			self.Comms:Fire(key, self.theme[key])
+		end
+		self:SaveThemeConfig()
+		if SaveConfig then
+			SaveConfig()
 		end
 	end
 end
@@ -267,7 +312,7 @@ function syde:Report(context, err)
 	warn(table.concat({
 		"",
 		"----------screenshot this and send it to king jericoo------",
-		"[ Syde ] " .. tostring(context or "Error"),
+		"[ UI ] " .. tostring(context or "Error"),
 		"Problem: " .. message,
 		"Fix: " .. fix,
 		"------------------------------------------------------------",
@@ -1413,10 +1458,14 @@ do
 		LOADER.Parent = coregui
 
 		-- PreLoad
-		Config.Name = Config.Name or 'Syde™'
-		Config.Logo = Config.Logo or 'rbxassetid://14554547135'
-		Config.ConfigFolder = Config.ConfigFolder or 'syde'
+		Config.Name = Config.Name or 'UI'
+		Config.Logo = Config.Logo or ''
+		Config.ConfigFolder = Config.ConfigFolder or 'UI'
 		Config.Status = Config.Status or false
+
+		-- Auto-load saved theme if exists
+		syde:LoadThemeConfig()
+
 		Config.Accent = Config.Accent or syde.theme.Accent
 		Config.HitBox = Config.HitBox or syde.theme.HitBox
 
@@ -1425,9 +1474,17 @@ do
 		LOADER.loader.profile.Title.Text = Config.Name
 		--	LOADER.load.logo.stroke.UIStroke.Transparency = 1
 
+		local formattedLogo = ""
+		if Config.Logo and Config.Logo ~= "" and Config.Logo ~= "0" then
+			formattedLogo = tostring(Config.Logo)
+			if not formattedLogo:find("rbxassetid://") and not formattedLogo:find("http") then
+				formattedLogo = "rbxassetid://" .. formattedLogo
+			end
+		end
+
 		local LoaderConfig = {
 			Name = Config.Name;
-			Logo = 'rbxassetid://'..Config.Logo;
+			Logo = formattedLogo;
 			ConfigFolder = Config.ConfigFolder;
 			Status = Config.Status;
 			Accent = Config.Accent or syde.theme.Accent;
@@ -1453,8 +1510,15 @@ do
 			--	LOADER.load.logo["Title/Status"].Text = string.format('%s  <font color="#363636">•</font>  %s', LoaderConfig.Name, statusData.Text)
 		end
 
-		LOADER.loader.profile.Image = LoaderConfig.Logo;
-		LOADER.loader.ImageLabel.Image = LoaderConfig.Logo;
+		if LoaderConfig.Logo ~= "" then
+			LOADER.loader.profile.Image = LoaderConfig.Logo
+			LOADER.loader.ImageLabel.Image = LoaderConfig.Logo
+			LOADER.loader.profile.Visible = true
+		else
+			LOADER.loader.profile.Image = ""
+			LOADER.loader.ImageLabel.Image = ""
+			LOADER.loader.profile.Visible = false
+		end
 		--	LOADER.load.info.build.Text = syde.Build
 
 		local ti = TweenInfo.new(0.2, Enum.EasingStyle.Exponential)
@@ -1627,7 +1691,7 @@ do
 			TweenWorkLabel(0.4,'rbxassetid://136002400178503', '')
 
 			if Config.ConfigurationSaving and Config.ConfigurationSaving.Enabled then
-				local folderName = Config.ConfigurationSaving.FolderName or "SydeSec"
+				local folderName = Config.ConfigurationSaving.FolderName or "UI_Configs"
 				local fileName = Config.ConfigurationSaving.FileName or "default_config"
 
 				syde.ConfigEnabled = true
@@ -1670,7 +1734,7 @@ do
 
 			TweenWorkLabel(0.4,'rbxassetid://105810189969774', '')
 
-			local UI_TAG = "sydeUILoader"
+			local UI_TAG = "UILoader"
 			local MARKER_NAME = "SYDEUIDetector"
 			local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
 			local PROTECTION_EVENT = Instance.new("BindableEvent")
@@ -1716,7 +1780,7 @@ do
 				while Library and Library.Parent do
 					task.wait(1)
 					if Library.Parent ~= coregui then
-						warn("Syde 〡 UI moved. Restoring...")
+						warn("[UI] UI moved. Restoring...")
 						pcall(function()
 							Library.Parent = coregui
 						end)
@@ -1729,7 +1793,7 @@ do
 
 			if Config.AutoJoinDiscord and Config.AutoJoinDiscord.Enabled then
 				local discordConfig = Config.AutoJoinDiscord
-				local rootFolder = Config.ConfigurationSaving and Config.ConfigurationSaving.FolderName or "SydeSec"
+				local rootFolder = Config.ConfigurationSaving and Config.ConfigurationSaving.FolderName or "UI_Configs"
 				local discordFolder = rootFolder .. "/DiscordInvites"
 				local inviteCode = discordConfig.Invite
 				local inviteFilePath = discordFolder .. "/" .. inviteCode .. ".txt"
@@ -1838,6 +1902,17 @@ local function ApplyFlag(Flag, Value)
 		return true
 	end
 
+	-- Keybind Handling
+	if Flag.Type == "Keybind" or Flag.SetKeybind then
+		if Flag.SetKeybind then
+			Flag:SetKeybind(Value, true)
+			return true
+		elseif Flag.Set then
+			Flag:Set(Value, true)
+			return true
+		end
+	end
+
 	-- Standard Setter
 	if Flag.Set then
 		Flag:Set(Value, true)
@@ -1855,28 +1930,44 @@ local function ApplyFlag(Flag, Value)
 		return true
 	end
 
-	warn("Syde 〡 Unsupported flag type for:", Flag)
+	warn("[UI] Unsupported flag type for:", Flag)
 	return false
 end
 
 function LoadConfig(Configuration)
 	if type(Configuration) ~= "string" then
-		warn("Syde 〡 Invalid config format.")
+		warn("[UI] Invalid config format.")
 		return false, 0
 	end
 
 	local Decoded = SafeDecode(Configuration)
 	if not Decoded then
-		warn("Syde 〡 Failed to decode config.")
+		warn("[UI] Failed to decode config.")
 		return false, 0
 	end
 
 	-- Cache so flags registered later can still apply their saved values
 	syde.LoadedConfig = Decoded
 
+	-- Theme auto-restore from config
+	if Decoded._theme and type(Decoded._theme) == "table" then
+		if Decoded._theme.Accent then
+			local c = syde:ColorUnpack(Decoded._theme.Accent)
+			if typeof(c) == "Color3" then
+				syde:UpdateTheme({ Accent = c })
+			end
+		end
+		if Decoded._theme.HitBox then
+			local c = syde:ColorUnpack(Decoded._theme.HitBox)
+			if typeof(c) == "Color3" then
+				syde:UpdateTheme({ HitBox = c })
+			end
+		end
+	end
+
 	-- Version check (future ready)
 	if Decoded._version and Decoded._version ~= CONFIG_VERSION then
-		warn("Syde 〡 Config version mismatch.")
+		warn("[UI] Config version mismatch.")
 	end
 
 	local applied = 0
@@ -1892,7 +1983,7 @@ function LoadConfig(Configuration)
 			if ok and success then
 				applied = applied + 1
 			elseif not ok then
-				warn("Syde 〡 Failed to apply flag '" .. tostring(FlagName) .. "':", success)
+				warn("[UI] Failed to apply flag '" .. tostring(FlagName) .. "':", success)
 			end
 		end
 	end
@@ -1916,7 +2007,11 @@ local function PerformSave()
 	if not writefile then return end
 
 	local Data = {
-		_version = CONFIG_VERSION
+		_version = CONFIG_VERSION,
+		_theme = {
+			Accent = syde:ColorPack(syde.theme.Accent),
+			HitBox = syde:ColorPack(syde.theme.HitBox),
+		}
 	}
 
 	for FlagName, Flag in pairs(syde.Flags) do
@@ -1924,8 +2019,12 @@ local function PerformSave()
 			if Flag.Color then
 				Data[FlagName] = syde:ColorPack(Flag.Color)
 			end
+		elseif Flag.Type == "Keybind" or Flag.Key ~= nil then
+			Data[FlagName] = Flag.Key and Flag.Key.Name or "NONE"
 		elseif Flag.V ~= nil then
 			Data[FlagName] = Flag.V
+		elseif Flag.Value ~= nil then
+			Data[FlagName] = Flag.Value
 		elseif Flag.Color then
 			Data[FlagName] = syde:ColorPack(Flag.Color)
 		elseif Flag.StarterValue ~= nil then
@@ -1945,7 +2044,7 @@ local function PerformSave()
 	end)
 
 	if not success then
-		warn("Syde 〡 Failed to save config:", err)
+		warn("[UI] Failed to save config:", err)
 	end
 end
 
@@ -2024,7 +2123,13 @@ function syde:SaveConfigAs(name)
 		return false
 	end
 
-	local Data = { _version = CONFIG_VERSION }
+	local Data = {
+		_version = CONFIG_VERSION,
+		_theme = {
+			Accent = syde:ColorPack(syde.theme.Accent),
+			HitBox = syde:ColorPack(syde.theme.HitBox),
+		}
+	}
 	local count = 0
 	for FlagName, Flag in pairs(syde.Flags) do
 		if Flag.Type == "ColorPicker" then
@@ -2032,8 +2137,14 @@ function syde:SaveConfigAs(name)
 				Data[FlagName] = syde:ColorPack(Flag.Color)
 				count = count + 1
 			end
+		elseif Flag.Type == "Keybind" or Flag.Key ~= nil then
+			Data[FlagName] = Flag.Key and Flag.Key.Name or "NONE"
+			count = count + 1
 		elseif Flag.V ~= nil then
 			Data[FlagName] = Flag.V
+			count = count + 1
+		elseif Flag.Value ~= nil then
+			Data[FlagName] = Flag.Value
 			count = count + 1
 		elseif Flag.Color then
 			Data[FlagName] = syde:ColorPack(Flag.Color)
@@ -2748,7 +2859,7 @@ function syde:Init(library)
 
 	ui.Enabled = true
 	if loaded == false then
-		local UI_TAG = "sydeUILoader"
+		local UI_TAG = "UILoader"
 		local MARKER_NAME = "SYDEUIDetector"
 		local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
 		local PROTECTION_EVENT = Instance.new("BindableEvent")
@@ -2805,7 +2916,7 @@ function syde:Init(library)
 	task.wait(0.1)
 
 	local Data = {
-		Title = library.Title or "Syde";
+		Title = library.Title or "UI";
 		SubText = library.SubText or "Google";
 		Home = library.Home or {} 
 	}
@@ -7146,7 +7257,7 @@ function syde:Init(library)
 			-- find page
 			targetPage = pages:FindFirstChild(tabName)
 			if not (selectedTab and targetPage) then
-				warn("[Syde] SwitchToTab failed:", tabName)
+				warn("[UI] SwitchToTab failed:", tabName)
 				return
 			end
 
@@ -7837,6 +7948,10 @@ function syde:Init(library)
 						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 					end
 				end
+
+				if not skipSave and data.Flag and SaveConfig then
+					SaveConfig()
+				end
 			end
 
 			if syde.ConfigEnabled and data.Flag then
@@ -8123,6 +8238,10 @@ function syde:Init(library)
 					end
 
 					Options.StarterValue = NewVal
+
+					if not skipSave and Options.Flag and SaveConfig then
+						SaveConfig()
+					end
 				end
 
 				-- click the value to type a custom number (reverts if outside range)
@@ -8206,15 +8325,33 @@ function syde:Init(library)
 				tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
 			end)
 
-			local function SetKeybind(keyCode)
+			data.Flag = Keybind.Flag
+			data.Type = "Keybind"
+
+			function data:Set(keyCode, skipSave)
+				data:SetKeybind(keyCode, skipSave)
+			end
+
+			function data:SetKeybind(keyCode, skipSave)
+				if typeof(keyCode) == "string" then
+					keyCode = Enum.KeyCode[keyCode]
+				end
 				if keyCode and keyCode ~= Enum.KeyCode.Unknown then
 					data.Key = keyCode
-					tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
 					KeyBind.Bind.v.Text = keyCode.Name
 				else
 					data.Key = nil
 					KeyBind.Bind.v.Text = "NONE"
 				end
+				tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
+				if not skipSave and data.Flag and SaveConfig then
+					SaveConfig()
+				end
+			end
+
+			local function SetKeybind(keyCode)
+				tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
+				data:SetKeybind(keyCode)
 			end
 
 			-- Main input handler
@@ -8267,6 +8404,15 @@ function syde:Init(library)
 				end
 			end)
 
+			if syde.ConfigEnabled and data.Flag then
+				syde.Flags[data.Flag] = data
+				if syde.LoadedConfig and syde.LoadedConfig[data.Flag] ~= nil then
+					local savedKey = syde.LoadedConfig[data.Flag]
+					data:SetKeybind(savedKey, true)
+				end
+			end
+
+			return data
 		end
 
 		--@@TextInput
@@ -9088,7 +9234,40 @@ function syde:Init(library)
 				UpdateCustomLayout()
 			end
 
+			data.Flag = Dropdown.Flag
+			data.Type = "Dropdown"
+
+			function data:Set(option, skipSave)
+				if data.Multi then
+					if type(option) == "table" then
+						SelectedOptions = {}
+						SelectedOrder = {}
+						for _, opt in ipairs(option) do
+							SelectedOptions[opt] = true
+							table.insert(SelectedOrder, opt)
+						end
+					end
+				else
+					local optStr = tostring(option)
+					SelectedOptions = {[optStr] = true}
+					SelectedOrder = {optStr}
+					dropdown.dropholder.drop.selected.Text = optStr
+				end
+				UpdateSelectedText()
+				if not skipSave and data.Flag and SaveConfig then
+					SaveConfig()
+				end
+			end
+
+			if syde.ConfigEnabled and data.Flag then
+				syde.Flags[data.Flag] = data
+				if syde.LoadedConfig and syde.LoadedConfig[data.Flag] ~= nil then
+					data:Set(syde.LoadedConfig[data.Flag], true)
+				end
+			end
+
 			SetDropdownOptions()
+			return data
 		end
 
 		--@@Colorpicker
@@ -10015,6 +10194,10 @@ function syde:Init(library)
 				HSV[1], HSV[2], HSV[3] = h, s, v
 
 				updatestuff()
+
+				if not skipSave and data.Flag and SaveConfig then
+					SaveConfig()
+				end
 			end
 
 			if syde.ConfigEnabled and data.Flag then
