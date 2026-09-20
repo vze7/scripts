@@ -2,11 +2,10 @@
 
 local Players = game:GetService("Players")
 
--- Referência à biblioteca Syde: utiliza a instância local (se colado no final de syde.lua)
--- ou carrega dinamicamente caso seja executado separadamente.
+-- Referência à biblioteca: utiliza a instância local ou carrega dinamicamente via GitHub
 local syde = syde or loadstring(game:HttpGet("https://raw.githubusercontent.com/vze7/scripts/main/syde.lua", true))()
 
--- Função auxiliar para obter o Humanoid do jogador local de forma segura
+-- Função auxiliar para obter o Humanoid do jogador local
 local function getHumanoid(): Humanoid?
 	local lp = Players.LocalPlayer
 	local char = lp and lp.Character
@@ -20,12 +19,12 @@ end
 -- 1. CARREGAMENTO INICIAL (LOADER & CONFIGURAÇÃO)
 -- ============================================================
 syde:Load({
-	Logo = "7488932274",
-	Name = "Syde Test",
+	Logo = "", -- Imagem de gato removida
+	Name = "Test Hub",
 	Status = "Stable", -- Opções: Stable, Unstable, Detected, Patched
 	Accent = Color3.fromRGB(251, 144, 255),
 	HitBox = Color3.fromRGB(251, 144, 255),
-	AutoLoad = false,
+	AutoLoad = true, -- Auto-carrega tema e configurações salvas
 	Socials = {
 		{
 			Name = "Discord",
@@ -42,7 +41,7 @@ syde:Load({
 	},
 	ConfigurationSaving = {
 		Enabled = true,
-		FolderName = "SydeTest",
+		FolderName = "TestHub",
 		FileName = "config",
 	},
 	AutoJoinDiscord = {
@@ -56,8 +55,8 @@ syde:Load({
 -- 2. INICIALIZAÇÃO DA JANELA PRINCIPAL
 -- ============================================================
 local Window = syde:Init({
-	Title = "Syde Test",
-	SubText = "Elementos & Callbacks",
+	Title = "Test Hub",
+	SubText = "Elementos & Auto-Save",
 })
 
 -- ============================================================
@@ -66,19 +65,19 @@ local Window = syde:Init({
 local Tab1 = Window:InitTab({ Title = "Básico" })
 
 Tab1:Section("Informações")
-Tab1:Label("Script de teste para validação completa da biblioteca Syde UI.", "Left")
+Tab1:Label("Script de teste com suporte a salvamento automático de tema e binds.", "Left")
 
-local aboutParagraph = Tab1:Paragraph({
-	Title = "Sobre o Syde",
-	Content = "Biblioteca moderna com suporte a temas, animações suaves, gerenciamento de configurações e elementos interativos.",
+Tab1:Paragraph({
+	Title = "Sistema de Auto-Save",
+	Content = "Qualquer alteração em temas (Accent/Hitbox), binds de teclado, toggles, sliders e dropdowns é gravada e restaurada automaticamente.",
 })
 
 Tab1:Section("Controles Principais")
 
--- Toggle Interativo
+-- Toggle Interativo com Auto-Save
 local myToggle = Tab1:Toggle({
 	Title = "Ativar Feature",
-	Description = "Liga ou desliga a funcionalidade de teste.",
+	Description = "Liga ou desliga a funcionalidade (salva automaticamente).",
 	Value = false,
 	Flag = "FeatureToggle",
 	CallBack = function(state)
@@ -97,14 +96,14 @@ Tab1:Button({
 	Type = "Default",
 	CallBack = function()
 		syde:Notify({
-			Title = "Botão Padrão",
+			Title = "Botão",
 			Content = "Ação executada com sucesso!",
 			Duration = 2.5,
 		})
 	end,
 })
 
--- Botão com tempo de segurar (Hold)
+-- Botão Hold
 Tab1:Button({
 	Title = "Segurar (3 segundos)",
 	Description = "Segure o botão pressionado para confirmar a ação.",
@@ -124,11 +123,11 @@ Tab1:Button({
 -- ============================================================
 local Tab2 = Window:InitTab({ Title = "Sliders & Seleção" })
 
-Tab2:Section("Valores Numéricos")
+Tab2:Section("Valores Numéricos (Auto-Save)")
 
 Tab2:Slider({
 	Title = "Configurações do Personagem",
-	Description = "Ajuste de velocidade e força de pulo em tempo real.",
+	Description = "Ajuste de velocidade e força de pulo (salvo automaticamente).",
 	Sliders = {
 		{
 			Title = "Velocidade (WalkSpeed)",
@@ -159,15 +158,16 @@ Tab2:Slider({
 	},
 })
 
-Tab2:Section("Menus de Seleção")
+Tab2:Section("Menus de Seleção (Auto-Save)")
 
--- Dropdown Simples
+-- Dropdown Simples com Flag
 Tab2:Dropdown({
 	Title = "Modo de Operação",
 	Options = {"Padrão", "Furtivo", "Agressivo", "Defensivo"},
 	StarterOption = "Padrão",
 	PlaceHolder = "Selecione o modo...",
 	Multi = false,
+	Flag = "GameModeDropdown",
 	CallBack = function(selected)
 		syde:Notify({
 			Title = "Modo Selecionado",
@@ -177,22 +177,71 @@ Tab2:Dropdown({
 	end,
 })
 
--- Dropdown Multi-Seleção
+-- Dropdown Multi-Seleção com Flag
 Tab2:Dropdown({
 	Title = "Filtrar Alvos (Múltiplo)",
 	Options = {"Jogadores", "NPCs", "Inimigos", "Itens Coletáveis"},
 	PlaceHolder = "Escolha um ou mais alvos...",
 	Multi = true,
+	Flag = "TargetsDropdown",
 	CallBack = function(selectedList)
 		local listaFormatada = typeof(selectedList) == "table" and table.concat(selectedList, ", ") or tostring(selectedList)
-		print("[Syde Multi-Dropdown] Alvos selecionados:", listaFormatada)
+		print("[Multi-Dropdown] Alvos selecionados:", listaFormatada)
 	end,
 })
 
 -- ============================================================
--- ABA 3: INPUTS & ATALHOS
+-- ABA 3: INPUTS, BINDS & TEMA
 -- ============================================================
-local Tab3 = Window:InitTab({ Title = "Inputs & Atalhos" })
+local Tab3 = Window:InitTab({ Title = "Binds & Tema" })
+
+Tab3:Section("Atalho de Teclado (Auto-Save)")
+
+-- Keybind com Flag (salva tecla e estado automaticamente)
+Tab3:Keybind({
+	Title = "Alternar Toggle",
+	Description = "Pressione a tecla para alternar. Nova tecla salva automaticamente.",
+	Key = Enum.KeyCode.H,
+	Flag = "ToggleKeybind",
+	CallBack = function()
+		if myToggle then
+			local novoEstado = not myToggle.V
+			myToggle:Set(novoEstado)
+		end
+	end,
+})
+
+Tab3:Section("Cores do Tema (Auto-Save)")
+
+Tab3:ColorPicker({
+	Title = "Cor de Destaque (Accent)",
+	Color = syde.theme.Accent,
+	Linkable = true,
+	Flag = "AccentThemePicker",
+	CallBack = function(color)
+		syde:UpdateTheme({ Accent = color })
+		syde:Notify({
+			Title = "Tema",
+			Content = "Cor de destaque salva automaticamente!",
+			Duration = 2,
+		})
+	end,
+})
+
+Tab3:ColorPicker({
+	Title = "Cor dos Elementos (HitBox)",
+	Color = syde.theme.HitBox,
+	Linkable = true,
+	Flag = "HitBoxThemePicker",
+	CallBack = function(color)
+		syde:UpdateTheme({ HitBox = color })
+		syde:Notify({
+			Title = "Tema",
+			Content = "Cor de hitbox salva automaticamente!",
+			Duration = 2,
+		})
+	end,
+})
 
 Tab3:Section("Campos de Texto")
 
@@ -215,44 +264,17 @@ Tab3:TextInput({
 	NumberOnly = true,
 	ClearOnLost = false,
 	CallBack = function(num)
-		print("[Syde NumberInput] Valor digitado:", num)
-	end,
-})
-
-Tab3:Section("Atalho de Teclado")
-
-Tab3:Keybind({
-	Title = "Alternar Toggle",
-	Description = "Pressione a tecla definida para inverter o Toggle.",
-	Key = Enum.KeyCode.H,
-	CallBack = function()
-		if myToggle then
-			local novoEstado = not myToggle.V
-			myToggle:Set(novoEstado)
-		end
-	end,
-})
-
-Tab3:Section("Seletor de Cores")
-
-Tab3:ColorPicker({
-	Title = "Cor de Destaque",
-	Color = Color3.fromRGB(251, 144, 255),
-	Linkable = true,
-	Flag = "TestColorPicker",
-	CallBack = function(color)
-		print("[Syde ColorPicker] Cor selecionada:", color)
+		print("[NumberInput] Valor digitado:", num)
 	end,
 })
 
 -- ============================================================
--- ABA 4: DIÁLOGOS & CONFIGURAÇÃO
+-- ABA 4: DIÁLOGOS & SISTEMA
 -- ============================================================
-local Tab4 = Window:InitTab({ Title = "Alerts & Sistema" })
+local Tab4 = Window:InitTab({ Title = "Alerts & Perfis" })
 
-Tab4:Section("Diálogos e Notificações")
+Tab4:Section("Diálogos e Confirmação")
 
--- Modal de Confirmação (suporta ambas as grafias para compatibilidade com o syde)
 Tab4:Button({
 	Title = "Abrir Modal de Confirmação",
 	Description = "Exibe um diálogo modal com botões de Confirmar e Cancelar.",
@@ -260,7 +282,7 @@ Tab4:Button({
 	CallBack = function()
 		syde:Modal({
 			Title = "Confirmação de Teste",
-			Content = "Deseja realmente confirmar esta ação de teste?",
+			Content = "Deseja realmente confirmar esta ação?",
 			ConfimCallBack = function()
 				syde:Notify({
 					Title = "Confirmado!",
@@ -281,38 +303,22 @@ Tab4:Button({
 
 Tab4:Button({
 	Title = "Disparar Notificação Longa",
-	Description = "Exibe uma notificação com texto maior e duração de 5 segundos.",
+	Description = "Exibe uma notificação com tempo estendido.",
 	Type = "Default",
 	CallBack = function()
 		syde:Notify({
 			Title = "Aviso do Sistema",
-			Content = "Esta é uma notificação com tempo estendido para leitura completa de informações.",
+			Content = "Esta é uma notificação detalhada com tempo de exibição estendido para leitura.",
 			Duration = 5,
 		})
-	end,
-})
-
-Tab4:Button({
-	Title = "Forçar Toggle via :Set()",
-	Description = "Altera o estado do Toggle programaticamente.",
-	Type = "Default",
-	CallBack = function()
-		if myToggle then
-			myToggle:Set(true)
-			syde:Notify({
-				Title = "Método :Set()",
-				Content = "Toggle foi forçado para ATIVADO!",
-				Duration = 2,
-			})
-		end
 	end,
 })
 
 Tab4:Section("Gerenciamento de Perfis")
 
 Tab4:Button({
-	Title = "Salvar Perfil ('default')",
-	Description = "Grava o estado das flags salvas no disco.",
+	Title = "Salvar Perfil Manual ('default')",
+	Description = "Força a gravação de todas as flags e tema no disco.",
 	Type = "Default",
 	CallBack = function()
 		syde:SaveConfigAs("default")
@@ -325,7 +331,7 @@ Tab4:Button({
 })
 
 Tab4:Button({
-	Title = "Recarregar Perfil ('default')",
+	Title = "Recarregar Perfil Manual ('default')",
 	Description = "Carrega e restaura as flags salvas no perfil.",
 	Type = "Default",
 	CallBack = function()
@@ -339,16 +345,16 @@ Tab4:Button({
 })
 
 -- ============================================================
--- 3. CARREGAMENTO DE CONFIGURAÇÃO & NOTIFICAÇÃO DE SUCESSO
+-- 3. CARREGAMENTO INICIAL & NOTIFICAÇÃO
 -- ============================================================
 syde:LoadSaveConfig()
 
 syde:Notify({
-	Title = "Syde Test",
+	Title = "Test Hub",
 	Content = "Interface inicializada com sucesso!",
 	Duration = 4,
 })
 
-print("[Syde Test] Interface e callbacks carregados com sucesso.")
+print("[Test Hub] Interface e auto-save ativos.")
 
 return syde
