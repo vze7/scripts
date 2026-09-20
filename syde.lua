@@ -2341,109 +2341,153 @@ end
 local activeModals = 0 -- track how many modals are currently open
 
 function syde:Modal(Modal)
+	Modal = Modal or {}
 	task.spawn(function()
 		local ModalData = {
-			Title = Modal.Title;
-			Content = Modal.Content;
-			ConfirmCallBack = Modal.ConfimCallBack
+			Title = Modal.Title or Modal.Name or "Confirm",
+			Content = Modal.Content or Modal.Text or "Are you sure?",
+			ConfirmCallBack = Modal.ConfirmCallBack or Modal.ConfimCallBack or Modal.Callback or Modal.CallBack
 		}
 
-		local ModalInstance = ui.main.modal:Clone()
+		local modalTemplate = (ui and ui.main and (ui.main:FindFirstChild("modal") or ui.main:FindFirstChild("Modal")))
+
+		local ModalInstance
+		if modalTemplate then
+			ModalInstance = modalTemplate:Clone()
+		else
+			ModalInstance = Instance.new("Frame")
+			ModalInstance.Name = "Modal"
+			ModalInstance.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+			local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 8) corner.Parent = ModalInstance
+			local stroke = Instance.new("UIStroke") stroke.Color = Color3.fromRGB(60, 60, 60) stroke.Parent = ModalInstance
+
+			local t = Instance.new("TextLabel")
+			t.Name = "Title"
+			t.BackgroundTransparency = 1
+			t.Size = UDim2.new(1, -20, 0, 30)
+			t.Position = UDim2.new(0, 10, 0, 10)
+			t.Font = Enum.Font.GothamBold
+			t.TextColor3 = Color3.fromRGB(255, 255, 255)
+			t.TextSize = 15
+			t.TextXAlignment = Enum.TextXAlignment.Left
+			t.Parent = ModalInstance
+
+			local c = Instance.new("TextLabel")
+			c.Name = "Content"
+			c.BackgroundTransparency = 1
+			c.Size = UDim2.new(1, -20, 0, 50)
+			c.Position = UDim2.new(0, 10, 0, 42)
+			c.Font = Enum.Font.Gotham
+			c.TextColor3 = Color3.fromRGB(200, 200, 200)
+			c.TextSize = 13
+			c.TextWrapped = true
+			c.TextXAlignment = Enum.TextXAlignment.Left
+			c.Parent = ModalInstance
+
+			local btnHolder = Instance.new("Frame")
+			btnHolder.Name = "Buttons"
+			btnHolder.BackgroundTransparency = 1
+			btnHolder.Size = UDim2.new(1, -20, 0, 32)
+			btnHolder.Position = UDim2.new(0, 10, 1, -42)
+			btnHolder.Parent = ModalInstance
+
+			local confirm = Instance.new("TextButton")
+			confirm.Name = "Confirm"
+			confirm.BackgroundColor3 = syde.theme.Accent or Color3.fromRGB(255, 151, 227)
+			confirm.Size = UDim2.new(0.48, 0, 1, 0)
+			confirm.Position = UDim2.new(0.52, 0, 0, 0)
+			confirm.Text = "Confirm"
+			confirm.TextColor3 = Color3.fromRGB(20, 20, 20)
+			confirm.Font = Enum.Font.GothamBold
+			confirm.TextSize = 13
+			local c_corner = Instance.new("UICorner") c_corner.CornerRadius = UDim.new(0, 6) c_corner.Parent = confirm
+			local c_lbl = Instance.new("TextLabel") c_lbl.Name = "TextLabel" c_lbl.Text = "Confirm" c_lbl.Size = UDim2.new(1,0,1,0) c_lbl.BackgroundTransparency = 1 c_lbl.TextColor3 = Color3.fromRGB(20,20,20) c_lbl.Font = Enum.Font.GothamBold c_lbl.TextSize = 13 c_lbl.Parent = confirm
+			confirm.Parent = btnHolder
+
+			local cancel = Instance.new("TextButton")
+			cancel.Name = "Cancel"
+			cancel.BackgroundColor3 = Color3.fromRGB(36, 36, 36)
+			cancel.Size = UDim2.new(0.48, 0, 1, 0)
+			cancel.Position = UDim2.new(0, 0, 0, 0)
+			cancel.Text = "Cancel"
+			cancel.TextColor3 = Color3.fromRGB(220, 220, 220)
+			cancel.Font = Enum.Font.Gotham
+			cancel.TextSize = 13
+			local can_corner = Instance.new("UICorner") can_corner.CornerRadius = UDim.new(0, 6) can_corner.Parent = cancel
+			local can_lbl = Instance.new("TextLabel") can_lbl.Name = "TextLabel" can_lbl.Text = "Cancel" can_lbl.Size = UDim2.new(1,0,1,0) can_lbl.BackgroundTransparency = 1 can_lbl.TextColor3 = Color3.fromRGB(220,220,220) can_lbl.Font = Enum.Font.Gotham can_lbl.TextSize = 13 can_lbl.Parent = cancel
+			cancel.Parent = btnHolder
+		end
+
+		ModalInstance.AnchorPoint = Vector2.new(0.5, 0.5)
+		ModalInstance.Position = UDim2.new(0.5, 0, 0.5, 0)
+		ModalInstance.Size = UDim2.new(0, 360, 0, 150)
+		ModalInstance.ZIndex = 200
 		ModalInstance.Visible = true
 		ModalInstance.Parent = ui.main
-		ModalInstance.Title.Text = ModalData.Title
-		ModalInstance.Content.Text = ModalData.Content
-		--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
-		ModalInstance.Size = UDim2.new(0, 350,0, 144)
-		ModalInstance.BackgroundTransparency = 1
-		ModalInstance.Title.TextTransparency = 1
-		ModalInstance.Content.TextTransparency = 1
 
-		ModalInstance.Buttons.Confirm.BackgroundTransparency = 1
-		ModalInstance.Buttons.Confirm.TextLabel.TextTransparency = 1
-		--	ModalInstance.Buttons.Confirm.UIStroke.Transparency = 1
-
-		ModalInstance.Buttons.Cancel.BackgroundTransparency = 1
-		ModalInstance.Buttons.Cancel.TextLabel.TextTransparency = 1
-		ModalInstance.Buttons.Cancel.UIStroke.Transparency = 1
-
-		local function openModal()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
-			activeModals += 1
-			--	ModalInstance.Size = UDim2.new(0, ModalInstance.Size.X.Offset, 0, ModalInstance.Content.TextBounds.Y + 120)
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0,  ModalInstance.Content.TextBounds.Y + 150)}):Play()
-
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-
+		if ModalInstance:FindFirstChild("Title") then
+			ModalInstance.Title.Text = ModalData.Title
+			ModalInstance.Title.ZIndex = 202
 		end
-		openModal()
+		if ModalInstance:FindFirstChild("Content") then
+			ModalInstance.Content.Text = ModalData.Content
+			ModalInstance.Content.ZIndex = 202
+		end
+
+		for _, desc in ipairs(ModalInstance:GetDescendants()) do
+			if desc:IsA("GuiObject") then
+				desc.ZIndex = math.max(desc.ZIndex, 201)
+			end
+		end
+
+		local dim = ui.main:FindFirstChild("dim") or ui.main:FindFirstChild("Dim")
+		if dim then
+			dim.ZIndex = 190
+			dim.Visible = true
+			tweenservice:Create(dim, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { BackgroundTransparency = 0.3 }):Play()
+		end
 
 		local function closeModal()
-			activeModals -= 1
-			ModalInstance.Buttons.Cancel.Interactable = false
-			ModalInstance.Buttons.Confirm.Interactable = false
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			task.wait(0.45)
-			ModalInstance:Destroy()
-		end
-
-
-
-		if activeModals == 1 then
-			ui.main.dim.Visible = true
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-				BackgroundTransparency = 0.3
-			}):Play()
-		end
-
-		ModalInstance.Buttons.Confirm.MouseButton1Click:Connect(function()
-			if typeof(ModalData.ConfirmCallBack) == "function" then
-				ModalData.ConfirmCallBack()
-			end
-
-			closeModal()
-
-			if activeModals == 0 then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+			activeModals = math.max(0, activeModals - 1)
+			pcall(function()
+				tweenservice:Create(ModalInstance, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+					Size = UDim2.new(0, 320, 0, 120),
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.7)
-				ui.main.dim.Visible = false
+			end)
+			task.wait(0.2)
+			ModalInstance:Destroy()
+			if activeModals == 0 and dim then
+				tweenservice:Create(dim, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { BackgroundTransparency = 1 }):Play()
+				task.delay(0.2, function()
+					if activeModals == 0 then dim.Visible = false end
+				end)
 			end
-		end)
+		end
 
-		ModalInstance.Buttons.Cancel.MouseButton1Click:Connect(function()
-			closeModal()
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-				BackgroundTransparency = 1
-			}):Play()
-			task.wait(0.7)
-			ui.main.dim.Visible = false
-		end)
+		activeModals += 1
+		tweenservice:Create(ModalInstance, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			Size = UDim2.new(0, 360, 0, 150),
+			BackgroundTransparency = 0
+		}):Play()
 
+		local confirmBtn = ModalInstance:FindFirstChild("Buttons") and ModalInstance.Buttons:FindFirstChild("Confirm")
+		local cancelBtn = ModalInstance:FindFirstChild("Buttons") and ModalInstance.Buttons:FindFirstChild("Cancel")
+
+		if confirmBtn then
+			confirmBtn.MouseButton1Click:Connect(function()
+				if typeof(ModalData.ConfirmCallBack) == "function" then
+					pcall(ModalData.ConfirmCallBack)
+				end
+				closeModal()
+			end)
+		end
+
+		if cancelBtn then
+			cancelBtn.MouseButton1Click:Connect(function()
+				closeModal()
+			end)
+		end
 	end)
 end
 
@@ -2568,10 +2612,35 @@ function syde:MakeNotification(NotificationConfig)
 	})
 end
 
+local freeMouseBtn = nil
+local function getFreeMouseBtn()
+	if freeMouseBtn and freeMouseBtn.Parent then return freeMouseBtn end
+	pcall(function()
+		local targetParent = (ui and ui:IsA("ScreenGui") and ui) or (Library and Library:IsA("ScreenGui") and Library) or coregui
+		freeMouseBtn = Instance.new("TextButton")
+		freeMouseBtn.Name = "FreeMouseModal"
+		freeMouseBtn.Size = UDim2.new(0, 0, 0, 0)
+		freeMouseBtn.Position = UDim2.new(0, 0, 0, 0)
+		freeMouseBtn.BackgroundTransparency = 1
+		freeMouseBtn.Text = ""
+		freeMouseBtn.Modal = true
+		freeMouseBtn.Visible = false
+		freeMouseBtn.Parent = targetParent
+	end)
+	return freeMouseBtn
+end
+
 function syde:UnlockMouse(Value)
+	local btn = getFreeMouseBtn()
+	if btn then
+		btn.Modal = Value and true or false
+		btn.Visible = Value and true or false
+	end
+
+	local uis = game:GetService("UserInputService")
+	local lp = game:GetService("Players").LocalPlayer
+
 	if syde.UMouseMode == "ThirdPerson" then
-		local lp = game:GetService("Players").LocalPlayer
-		local uis = game:GetService("UserInputService")
 		if Value then
 			if lp then
 				lp.CameraMode = Enum.CameraMode.LockFirstPerson
@@ -2592,7 +2661,6 @@ function syde:UnlockMouse(Value)
 			end
 		end
 	else
-		local uis = game:GetService("UserInputService")
 		uis.MouseBehavior = Value and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
 		uis.MouseIconEnabled = Value and true or false
 	end
@@ -2631,9 +2699,12 @@ function syde:MakeWindow(WindowConfig)
 		}
 	}
 
-	if WindowConfig.FreeMouse then
+	if WindowConfig.FreeMouse ~= false then
 		syde.FreeMouse = true
-		syde:UnlockMouse(true)
+		task.spawn(function()
+			task.wait(0.05)
+			syde:UnlockMouse(true)
+		end)
 	end
 
 	local windowObj = syde:Init(libConfig)
@@ -2742,6 +2813,10 @@ function openui()
 	window.Visible = true
 	uiclosed = false
 
+	if syde.FreeMouse ~= false then
+		syde:UnlockMouse(true)
+	end
+
 	local fastTween = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	if bluron then
@@ -2833,6 +2908,10 @@ function closeui()
 	closesettings()
 	closesearch()
 	settingsOpen = false
+
+	if syde.FreeMouse ~= false then
+		syde:UnlockMouse(false)
+	end
 
 	task.delay(0.2, function()
 		if uiclosed then
@@ -6915,6 +6994,14 @@ function syde:Init(library)
 		selected = false
 	}
 
+	function tbdata:Modal(ModalConfig)
+		return syde:Modal(ModalConfig)
+	end
+
+	function tbdata:Dialog(ModalConfig)
+		return syde:Modal(ModalConfig)
+	end
+
 	function tbdata:MakeTab(TabConfig)
 		TabConfig = TabConfig or {}
 		local tabTitle = TabConfig.Name or TabConfig.Title or "Tab"
@@ -10399,6 +10486,14 @@ function syde:Init(library)
 		end
 
 		--@@Orion Compatibility Methods
+		function initelement:Modal(ModalConfig)
+			return syde:Modal(ModalConfig)
+		end
+
+		function initelement:Dialog(ModalConfig)
+			return syde:Modal(ModalConfig)
+		end
+
 		function initelement:AddToggle(ToggleConfig)
 			ToggleConfig = ToggleConfig or {}
 			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
