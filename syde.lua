@@ -1,3 +1,4 @@
+-- Made: By iceboy
 --[[
 
 .dP"Y8 Yb  dP 8888b.  888888 
@@ -128,6 +129,12 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	LoadedConfig = nil;
+	UMouseMode = "ThirdPerson";
+	maxds = 500;
+	minds = 10;
+	FreeMouse = true;
+	SelectedTheme = "Default";
+	_currentWindow = nil;
 }
 
 -- @Utilities
@@ -186,6 +193,9 @@ function syde:IsBindableInput(input)
 	end
 	if string.find(tostring(t), "Gamepad", 1, true) then
 		return input.KeyCode ~= Enum.KeyCode.Unknown
+	end
+	if string.find(tostring(t), "MouseButton", 1, true) then
+		return true
 	end
 	return false
 end
@@ -2506,6 +2516,102 @@ function syde:Toast(Toasty)
 	end)
 end
 
+function syde:MakeNotification(NotificationConfig)
+	NotificationConfig = NotificationConfig or {}
+	local icon = NotificationConfig.Image or NotificationConfig.Icon or ""
+	if type(icon) == "string" then
+		icon = icon:gsub("rbxassetid://", "")
+	end
+	return syde:Notify({
+		Title = NotificationConfig.Name or NotificationConfig.Title or "Note!",
+		Content = NotificationConfig.Content or "Message",
+		Duration = NotificationConfig.Time or NotificationConfig.Duration or 5,
+		Icon = icon
+	})
+end
+
+function syde:UnlockMouse(Value)
+	if syde.UMouseMode == "ThirdPerson" then
+		local lp = game:GetService("Players").LocalPlayer
+		local uis = game:GetService("UserInputService")
+		if Value then
+			if lp then
+				lp.CameraMode = Enum.CameraMode.LockFirstPerson
+				task.wait()
+				lp.CameraMode = Enum.CameraMode.Classic
+				lp.CameraMaxZoomDistance = syde.maxds or 500
+				lp.CameraMinZoomDistance = syde.minds or 10
+			end
+			uis.MouseBehavior = Enum.MouseBehavior.Default
+			uis.MouseIconEnabled = true
+		else
+			uis.MouseIconEnabled = false
+			uis.MouseBehavior = Enum.MouseBehavior.LockCenter
+			if lp then
+				lp.CameraMaxZoomDistance = 0.5
+				lp.CameraMinZoomDistance = 0.5
+				lp.CameraMode = Enum.CameraMode.LockFirstPerson
+			end
+		end
+	else
+		local uis = game:GetService("UserInputService")
+		uis.MouseBehavior = Value and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
+		uis.MouseIconEnabled = Value and true or false
+	end
+end
+
+function syde:MakeWindow(WindowConfig)
+	WindowConfig = WindowConfig or {}
+	local libConfig = {
+		Title = WindowConfig.Name or WindowConfig.Title or "Syde",
+		SubText = WindowConfig.TagText or WindowConfig.SubText or "Hub",
+		Home = {
+			Enabled = false
+		}
+	}
+
+	if WindowConfig.FreeMouse then
+		syde.FreeMouse = true
+		syde:UnlockMouse(true)
+	end
+
+	if WindowConfig.SaveConfig and WindowConfig.ConfigFolder then
+		syde.ConfigFolder = WindowConfig.ConfigFolder
+		syde.ConfigEnabled = true
+		pcall(function()
+			if isfolder and makefolder and not isfolder(WindowConfig.ConfigFolder) then
+				makefolder(WindowConfig.ConfigFolder)
+			end
+		end)
+	end
+
+	local windowObj = syde:Init(libConfig)
+
+	if WindowConfig.KeyToOpenWindow or WindowConfig.Openkey then
+		local key = WindowConfig.KeyToOpenWindow or WindowConfig.Openkey
+		if type(key) == "string" and Enum.KeyCode[key] then
+			uitoggle = Enum.KeyCode[key]
+		elseif typeof(key) == "EnumItem" then
+			uitoggle = key
+		end
+	end
+
+	return windowObj
+end
+
+function syde:Destroy()
+	syde:UnlockMouse(false)
+	pcall(function()
+		if Library and Library.Parent then
+			Library:Destroy()
+		end
+	end)
+end
+
+function syde:DestroyLib()
+	syde:Destroy()
+end
+
 
 
 --@SetupFunctionst
@@ -2755,7 +2861,14 @@ syde:HidePH(pages, 'page')
 
 --@@Initialize
 function syde:Init(library)
+	if syde._currentWindow then
+		pcall(function()
+			ui.Enabled = true
+		end)
+		return syde._currentWindow
+	end
 
+	library = library or {}
 	ui.Enabled = true
 	if loaded == false then
 		local UI_TAG = "sydeUILoader"
@@ -6856,6 +6969,60 @@ function syde:Init(library)
 		selected = false
 	}
 
+	function tbdata:MakeTab(TabConfig)
+		TabConfig = TabConfig or {}
+		local tabTitle = TabConfig.Name or TabConfig.Title or "Tab"
+		local tabObj = self:InitTab({
+			Title = tabTitle,
+			Locked = TabConfig.Locked,
+			Key = TabConfig.Key
+		})
+		return tabObj
+	end
+
+	function tbdata:ChangeIcon(IconId)
+		local iconStr = tostring(IconId or "")
+		if iconStr ~= "" and not iconStr:find("rbxassetid://") and tonumber(iconStr) then
+			iconStr = "rbxassetid://" .. iconStr
+		end
+		pcall(function()
+			if top and top:FindFirstChild("icon") and top.icon:IsA("ImageLabel") then
+				top.icon.Image = iconStr
+			elseif window:FindFirstChild("icon") and window.icon:IsA("ImageLabel") then
+				window.icon.Image = iconStr
+			end
+		end)
+	end
+
+	function tbdata:SetName(NameConfig)
+		pcall(function()
+			local titleText = "Syde"
+			local titleColor = nil
+			if type(NameConfig) == "table" then
+				titleText = tostring(NameConfig[1] or "")
+				if NameConfig[2] then
+					if typeof(NameConfig[2]) == "Color3" then
+						titleColor = NameConfig[2]
+					elseif type(NameConfig[2]) == "string" then
+						titleColor = Color3.fromHex(NameConfig[2])
+					end
+				end
+			else
+				titleText = tostring(NameConfig or "")
+			end
+			if top and top:FindFirstChild("title") then
+				top.title.Text = titleText
+				if titleColor then
+					top.title.TextColor3 = titleColor
+				end
+				local textSize = top.title.TextBounds.X + 3
+				tweenservice:Create(top.title, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+					Size = UDim2.new(0, textSize, 0, 20)
+				}):Play()
+			end
+		end)
+	end
+
 	function tbdata:InitTab(tab)
 		-- bootstrap Home-mode once so first-created tabs don't auto-open
 
@@ -7604,16 +7771,21 @@ function syde:Init(library)
 				end
 			end
 
+			data._frame = button
+			data.toggle = function(self) if self._frame and self._frame.Parent then self._frame.Visible = not self._frame.Visible end end
+			data.remove = function(self) if self._frame and self._frame.Parent then self._frame:Destroy() end end
+			return data
+
 		end
 
 		--@@Toggle
 		function initelement:Toggle(Toggle)
 			local data = {
-				Title = Toggle.Title or "Temp Toggle";
-				Desc = Toggle.Description or "";
-				V = Toggle.Value or false;
+				Title = Toggle.Title or Toggle.Name or "Temp Toggle";
+				Desc = Toggle.Description or Toggle.Desc or "";
+				V = Toggle.Value ~= nil and Toggle.Value or (Toggle.Default ~= nil and Toggle.Default or false);
 				Config = Toggle.Config or false;
-				CallBack = Toggle.CallBack;
+				CallBack = Toggle.Callback or Toggle.CallBack;
 				Flag = Toggle.Flag;
 			}
 
@@ -7899,6 +8071,7 @@ function syde:Init(library)
 
 			function data:Set(NewValue, skipSave)
 				data.V = NewValue
+				data.Value = NewValue
 				UpdateToggleUI(NewValue)
 
 				if data.CallBack then
@@ -7908,8 +8081,13 @@ function syde:Init(library)
 					if not success then
 						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 					end
-				end
 			end
+			end
+
+			data.Value = data.V
+			data._frame = toggle
+			data.toggle = function(self) if self._frame and self._frame.Parent then self._frame.Visible = not self._frame.Visible end end
+			data.remove = function(self) if self._frame and self._frame.Parent then self._frame:Destroy() end end
 
 			if syde.ConfigEnabled and data.Flag then
 				syde.Flags[data.Flag] = data
@@ -7925,10 +8103,23 @@ function syde:Init(library)
 		--@@Slider
 		function initelement:Slider(Slider)
 			local data = {
-				Title = Slider.Title;
-				Desc = Slider.Description;
+				Title = Slider.Title or Slider.Name or "Slider";
+				Desc = Slider.Description or Slider.Desc or "";
 				Sliders = Slider.Sliders
 			}
+
+			if not data.Sliders then
+				data.Sliders = {
+					{
+						Title = Slider.ValueName or Slider.Name or Slider.Title or "Value",
+						Range = Slider.Range or {Slider.Min or 0, Slider.Max or 100},
+						Increment = Slider.Increment or 1,
+						StarterValue = Slider.Default ~= nil and Slider.Default or (Slider.StarterValue or 0),
+						CallBack = Slider.Callback or Slider.CallBack,
+						Flag = Slider.Flag
+					}
+				}
+			end
 
 			local slider = pages.page.Slider:Clone()
 			slider.Visible = true
@@ -7938,6 +8129,7 @@ function syde:Init(library)
 			slider.slideholder.slider.Visible = false
 			slider:SetAttribute("Searchable", true)
 
+			local primaryOptions = nil
 
 			--[SLIDERS INITIALIZE]
 			for _, Options in ipairs(data.Sliders) do
@@ -8200,6 +8392,13 @@ function syde:Init(library)
 				-- click the value to type a custom number (reverts if outside range)
 				syde:AttachSliderInput(Slider, Options)
 
+				Options._frame = slider
+				Options.toggle = function(self) slider.Visible = not slider.Visible end
+				Options.remove = function(self) slider:Destroy() end
+				if not primaryOptions then
+					primaryOptions = Options
+				end
+
 				if syde.ConfigEnabled and Options.Flag then
 					syde.Flags[Options.Flag] = Options
 					if syde.LoadedConfig and syde.LoadedConfig[Options.Flag] ~= nil then
@@ -8244,15 +8443,49 @@ function syde:Init(library)
 				end
 			end
 
+			if Slider.Block and Slider.varFunc then
+				local lastBlocked = nil
+				task.spawn(function()
+					while slider and slider.Parent do
+						local ok, blocked = pcall(function()
+							local t = Slider.varFunc(Slider.Block[1])
+							if type(t) ~= "table" then return true end
+							return not t[Slider.Block[2]]
+						end)
+						if ok and blocked ~= lastBlocked then
+							lastBlocked = blocked
+							slider.slideholder.Interactable = not blocked
+							tweenservice:Create(slider, TweenInfo.new(0.3), {
+								BackgroundTransparency = blocked and 0.8 or 0
+							}):Play()
+						end
+						task.wait(0.2)
+					end
+				end)
+			end
+
+			data._frame = slider
+			data.toggle = function(self) slider.Visible = not slider.Visible end
+			data.remove = function(self) slider:Destroy() end
+
+			if primaryOptions then
+				primaryOptions._frame = slider
+				primaryOptions.toggle = data.toggle
+				primaryOptions.remove = data.remove
+				return primaryOptions
+			end
+
+			return data
+
 		end
 
 		--@@KeyBind
 		function initelement:Keybind(Keybind)
 			local data = {
-				Title = Keybind.Title;
-				Key = Keybind.Key;
-				Desc = Keybind.Description or "";
-				CallBack = Keybind.CallBack;
+				Title = Keybind.Title or Keybind.Name or "Keybind";
+				Key = Keybind.Key or Keybind.Default;
+				Desc = Keybind.Description or Keybind.Desc or "";
+				CallBack = Keybind.Callback or Keybind.CallBack or function() end;
 				WaitingForKey = false;
 				Hold = false;
 				Holding = false
@@ -8265,7 +8498,11 @@ function syde:Init(library)
 			KeyBind.Name = data.Title
 			KeyBind:SetAttribute("Searchable", true)
 
-			KeyBind.Bind.v.Text = data.Key and data.Key.Name or "NONE"
+			local keyText = "NONE"
+			if typeof(data.Key) == "EnumItem" then
+				keyText = data.Key.Name
+			end
+			KeyBind.Bind.v.Text = keyText
 			tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
 
 			KeyBind.interact.MouseButton1Click:Connect(function()
@@ -8279,7 +8516,7 @@ function syde:Init(library)
 			end)
 
 			local function SetKeybind(keyCode)
-				if keyCode and keyCode ~= Enum.KeyCode.Unknown then
+				if typeof(keyCode) == "EnumItem" and keyCode ~= Enum.KeyCode.Unknown then
 					data.Key = keyCode
 					tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
 					KeyBind.Bind.v.Text = keyCode.Name
@@ -8294,17 +8531,27 @@ function syde:Init(library)
 				if data.WaitingForKey then
 					if syde:IsBindableInput(input) then
 						data.WaitingForKey = false
-						SetKeybind(input.KeyCode)
+						if input.UserInputType == Enum.UserInputType.Keyboard then
+							SetKeybind(input.KeyCode)
+						else
+							SetKeybind(input.UserInputType)
+						end
 					end
 					return
 				end
 
-				-- don't fire the bind while typing in a textbox (ignore processed so
-				-- keys the game also uses, e.g. RightShift shift-lock, still work)
 				if userinput:GetFocusedTextBox() then return end
-				if input.KeyCode == Enum.KeyCode.Unknown then return end
 
-				if input.KeyCode == data.Key then
+				local isMatchingKey = false
+				if typeof(data.Key) == "EnumItem" then
+					if data.Key.EnumType == Enum.KeyCode and input.KeyCode == data.Key then
+						isMatchingKey = true
+					elseif data.Key.EnumType == Enum.UserInputType and input.UserInputType == data.Key then
+						isMatchingKey = true
+					end
+				end
+
+				if isMatchingKey then
 					data.Hold = true
 
 					local holdConnection
@@ -8339,17 +8586,24 @@ function syde:Init(library)
 				end
 			end)
 
+			data._frame = KeyBind
+			data.toggle = function(self) KeyBind.Visible = not KeyBind.Visible end
+			data.remove = function(self) KeyBind:Destroy() end
+			data.Set = function(self, newKey) SetKeybind(newKey) end
+
+			return data
+
 		end
 
 		--@@TextInput
 		function initelement:TextInput(TextInput)
 			local data = {
-				Title = TextInput.Title or "Text Input",
-				PlaceHolder = TextInput.PlaceHolder or "Enter text...",
+				Title = TextInput.Title or TextInput.Name or "Text Input",
+				PlaceHolder = TextInput.PlaceHolder or TextInput.BackGrountText or TextInput.Placeholder or "Enter text...",
 				NumbersOnly = TextInput.NumberOnly or false,
-				ClearOnLost = TextInput.ClearOnLost == nil and true or TextInput.ClearOnLost,
-				--	MaxSize = TextInput.MaxSize or 100,
-				CallBack = TextInput.CallBack,
+				ClearOnLost = TextInput.ClearOnLost == nil and (TextInput.TextDisappear ~= false) or TextInput.ClearOnLost,
+				CallBack = TextInput.Callback or TextInput.CallBack,
+				Default = TextInput.Default
 			}
 
 			local textinput = pages.page.Input:Clone()
@@ -8474,6 +8728,20 @@ function syde:Init(library)
 				end
 			end)
 
+			if data.Default ~= nil and tostring(data.Default) ~= "" then
+				textBox.Text = tostring(data.Default)
+			end
+
+			data._frame = textinput
+			data._textBox = textBox
+			data.toggle = function(self) textinput.Visible = not textinput.Visible end
+			data.remove = function(self) textinput:Destroy() end
+			data.Set = function(self, val)
+				textBox.Text = tostring(val or "")
+				if data.CallBack then data.CallBack(textBox.Text) end
+			end
+
+			return data
 
 		end
 
@@ -8767,8 +9035,8 @@ function syde:Init(library)
 		--@@Labels/Paragraph
 		function initelement:Paragraph(Paragraph)
 			local ParaData = {
-				Title = Paragraph.Title;
-				Content = Paragraph.Content;
+				Title = Paragraph.Title or Paragraph.Name or "Paragraph";
+				Content = Paragraph.Content or Paragraph.Text or "";
 			}
 
 			local Para = pages.page.Paragraph:Clone()
@@ -8779,18 +9047,17 @@ function syde:Init(library)
 			Para:SetAttribute("Searchable", true)
 
 			Para.Content.Size = UDim2.new(1, -20, 0, Para.Content.TextBounds.Y)
-			--	Para.Size = UDim2.new(1, -35, 0, Para.Content.Size.Y.Offset + 200)
 
 			local function updateSize()
 				local textSize = textservice:GetTextSize(
 					Para.Content.Text,
 					Para.Content.TextSize,
 					Para.Content.Font,
-					Vector2.new(Para.Content.AbsoluteSize.X, math.huge) -- Allows vertical expansion
+					Vector2.new(Para.Content.AbsoluteSize.X, math.huge)
 				)
 
 				local newDescSize = UDim2.new(1, -20, 0, textSize.Y)
-				local newButtonSize = UDim2.new(Para.Size.X.Scale, Para.Size.X.Offset, 0, textSize.Y + 120) -- Adding extra padding
+				local newButtonSize = UDim2.new(Para.Size.X.Scale, Para.Size.X.Offset, 0, textSize.Y + 120)
 
 				local descTween = tweenservice:Create(Para.Content, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
 				descTween:Play()
@@ -8802,6 +9069,15 @@ function syde:Init(library)
 			updateSize()
 
 			Para.Content:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+
+			ParaData._frame = Para
+			ParaData.toggle = function(self) Para.Visible = not Para.Visible end
+			ParaData.remove = function(self) Para:Destroy() end
+			ParaData.Set = function(self, newTitle, newContent)
+				if newTitle then Para.Frame.title.Text = tostring(newTitle) end
+				if newContent then Para.Content.Text = tostring(newContent) updateSize() end
+			end
+			return ParaData
 		end
 
 		function initelement:Label(Text, Alignment)
@@ -8809,7 +9085,7 @@ function syde:Init(library)
 			local Label = pages.page.Label:Clone()
 			Label.Visible = true
 			Label.Parent = Page
-			Label.text.Text = Text
+			Label.text.Text = tostring(Text or "")
 			Label:SetAttribute("Searchable", true)
 
 			if Alignment == 'Center' then
@@ -8818,17 +9094,24 @@ function syde:Init(library)
 				Label.text.TextXAlignment = Enum.TextXAlignment.Right
 			end
 
+			local labelData = {
+				_frame = Label,
+				Set = function(self, newText) Label.text.Text = tostring(newText or "") end,
+				toggle = function(self) Label.Visible = not Label.Visible end,
+				remove = function(self) Label:Destroy() end
+			}
+			return labelData
 
 		end
 
 		function initelement:Section(Title, Icon)
 			local SectionData = {
-				Title = Title
+				Title = Title or ""
 			}
 
-			local Section =  pages.page.Section:Clone()
+			local Section = pages.page.Section:Clone()
 			Section.Visible = true
-			Section.Title.Text = Title
+			Section.Title.Text = SectionData.Title
 			Section.Parent = Page
 			Section.Title.Position = UDim2.new(0, 0,0, 0)
 
@@ -8838,17 +9121,24 @@ function syde:Init(library)
 			else
 				Section.icon.Visible = false
 			end
+
+			SectionData._frame = Section
+			SectionData.toggle = function(self) Section.Visible = not Section.Visible end
+			SectionData.remove = function(self) Section:Destroy() end
+			SectionData.Set = function(self, newTitle) Section.Title.Text = tostring(newTitle or "") end
+			return SectionData
 		end
 
 		--@@Dropdown
 		function initelement:Dropdown(Dropdown)
 			local data = {
-				Title = Dropdown.Title or "Temp Dropdown";
+				Title = Dropdown.Title or Dropdown.Name or "Temp Dropdown";
 				Options = Dropdown.Options or {};
-				StarterOption = Dropdown.StarterOption;
-				PlaceHolder = Dropdown.PlaceHolder or "Select Option...";
+				StarterOption = Dropdown.Default ~= nil and Dropdown.Default or Dropdown.StarterOption;
+				PlaceHolder = Dropdown.PlaceHolder or Dropdown.Placeholder or "Select Option...";
 				Multi = Dropdown.Multi or false;
-				CallBack = Dropdown.CallBack;
+				CallBack = Dropdown.Callback or Dropdown.CallBack;
+				Flag = Dropdown.Flag;
 			}
 
 			local dropdown = pages.page.Dropdown:Clone()
@@ -9089,7 +9379,16 @@ function syde:Init(library)
 
 
 
+			local function ClearDropdownOptions()
+				for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+					if opt:IsA("Frame") and opt ~= OptionButton then
+						opt:Destroy()
+					end
+				end
+			end
+
 			local function SetDropdownOptions()
+				ClearDropdownOptions()
 				local starterSet = false
 				for _, OptionText in ipairs(data.Options) do
 					local option = OptionButton:Clone()
@@ -9161,6 +9460,62 @@ function syde:Init(library)
 			end
 
 			SetDropdownOptions()
+
+			function data:Refresh(newOptions, clearCurrent)
+				data.Options = newOptions or {}
+				if clearCurrent then
+					SelectedOptions = {}
+					SelectedOrder = {}
+					data.StarterOption = nil
+					dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
+					for _, child in ipairs(selectedContainer:GetChildren()) do
+						if child:IsA("Frame") and child.Name ~= "result" then
+							child:Destroy()
+						end
+					end
+				end
+				SetDropdownOptions()
+			end
+
+			function data:Set(value, state)
+				if data.Multi then
+					if state == nil or state == true then
+						AddToSelected(value)
+					else
+						RemoveFromSelected(value)
+					end
+					UpdateSelectedText()
+					if data.CallBack then
+						data.CallBack(SelectedOrder)
+					end
+				else
+					SelectedOptions = {[value] = true}
+					SelectedOrder = {value}
+					dropdown.dropholder.drop.selected.Text = tostring(value)
+					for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+						if opt:IsA("Frame") and opt:FindFirstChild("Title") then
+							local isMatch = (opt.Title.Text == value)
+							opt.BackgroundColor3 = isMatch and Color3.fromRGB(39, 39, 39) or Color3.fromRGB(33, 33, 33)
+							if opt:FindFirstChild("ImageLabel") then
+								opt.ImageLabel.ImageTransparency = isMatch and 0 or 0.9
+							end
+						end
+					end
+					if data.CallBack then
+						data.CallBack(value)
+					end
+				end
+			end
+
+			data._frame = dropdown
+			data.toggle = function(self) dropdown.Visible = not dropdown.Visible end
+			data.remove = function(self) dropdown:Destroy() end
+			data.tg = nil
+			data.Value = data.Multi and SelectedOrder or data.StarterOption
+
+			return data
+
 		end
 
 		--@@Colorpicker
@@ -10102,8 +10457,443 @@ function syde:Init(library)
 
 
 
+			data._frame = colorpicker
+			data.toggle = function(self) colorpicker.Visible = not colorpicker.Visible end
+			data.remove = function(self) colorpicker:Destroy() end
+
 			return data
 
+		end
+
+		--@@Orion Compatibility Methods
+		function initelement:AddToggle(ToggleConfig)
+			ToggleConfig = ToggleConfig or {}
+			local data = self:Toggle({
+				Title = ToggleConfig.Name or ToggleConfig.Title or "Toggle",
+				Description = ToggleConfig.Description or ToggleConfig.Desc or "",
+				Value = ToggleConfig.Default ~= nil and ToggleConfig.Default or (ToggleConfig.Value ~= nil and ToggleConfig.Value or false),
+				Flag = ToggleConfig.Flag,
+				CallBack = ToggleConfig.Callback or ToggleConfig.CallBack
+			})
+			return data
+		end
+
+		function initelement:AddSlider(SliderConfig)
+			return self:Slider(SliderConfig)
+		end
+
+		function initelement:AddDropdown(DropdownConfig)
+			return self:Dropdown(DropdownConfig)
+		end
+
+		function initelement:AddButton(ButtonConfig)
+			ButtonConfig = ButtonConfig or {}
+			return self:Button({
+				Title = ButtonConfig.Name or ButtonConfig.Title or "Button",
+				Description = ButtonConfig.Description or ButtonConfig.Desc or "",
+				Type = ButtonConfig.Type or "Default",
+				HoldTime = ButtonConfig.HoldTime or 3,
+				CallBack = ButtonConfig.Callback or ButtonConfig.CallBack
+			})
+		end
+
+		function initelement:AddParagraph(a, b, c)
+			local title, content
+			if type(a) == "table" then
+				title = a.Title or a.Name or "Paragraph"
+				content = a.Content or a.Text or ""
+			else
+				title = tostring(a or "")
+				content = tostring(b or "")
+			end
+			return self:Paragraph({
+				Title = title,
+				Content = content
+			})
+		end
+
+		function initelement:AddPbind(PBindConfig)
+			PBindConfig = PBindConfig or {}
+			local name = PBindConfig.Name or "Position"
+			local defX = tostring(PBindConfig.DefaultX or "")
+			local defY = tostring(PBindConfig.DefaultY or "")
+			local defZ = tostring(PBindConfig.DefaultZ or "")
+			local cb = PBindConfig.Callback or PBindConfig.CallBack or function() end
+
+			local pbindFrame = pages.page.Input:Clone()
+			pbindFrame.Visible = true
+			pbindFrame.Parent = Page
+			pbindFrame.Name = name
+			pbindFrame.title.Text = name
+			pbindFrame:SetAttribute("Searchable", true)
+
+			if pbindFrame:FindFirstChild("TextFrame") then
+				pbindFrame.TextFrame.Visible = false
+			end
+
+			local coordsHolder = Instance.new("Frame")
+			coordsHolder.Name = "CoordsHolder"
+			coordsHolder.BackgroundTransparency = 1
+			coordsHolder.Size = UDim2.new(0, 240, 0, 32)
+			coordsHolder.Position = UDim2.new(1, -250, 0.5, -16)
+			coordsHolder.Parent = pbindFrame
+
+			local layout = Instance.new("UIListLayout")
+			layout.FillDirection = Enum.FillDirection.Horizontal
+			layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+			layout.VerticalAlignment = Enum.VerticalAlignment.Center
+			layout.Padding = UDim.new(0, 6)
+			layout.Parent = coordsHolder
+
+			local boxes = {}
+			local pbindObj = {
+				ValueX = defX,
+				ValueY = defY,
+				ValueZ = defZ,
+				_frame = pbindFrame
+			}
+
+			local function createCoordBox(lblText, defVal, keyName)
+				local boxContainer = Instance.new("Frame")
+				boxContainer.Name = lblText .. "Box"
+				boxContainer.BackgroundColor3 = Color3.fromRGB(29, 29, 29)
+				boxContainer.Size = UDim2.new(0, 72, 0, 28)
+				boxContainer.Parent = coordsHolder
+
+				local corner = Instance.new("UICorner")
+				corner.CornerRadius = UDim.new(0, 6)
+				corner.Parent = boxContainer
+
+				local stroke = Instance.new("UIStroke")
+				stroke.Color = Color3.fromRGB(50, 50, 50)
+				stroke.Transparency = 0.5
+				stroke.Parent = boxContainer
+
+				local lbl = Instance.new("TextLabel")
+				lbl.BackgroundTransparency = 1
+				lbl.Size = UDim2.new(0, 16, 1, 0)
+				lbl.Position = UDim2.new(0, 5, 0, 0)
+				lbl.Font = Enum.Font.GothamBold
+				lbl.Text = lblText .. ":"
+				lbl.TextColor3 = syde.theme.Accent or Color3.fromRGB(255, 151, 227)
+				lbl.TextSize = 12
+				lbl.Parent = boxContainer
+
+				local tb = Instance.new("TextBox")
+				tb.BackgroundTransparency = 1
+				tb.Size = UDim2.new(1, -24, 1, 0)
+				tb.Position = UDim2.new(0, 22, 0, 0)
+				tb.Font = Enum.Font.Gotham
+				tb.Text = defVal
+				tb.PlaceholderText = "0"
+				tb.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+				tb.TextColor3 = Color3.fromRGB(255, 255, 255)
+				tb.TextSize = 12
+				tb.ClearTextOnFocus = false
+				tb.Parent = boxContainer
+
+				local function fireCallback()
+					pbindObj.ValueX = boxes.X and boxes.X.Text or ""
+					pbindObj.ValueY = boxes.Y and boxes.Y.Text or ""
+					pbindObj.ValueZ = boxes.Z and boxes.Z.Text or ""
+					cb(pbindObj.ValueX, pbindObj.ValueY, pbindObj.ValueZ)
+				end
+
+				tb.FocusLost:Connect(fireCallback)
+				tb:GetPropertyChangedSignal("Text"):Connect(function()
+					local cleaned = tb.Text:gsub("[^0-9%.%-]", "")
+					if tb.Text ~= cleaned then tb.Text = cleaned end
+				end)
+
+				boxes[lblText] = tb
+			end
+
+			createCoordBox("X", defX, "ValueX")
+			createCoordBox("Y", defY, "ValueY")
+			createCoordBox("Z", defZ, "ValueZ")
+
+			function pbindObj:Set(x, y, z)
+				if x ~= nil and boxes.X then boxes.X.Text = tostring(x) pbindObj.ValueX = tostring(x) end
+				if y ~= nil and boxes.Y then boxes.Y.Text = tostring(y) pbindObj.ValueY = tostring(y) end
+				if z ~= nil and boxes.Z then boxes.Z.Text = tostring(z) pbindObj.ValueZ = tostring(z) end
+				cb(pbindObj.ValueX, pbindObj.ValueY, pbindObj.ValueZ)
+			end
+
+			function pbindObj:toggle()
+				pbindFrame.Visible = not pbindFrame.Visible
+			end
+
+			function pbindObj:remove()
+				pbindFrame:Destroy()
+			end
+
+			return pbindObj
+		end
+
+		function initelement:AddBind(BindConfig)
+			BindConfig = BindConfig or {}
+			local key = BindConfig.Default or BindConfig.Key or Enum.KeyCode.Unknown
+			local cb = BindConfig.Callback or BindConfig.CallBack or function() end
+			local name = BindConfig.Name or BindConfig.Title or "Bind"
+
+			local bindData = self:Keybind({
+				Title = name,
+				Key = key,
+				Description = BindConfig.Description or "",
+				CallBack = cb
+			})
+
+			local bindObj = {
+				Value = key,
+				_frame = bindData and bindData._frame or nil,
+				Set = function(self, newKey)
+					if bindData and bindData.Set then
+						bindData:Set(newKey)
+					end
+					self.Value = newKey
+				end,
+				toggle = function(self)
+					if bindData and bindData._frame then
+						bindData._frame.Visible = not bindData._frame.Visible
+					end
+				end,
+				remove = function(self)
+					if bindData and bindData._frame then
+						bindData._frame:Destroy()
+					end
+				end
+			}
+			return bindObj
+		end
+
+		function initelement:AddTextbox(TextboxConfig)
+			TextboxConfig = TextboxConfig or {}
+			local name = TextboxConfig.Name or TextboxConfig.Title or "Textbox"
+			local def = TextboxConfig.Default ~= nil and tostring(TextboxConfig.Default) or ""
+			local placeholder = TextboxConfig.BackGrountText or TextboxConfig.PlaceHolder or TextboxConfig.Placeholder or "Enter..."
+			local clearOnLost = TextboxConfig.TextDisappear ~= false
+			local cb = TextboxConfig.Callback or TextboxConfig.CallBack or function() end
+
+			local inputData = self:TextInput({
+				Title = name,
+				PlaceHolder = placeholder,
+				ClearOnLost = clearOnLost,
+				Default = def,
+				CallBack = cb
+			})
+
+			local tbObj = {
+				Value = def,
+				_frame = inputData and inputData._frame or nil,
+				Set = function(self, val)
+					self.Value = tostring(val)
+					if inputData and inputData.Set then
+						inputData:Set(val)
+					else
+						cb(tostring(val))
+					end
+				end,
+				toggle = function(self)
+					if inputData and inputData._frame then
+						inputData._frame.Visible = not inputData._frame.Visible
+					end
+				end,
+				remove = function(self)
+					if inputData and inputData._frame then
+						inputData._frame:Destroy()
+					end
+				end
+			}
+			return tbObj
+		end
+
+		function initelement:AddColorpicker(ColorpickerConfig)
+			ColorpickerConfig = ColorpickerConfig or {}
+			local name = ColorpickerConfig.Name or ColorpickerConfig.Title or "Color Picker"
+			local defColor = ColorpickerConfig.Default or ColorpickerConfig.Color or Color3.fromRGB(255, 255, 255)
+			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
+
+			local pickerData = self:ColorPicker({
+				Title = name,
+				Color = defColor,
+				Flag = ColorpickerConfig.Flag,
+				CallBack = cb
+			})
+			return pickerData
+		end
+
+		function initelement:ColorLabel(Text, ToChangeColor, Position)
+			local Label = pages.page.Label:Clone()
+			Label.Visible = true
+			Label.Parent = Page
+			Label.text.Text = tostring(Text or "")
+			Label:SetAttribute("Searchable", true)
+
+			if ToChangeColor then
+				Label.text.TextColor3 = ToChangeColor
+			else
+				Label.text.TextColor3 = syde.theme.Accent or Color3.fromRGB(255, 151, 227)
+			end
+
+			if Position == "Center" then
+				Label.text.TextXAlignment = Enum.TextXAlignment.Center
+			elseif Position == "Right" then
+				Label.text.TextXAlignment = Enum.TextXAlignment.Right
+			else
+				Label.text.TextXAlignment = Enum.TextXAlignment.Left
+			end
+
+			local labelObj = {
+				_frame = Label,
+				Set = function(self, newText, newColor)
+					if newText then Label.text.Text = tostring(newText) end
+					if newColor then Label.text.TextColor3 = newColor end
+				end,
+				toggle = function(self)
+					Label.Visible = not Label.Visible
+				end,
+				remove = function(self)
+					Label:Destroy()
+			end
+			}
+			return labelObj
+		end
+
+		function initelement:AddLabel(Text, Alignment)
+			return self:Label(Text, Alignment)
+		end
+
+		function initelement:AddLog(Text)
+			local Label = pages.page.Label:Clone()
+			Label.Visible = true
+			Label.Parent = Page
+			Label.text.Text = tostring(Text or "")
+			Label.text.TextXAlignment = Enum.TextXAlignment.Center
+			Label.text.TextColor3 = Color3.fromRGB(200, 200, 200)
+			Label:SetAttribute("Searchable", true)
+
+			local logObj = {
+				_frame = Label,
+				Set = function(self, newText)
+					Label.text.Text = tostring(newText or "")
+				end,
+				toggle = function(self)
+					Label.Visible = not Label.Visible
+				end,
+				remove = function(self)
+					Label:Destroy()
+			end
+			}
+			return logObj
+		end
+
+		function initelement:AddSection(Title, Alignment, Height)
+			Title = Title or ""
+			local Section = pages.page.Section:Clone()
+			Section.Visible = true
+			Section.Title.Text = Title
+			Section.Parent = Page
+			Section.Title.Position = UDim2.new(0, 0, 0, 0)
+			Section.icon.Visible = false
+
+			if Alignment == "Right" then
+				Section.Title.TextXAlignment = Enum.TextXAlignment.Right
+			elseif Alignment == "Center" then
+				Section.Title.TextXAlignment = Enum.TextXAlignment.Center
+			else
+				Section.Title.TextXAlignment = Enum.TextXAlignment.Left
+			end
+
+			local secObj = {
+				_frame = Section,
+				Set = function(self, newTitle)
+					Section.Title.Text = tostring(newTitle or "")
+				end,
+				toggle = function(self)
+					Section.Visible = not Section.Visible
+				end,
+				remove = function(self)
+					Section:Destroy()
+			end
+			}
+			return secObj
+		end
+
+		function initelement:AddPlayerParagraph(userId)
+			userId = userId or (game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId) or 0
+			local displayName = "Player"
+			local username = "Player"
+
+			pcall(function()
+				local info = game:GetService("UserService"):GetUserInfosByUserIdsAsync({userId})
+				if info and info[1] then
+					displayName = info[1].DisplayName or displayName
+					username = info[1].Username or username
+				end
+			end)
+
+			local para = pages.page.Paragraph:Clone()
+			para.Visible = true
+			para.Parent = Page
+			para.Frame.title.Text = displayName .. " (@" .. username .. ")"
+			para.Content.Text = "UserId: " .. tostring(userId)
+			para:SetAttribute("Searchable", true)
+
+			local playerObj = {
+				_frame = para,
+				toggle = function(self) para.Visible = not para.Visible end,
+				remove = function(self) para:Destroy() end
+			}
+			return playerObj
+		end
+
+		function initelement:FreeMouseDrp()
+			return self:AddDropdown({
+				Name = "Unlock Mouse Mode",
+				Options = {"ThirdPerson", "FreeMouse"},
+				Default = syde.UMouseMode or "ThirdPerson",
+				Callback = function(Value)
+					syde.UMouseMode = Value
+					if syde.FreeMouse then
+						syde:UnlockMouse(false)
+						task.wait(0.1)
+						syde:UnlockMouse(true)
+					end
+				end
+			})
+		end
+
+		function initelement:AddUiBind()
+			return self:AddBind({
+				Name = "UI Keybind",
+				Default = uitoggle or Enum.KeyCode.RightShift,
+				Callback = function()
+					if ToggleUI then ToggleUI() end
+				end
+			end)
+		end
+
+		function initelement:AddSmartTheme()
+			self:AddColorpicker({
+				Name = "Base Accent Color",
+				Default = syde.theme.Accent or Color3.fromRGB(255, 151, 227),
+				Callback = function(Value)
+					syde:UpdateTheme({
+						Accent = Value,
+						HitBox = Value
+					})
+				end
+			})
+
+			self:AddButton({
+				Name = "Reset Theme",
+				Callback = function()
+					syde:UpdateTheme({
+						Accent = Color3.fromRGB(255, 151, 227),
+						HitBox = Color3.fromRGB(255, 151, 227)
+					})
+				end
+			})
 		end
 
 		-- guard every builder so a failed element shows the banner instead of breaking the UI
@@ -10117,9 +10907,19 @@ function syde:Init(library)
 
 
 	end
+	syde._currentWindow = tbdata
 	return tbdata
 
 
 end
+
+pcall(function()
+	if getgenv then
+		getgenv().syde = syde
+		getgenv().OrionLib = syde
+	end
+	_G.syde = syde
+	_G.OrionLib = syde
+end)
 
 return syde
