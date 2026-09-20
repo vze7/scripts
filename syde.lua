@@ -1143,17 +1143,16 @@ function syde:registerLoadTween(object, properties, initialState, tweenInfo)
 	}
 end
 
-function syde:resetToInitialState(animated, resetTweenInfo)
+function syde:resetToInitialState(animated, resetTweenInfo, targetObject)
 	for object, tweenData in pairs(loadTweens) do
-		if object and object.Parent then
+		if object and object.Parent and (not targetObject or object == targetObject or object:IsDescendantOf(targetObject)) then
 			tweenData.tween:Cancel()
 
 			if animated then
-				local resetTween = tweenservice:Create(object, resetTweenInfo or TweenInfo.new(0.3), tweenData.initialState)
+				local resetTween = tweenservice:Create(object, resetTweenInfo or TweenInfo.new(0.18), tweenData.initialState)
 				resetTween:Play()
 				resetTween.Completed:Wait()
 			else
-
 				for property, value in pairs(tweenData.initialState) do
 					object[property] = value
 				end
@@ -1163,11 +1162,11 @@ function syde:resetToInitialState(animated, resetTweenInfo)
 end
 
 function syde:replayLoadTweens(targetObject)
-	syde:resetToInitialState(false)
+	syde:resetToInitialState(false, nil, targetObject)
 
 	for object, tweenData in pairs(loadTweens) do
 		if object and object.Parent then
-			if not targetObject or object == targetObject then
+			if not targetObject or object == targetObject or object:IsDescendantOf(targetObject) then
 				tweenData.tween:Cancel()
 				tweenData.tween:Play()
 			end
@@ -1273,7 +1272,7 @@ function syde:updateLayout(container, spacing)
 			if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
 				--child.Size = UDim2.new(1, -10, 0, child.Size.Y.Offset) -- Full width, fixed height
 				-- child.Position = UDim2.new(0, 0, 0, yOffset)
-				tweenservice:Create(child, TweenInfo.new(0.45, Enum.EasingStyle.Exponential), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+				tweenservice:Create(child, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 				yOffset = yOffset + child.AbsoluteSize.Y + spacing
 			end
 		end
@@ -1408,7 +1407,7 @@ local mh = true
 do
 
 	function syde:Load(Config)
-		task.wait(0.4)
+		task.wait(0.02)
 		local LOADER = Loader
 		LOADER.Enabled = true
 		LOADER.Parent = coregui
@@ -1458,7 +1457,7 @@ do
 		LOADER.loader.ImageLabel.Image = LoaderConfig.Logo;
 		--	LOADER.load.info.build.Text = syde.Build
 
-		local ti = TweenInfo.new(0.5, Enum.EasingStyle.Exponential)
+		local ti = TweenInfo.new(0.2, Enum.EasingStyle.Exponential)
 
 		task.spawn(function()
 			while LOADER and LOADER.Parent do
@@ -1600,11 +1599,9 @@ do
 			loadedsocial = true
 		end
 
-		tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-		--	tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Quint), {Position = UDim2.new(0.5, 0,0, 105)}):Play()
-
-		tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-		task.wait(0.4)
+		tweenservice:Create(logo, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+		tweenservice:Create(logo.Title, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		task.wait(0.04)
 
 
 		--	local function initLoader()
@@ -1616,18 +1613,14 @@ do
 			LOADER.loader.work.Position = UDim2.new(0.5, 0,1, -40)
 			LOADER.loader.work.Text = Text
 			LOADER.loader.work.ImageLabel.Image = icon
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -73) }):Play()
-			--	tweenservice:Create(game.Workspace.Camera, TweenInfo.new(1, Enum.EasingStyle.Exponential), { FieldOfView  = game.Workspace.Camera.FieldOfView - 3 }):Play()
-			task.wait(Finish)
-			tweenservice:Create(LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -100) }):Play()
-			task.wait(0.35)
-
-			-- reset
-
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.1, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -73) }):Play()
+			task.wait(0.05)
+			tweenservice:Create(LOADER.loader.work, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.08, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.1, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -100) }):Play()
+			task.wait(0.02)
 		end
 
 		local function load()
@@ -1798,20 +1791,16 @@ do
 				end
 			end
 
-			TweenWorkLabel(0.4,'rbxassetid://136405833725573', '')
-			task.wait(0.4)
+			TweenWorkLabel(0.05,'rbxassetid://136405833725573', '')
+			task.wait(0.03)
 			loaded = true
-			--	tweenservice:Create( LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 146,0, 25)}):Play()
-			--	tweenservice:Create( LOADER.load.Salt.ImageLabel, TweenInfo.new(0.65, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 		end
 
-		--	initLoader()
-		task.wait(0.08)
+		task.wait(0.02)
 		load()
 
-		task.wait(0.6)
+		task.wait(0.05)
 
-		--	Library.Enabled = true
 		syde.theme.Accent = Config.Accent;
 		syde.theme.HitBox = Config.HitBox;
 		LOADER:Destroy()
@@ -3751,8 +3740,8 @@ function syde:Init(library)
 			end
 
 			-- === Tween Info ===
-			local bgTween = TweenInfo.new(0.4, Enum.EasingStyle.Exponential)
-			local textTween = TweenInfo.new(0.25, Enum.EasingStyle.Exponential)
+			local bgTween = TweenInfo.new(0.15, Enum.EasingStyle.Quint)
+			local textTween = TweenInfo.new(0.1, Enum.EasingStyle.Quint)
 
 			local function ApplyTabStyle(tabButton, selected)
 				tweenservice:Create(tabButton, bgTween, {
@@ -6941,25 +6930,15 @@ function syde:Init(library)
 
 
 		local function ChangeName(Name)
-			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { TextTransparency = pages.clipframe.title.TextTransparency }):Play()
-			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { Position = pages.clipframe.title.Position }):Play()
+			local titleLabel = pages.clipframe.title
+			titleLabel.Text = Name
+			titleLabel.Position = UDim2.new(0, 5, 0.5, 4)
+			titleLabel.TextTransparency = 0.3
 
-			local fadeOut = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 })
-			local moveUp = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, -25) })
-
-			fadeOut:Play()
-			moveUp:Play()
-			task.wait(0.2)
-
-			pages.clipframe.title.Position = UDim2.new(0, 5,0.5, 25)
-
-			pages.clipframe.title.Text = Name
-
-			local moveDown = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, 0) })
-			local fadeIn = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
-
-			moveDown:Play()
-			fadeIn:Play()
+			tweenservice:Create(titleLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {
+				Position = UDim2.new(0, 5, 0.5, 0),
+				TextTransparency = 0
+			}):Play()
 		end
 
 		if isFirstTab then
@@ -6969,26 +6948,24 @@ function syde:Init(library)
 		end
 
 		if tbdata.first then
-			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0.52 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
-			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			tweenservice:Create(Tab.title, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 0.52 }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
+			tweenservice:Create(Tab.indicator, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
 		else
 			tbdata.first = tdata.Title
-			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
-			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.6 }):Play()
+			tweenservice:Create(Tab.title, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(Tab.indicator, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(Tab.indicator, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
+			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.15, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
+			tweenservice:Create(Tab, TweenInfo.new(0.2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
 		end
 
 
-		local positionTweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Quart)
-		local colorTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential)
+		local positionTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint)
+		local colorTweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quint)
 		local HomeButton = (window and window.tabs and window.tabs.Home) and window.tabs.Home or nil
 		local HomePage = (window and window.pages and window.pages.home) and window.pages.home or nil
 
@@ -7008,41 +6985,20 @@ function syde:Init(library)
 			end
 		end
 
-		local isInit = true
-
 		local function ApplyTabStyle(tabButton, isSelected)
 			local targetTextTransparency = isSelected and 0 or 0.6
 			local targetBackgroundTransparency = isSelected and 0 or 0.45
-			local targetTransparency = isSelected and 0 or 1
 			local targetColor = isSelected and syde.theme.Accent or Color3.fromRGB(29, 29, 29)
-			local targetSize = isSelected and UDim2.new(0, tabButton.title.TextBounds.X + 80,0, 35) or UDim2.new(0, tabButton.title.TextBounds.X + 50,0, 35)
-
-
-			if isInit then
-				task.spawn(function()
-					for _, v in ipairs(tabs:GetChildren()) do
-						if v:IsA("Frame") then
-							tweenservice:Create(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) }):Play()
-							task.wait(0.15)
-							tweenservice:Create(tabButton, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = targetSize }):Play()
-							isInit = false
-						end
-					end
-				end)
-
-			end
-
+			local targetSize = isSelected and UDim2.new(0, tabButton.title.TextBounds.X + 80, 0, 35) or UDim2.new(0, tabButton.title.TextBounds.X + 50, 0, 35)
 
 			tweenservice:Create(tabButton, positionTweenInfo, { Size = targetSize }):Play()
-			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency, }):Play()
+			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency }):Play()
 			tweenservice:Create(tabButton.title, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play()
 			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
 			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageTransparency = isSelected and 0.78 or 1 }):Play()
 
 			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundColor3 = targetColor }):Play()
 			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundTransparency = isSelected and 0 or 1 }):Play()
-
-
 		end
 		ApplyTabStyle(Tab, isFirstTab)
 
@@ -7128,65 +7084,36 @@ function syde:Init(library)
 			if tbdata.first == tdata.Title then return end 
 
 			-- Hide Home if active
-			if Data.Home.Enabled then
-				if tbdata.homeActive then
-					HideHomeForTab()
-				end
+			if Data.Home.Enabled and tbdata.homeActive then
+				HideHomeForTab()
 			end
-
 
 			local previous = tbdata.first
 			tbdata.first = tdata.Title
 
-			-- Check if both old + new are InitTab tabs
-			local prevPage = pages:FindFirstChild(previous)
-			local newPage  = pages:FindFirstChild(tdata.Title)
-
-			if prevPage and newPage then
-				-- both are regular tabs → animate
-				ChangeName(tdata.Title)
-			else
-				-- otherwise just snap
-				pages.clipframe.title.Text = tdata.Title
-			end
-
-			-- Hide all pages
+			-- Instant page switch: immediately show target page and hide others
 			for _, otherPage in ipairs(pages:GetChildren()) do
 				if otherPage:IsA("ScrollingFrame") then
-					otherPage.Visible = false
+					otherPage.Visible = (otherPage == Page)
 				end
 			end
-
 			Page.Visible = true
-			tbdata.first = tdata.Title
 
-		--[[	if TabData.Locked == true then
-				if lockedframe and lockedframe.Name == TabData.Title then
-					lockedframe.Visible = true
-					for _, v in pairs(WINDOW.Pages.lockedpages:GetChildren()) do
-						if v.Name ~= TabData.Title then
-							v.Visible = false
-						end
-					end
-				end
-				currentLockedTabData = TabData
-			else
-				for _, v in pairs(WINDOW.Pages.lockedpages:GetChildren()) do
-					if v then
-						v.Visible = false
-					end
-				end
-			end]]
+			-- Fast title animation
+			ChangeName(tdata.Title)
 
-			syde:replayLoadTweens()
+			-- Replay element animations asynchronously for this page only
+			task.spawn(function()
+				syde:replayLoadTweens(Page)
+			end)
 
+			-- Snappy tab button indicator & size update
 			for _, otherTab in ipairs(tabs:GetChildren()) do
 				if otherTab:IsA("Frame") then
 					ApplyTabStyle(otherTab, otherTab == Tab)
 					otherTab.interact.Active = true
 				end
 			end
-
 		end)
 
 		syde:AddConnection(syde.Comms.Event, function(p, color)
