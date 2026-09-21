@@ -2504,7 +2504,10 @@ function Owl:MakeWindow(WindowConfig)
 		SubText = WindowConfig.TagText or WindowConfig.SubText or "Hub",
 		Watermark = WindowConfig.Watermark == true,
 		Home = {
-			Enabled = false
+			Enabled = WindowConfig.Home == nil or WindowConfig.Home.Enabled ~= false,
+			profileImage = WindowConfig.Home and WindowConfig.Home.profileImage,
+			hTitle = WindowConfig.Home and WindowConfig.Home.hTitle,
+			hSubText = WindowConfig.Home and WindowConfig.Home.hSubText,
 		}
 	}
 
@@ -2902,25 +2905,30 @@ function Owl:Init(library)
 	end
 	task.wait(0.1)
 
+	local homeConfig = library.Home or {}
 	local Data = {
 		Title = library.Title or "Owl";
 		SubText = library.SubText or "Google";
-		Home = {Enabled = false}
+		Home = homeConfig
 	}
+	Data.Home.Enabled = Data.Home.Enabled ~= false
+	Data.Home.hTitle = Data.Home.hTitle or Data.Title
+	Data.Home.hSubText = Data.Home.hSubText or Data.SubText
+	Data.Home.profileImage = Data.Home.profileImage or ""
 	local homePage = window.pages:FindFirstChild("home")
-	if homePage then
+	if homePage and not Data.Home.Enabled then
 		homePage.Visible = false
 	end
 	local homeTab = window.tabs:FindFirstChild("Home")
 	if homeTab then
 		local homeInteract = homeTab:FindFirstChild("homeicon") and homeTab.homeicon:FindFirstChild("interact")
-		if homeInteract then
+		if homeInteract and not Data.Home.Enabled then
 			homeInteract.Interactable = false
 		end
 	end
 	local wallpaper = window:FindFirstChild("wallpaper")
 	if wallpaper then
-		wallpaper.Visible = false
+		wallpaper.Visible = not Data.Home.Enabled
 		local wallpaperState = window.wallpaper:FindFirstChild("ison")
 		if wallpaperState then
 			wallpaperState.Value = false
@@ -3163,8 +3171,17 @@ function Owl:Init(library)
 		window.pages.home.general.presence.Profile.ImageLabel.Text.Header.Text = Data.Home.hTitle
 		window.pages.home.general.presence.Profile.ImageLabel.Text.Sub.Text = Data.Home.hSubText
 
-		window.pages.home.general.presence.Profile.ImageLabel.Image = 'rbxassetid://'..Data.Home.profileImage
-		window.pages.home.general.presence.wallpaper.Image = 'rbxassetid://'..Data.Home.profileImage
+		local homeImage = tostring(Data.Home.profileImage or "")
+		if homeImage ~= "" then
+			if not string.find(homeImage, "://", 1, true) then
+				homeImage = "rbxassetid://" .. homeImage
+			end
+			window.pages.home.general.presence.Profile.ImageLabel.Image = homeImage
+			window.pages.home.general.presence.wallpaper.Image = homeImage
+		else
+			window.pages.home.general.presence.Profile.ImageLabel.Image = ""
+			window.pages.home.general.presence.wallpaper.Image = ""
+		end
 		
 		local placeId = game.PlaceId
 
@@ -10546,14 +10563,13 @@ function Owl:Init(library)
 		if not ui or not ui.Parent then return end
 		local legacyHome = window.pages:FindFirstChild("home")
 		if legacyHome then
-			legacyHome.Visible = false
+			legacyHome.Visible = Data.Home.Enabled
 			for _, object in ipairs(legacyHome:GetDescendants()) do
-				if object:IsA("ImageLabel") or object:IsA("ImageButton") then
-					object.Image = ""
-				elseif object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+				if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
 					local text = string.lower(object.Text or "")
 					if string.find(text, "luffy", 1, true) or string.find(text, "nicko", 1, true) then
 						object.Text = ""
+						object.Visible = false
 					end
 				end
 			end
@@ -10561,7 +10577,7 @@ function Owl:Init(library)
 		local legacyHomeTab = window.tabs:FindFirstChild("Home")
 		local legacyHomeIcon = legacyHomeTab and legacyHomeTab:FindFirstChild("homeicon")
 		if legacyHomeIcon then
-			legacyHomeIcon.Visible = false
+			legacyHomeIcon.Visible = Data.Home.Enabled
 		end
 		ui.Enabled = true
 	end)
