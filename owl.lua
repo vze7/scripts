@@ -2025,6 +2025,17 @@ end
 
 function Owl:Notify(Notification)
 	if Owl.SuppressNotify then return end
+	Notification = Notification or {}
+	if Notification.Varient ~= "Options" then
+		local title = tostring(Notification.Title or "Owl")
+		local content = tostring(Notification.Content or "")
+		Owl:Toast({
+			Content = content ~= "" and (title .. "  •  " .. content) or title,
+			Duration = Notification.Duration or 5,
+			Icon = Notification.Icon or "",
+		})
+		return
+	end
 	task.spawn(function()
 
 		local NotifData = {
@@ -2880,21 +2891,39 @@ function Owl:Init(library)
 		SubText = library.SubText or "Google";
 		Home = {Enabled = false}
 	}
-	if window.pages:FindFirstChild("home") then
-		window.pages.home.Visible = false
+	local function lockHidden(object)
+		if not object then return end
+		object.Visible = false
+		Owl:AddConnection(object:GetPropertyChangedSignal("Visible"), function()
+			if object.Visible then
+				object.Visible = false
+			end
+		end)
 	end
-	if window.tabs:FindFirstChild("Home") then
-		window.tabs.Home.Visible = false
-		local homeInteract = window.tabs.Home:FindFirstChild("homeicon") and window.tabs.Home.homeicon:FindFirstChild("interact")
+	lockHidden(window.pages:FindFirstChild("home"))
+	local homeTab = window.tabs:FindFirstChild("Home")
+	if homeTab then
+		lockHidden(homeTab)
+		local homeInteract = homeTab:FindFirstChild("homeicon") and homeTab.homeicon:FindFirstChild("interact")
 		if homeInteract then
 			homeInteract.Interactable = false
 		end
 	end
-	if window:FindFirstChild("wallpaper") then
-		window.wallpaper.Visible = false
+	local wallpaper = window:FindFirstChild("wallpaper")
+	if wallpaper then
+		lockHidden(wallpaper)
 		local wallpaperState = window.wallpaper:FindFirstChild("ison")
 		if wallpaperState then
 			wallpaperState.Value = false
+		end
+	end
+	for _, object in ipairs(ui:GetDescendants()) do
+		if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+			local text = string.lower(object.Text or "")
+			if string.find(text, "luffy", 1, true) or string.find(text, "nicko", 1, true) then
+				object.Text = ""
+				object.Visible = false
+			end
 		end
 	end
 	
