@@ -1260,7 +1260,7 @@ function Owl:Load(config)
 	card.BackgroundTransparency = 1
 	card.BorderSizePixel = 0
 	card.Position = UDim2.fromScale(0.5, 0.5)
-	card.Size = UDim2.fromOffset(300, 110)
+	card.Size = UDim2.fromOffset(280, 92)
 	card.Parent = backdrop
 
 	local cardScale = Instance.new("UIScale")
@@ -1370,7 +1370,7 @@ function Owl:Load(config)
 	local titleLabel = Instance.new("TextLabel")
 	titleLabel.BackgroundTransparency = 1
 	titleLabel.Font = Enum.Font.GothamSemibold
-	titleLabel.Position = UDim2.new(0, 0, 0, 22)
+	titleLabel.Position = UDim2.new(0, 0, 0, 18)
 	titleLabel.Size = UDim2.new(1, 0, 0, 24)
 	titleLabel.Text = title
 	titleLabel.TextColor3 = Color3.fromRGB(247, 247, 250)
@@ -1382,7 +1382,7 @@ function Owl:Load(config)
 	local statusLabel = Instance.new("TextLabel")
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.Font = Enum.Font.Gotham
-	statusLabel.Position = UDim2.new(0, 0, 0, 51)
+	statusLabel.Position = UDim2.new(0, 0, 0, 45)
 	statusLabel.Size = UDim2.new(1, 0, 0, 18)
 	statusLabel.Text = "Loading"
 	statusLabel.TextColor3 = Color3.fromRGB(151, 151, 162)
@@ -1395,10 +1395,10 @@ function Owl:Load(config)
 	track.BackgroundColor3 = Color3.fromRGB(44, 44, 52)
 	track.BackgroundTransparency = 1
 	track.BorderSizePixel = 0
-	track.Position = UDim2.fromOffset(28, 132)
+	track.Position = UDim2.fromOffset(28, 72)
 	track.Size = UDim2.new(1, -56, 0, 4)
 	track.Parent = card
-	track.Visible = false
+	track.Visible = true
 
 	local trackCorner = Instance.new("UICorner")
 	trackCorner.CornerRadius = UDim.new(1, 0)
@@ -1430,7 +1430,7 @@ function Owl:Load(config)
 		dot.BackgroundColor3 = accent
 		dot.BackgroundTransparency = 0.68
 		dot.BorderSizePixel = 0
-		dot.Position = UDim2.new(0.5, (index - 2) * 12, 0, 84)
+		dot.Position = UDim2.new(0.5, (index - 2) * 12, 0, 64)
 		dot.Size = UDim2.fromOffset(5, 5)
 		dot.Parent = card
 		local dotCorner = Instance.new("UICorner")
@@ -1447,6 +1447,7 @@ function Owl:Load(config)
 	Services.Tween:Create(cardScale, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
 	local loadingActive = true
+	Services.Tween:Create(fill, TweenInfo.new(0.9, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.fromScale(1, 1)}):Play()
 	task.spawn(function()
 		while loadingActive and loaderGui.Parent do
 			for _, dot in ipairs(dots) do
