@@ -123,9 +123,11 @@ local syde = {
 	ParentOverride = nil;
 	Build = 'Sv0';
 	plugins = {};
-	ConfigEnabled = false;
-	ConfigFolder = 'Syde';
+	ConfigEnabled = true;
+	ConfigFolder = 'FireHub';
 	ConfigFile = 'Config';
+	Folder = 'FireHub';
+	SaveCfg = true;
 	Flags = {};
 	SettingsFlags = {};
 	LoadedConfig = nil;
@@ -133,6 +135,18 @@ local syde = {
 	maxds = 500;
 	minds = 10;
 	FreeMouse = true;
+	Themes = {
+		Default = {
+			Main = Color3.fromRGB(25, 25, 25),
+			Second = Color3.fromRGB(32, 32, 32),
+			Stroke = Color3.fromRGB(60, 60, 60),
+			Divider = Color3.fromRGB(60, 60, 60),
+			Text = Color3.fromRGB(240, 240, 240),
+			TextDark = Color3.fromRGB(150, 150, 150),
+			Accent = Color3.fromRGB(255, 151, 227),
+			HitBox = Color3.fromRGB(255, 151, 227),
+		},
+	};
 	SelectedTheme = "Default";
 	_currentWindow = nil;
 }
@@ -1827,203 +1841,290 @@ do
 end
 
 local HttpService = https
-local CONFIG_VERSION = 1
+local THEME_FOLDER = "BlizTOrionTheme"
+local FILE_PATH = THEME_FOLDER .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
 
-local SaveDebounce
-local SAVE_DELAY = 0.2
-
-local function SafeDecode(data)
-	local success, result = pcall(function()
-		return HttpService:JSONDecode(data)
-	end)
-	return success and result or nil
+if makefolder and isfolder and not isfolder(THEME_FOLDER) then
+	pcall(makefolder, THEME_FOLDER)
 end
 
-local function ApplyFlag(Flag, Value)
-	if Value == nil then return false end
+local LoadedThemeFile = false
+local ThemeColorsToSave = {}
 
-	-- Keybind Handling
-	if type(Value) == "table" and Value._type == "Key" then
-		local keyItem
-		if Value.EnumType == "Enum.KeyCode" and Enum.KeyCode[Value.Name] then
-			keyItem = Enum.KeyCode[Value.Name]
-		elseif Value.EnumType == "Enum.UserInputType" and Enum.UserInputType[Value.Name] then
-			keyItem = Enum.UserInputType[Value.Name]
+local function Round(Number, Factor)
+	local Result = math.floor(Number/Factor + (math.sign(Number) * 0.5)) * Factor
+	if Result < 0 then Result = Result + Factor end
+	return Result
+end
+
+local function PackColor(Color)
+	if typeof(Color) ~= "Color3" then return nil end
+	return {R = Color.R * 255, G = Color.G * 255, B = Color.B * 255}
+end  
+
+local function UnpackColor(Color)
+	if not Color or not Color.R then return Color3.fromRGB(255, 255, 255) end
+	return Color3.fromRGB(Color.R, Color.G, Color.B)
+end
+
+function syde:SaveThemeCfg()
+	if not LoadedThemeFile then return end
+
+	local Data = {}
+	local themeData = (self.Themes and self.SelectedTheme and self.Themes[self.SelectedTheme]) or self.theme
+
+	if themeData then
+		for typeName, value in pairs(themeData) do
+			if typeof(value) == "Color3" then
+				ThemeColorsToSave[typeName] = PackColor(value)
+			end
 		end
-		if keyItem and Flag.Set then
-			Flag:Set(keyItem)
-			return true
-		end
-	elseif typeof(Value) == "string" and Enum.KeyCode[Value] and Flag.Set then
-		Flag:Set(Enum.KeyCode[Value])
-		return true
 	end
 
-	-- Pbind Handling
-	if type(Value) == "table" and Value._type == "Pbind" then
-		if Flag.Set then
-			Flag:Set(Value.X, Value.Y, Value.Z)
-			return true
-		end
+	if self.theme then
+		if self.theme.Accent then ThemeColorsToSave["Accent"] = PackColor(self.theme.Accent) end
+		if self.theme.HitBox then ThemeColorsToSave["HitBox"] = PackColor(self.theme.HitBox) end
 	end
 
-	-- ColorPicker Handling
-	if Flag.Type == "ColorPicker" or (type(Value) == "table" and Value._type == "Color") then
-		local col
-		if type(Value) == "table" and Value.R and Value.G and Value.B then
-			col = Color3.new(Value.R, Value.G, Value.B)
+	if makefolder and isfolder and not isfolder(THEME_FOLDER) then
+		pcall(makefolder, THEME_FOLDER)
+	end
+	if writefile then
+		pcall(function()
+			writefile(FILE_PATH, HttpService:JSONEncode(ThemeColorsToSave))
+		end)
+	end
+end
+
+local function LoadThemeCfg(Config)
+	Config = Config or FILE_PATH
+	if isfile and isfile(Config) then
+		local ok, dataOrErr = pcall(function()
+			return HttpService:JSONDecode(readfile(Config))
+		end)
+
+		if ok and type(dataOrErr) == "table" then
+			local Data = dataOrErr
+			syde.Themes = syde.Themes or {}
+			syde.Themes.Custom = syde.Themes.Custom or {}
+
+			for TypeName, Value in pairs(Data) do
+				local c = UnpackColor(Value)
+				syde.Themes.Custom[TypeName] = c
+				if TypeName == "Accent" or TypeName == "HitBox" then
+					if syde.theme then
+						syde.theme[TypeName] = c
+					end
+				end
+			end
+
+			syde.SelectedTheme = "Custom"
+			LoadedThemeFile = true
+
+			task.wait(0.02)
+			syde:SetTheme()
 		else
-			col = syde:ColorUnpack(Value)
+			LoadedThemeFile = true
 		end
-
-		if Flag.Set then
-			Flag:Set(col, true)
-		elseif Flag.Color then
-			Flag.Color = col
-		end
-
-		return true
+	else
+		LoadedThemeFile = true
 	end
-
-	-- Standard Setter
-	if Flag.Set then
-		Flag:Set(Value, true)
-		return true
-	end
-
-	-- Raw Value fallback
-	if Flag.V ~= nil then
-		Flag.V = Value
-		return true
-	end
-
-	if Flag.StarterValue ~= nil then
-		Flag.StarterValue = Value
-		return true
-	end
-
-	return false
 end
 
-function LoadConfig(Configuration)
-	if type(Configuration) ~= "string" then
-		warn("Syde 〡 Invalid config format.")
-		return false, 0
+function syde:SetTheme()
+	local themeData = (self.Themes and self.SelectedTheme and self.Themes[self.SelectedTheme]) or self.theme
+	if not themeData then return end
+
+	local accent = themeData.Accent or themeData.Main or (self.theme and self.theme.Accent)
+	local hitbox = themeData.HitBox or themeData.Accent or themeData.Main or (self.theme and self.theme.HitBox)
+
+	if accent and self.theme then
+		self.theme.Accent = accent
+		self.Comms:Fire("Accent", accent)
+	end
+	if hitbox and self.theme then
+		self.theme.HitBox = hitbox
+		self.Comms:Fire("HitBox", hitbox)
 	end
 
-	local Decoded = SafeDecode(Configuration)
-	if not Decoded then
-		warn("Syde 〡 Failed to decode config.")
-		return false, 0
-	end
-
-	-- Cache so flags registered later can still apply their saved values
-	syde.LoadedConfig = Decoded
-
-	-- Version check (future ready)
-	if Decoded._version and Decoded._version ~= CONFIG_VERSION then
-		warn("Syde 〡 Config version mismatch.")
-	end
-
-	local applied = 0
-
-	-- Suppress per-element notifications fired by callbacks during the bulk apply
-	syde.SuppressNotify = true
-	for FlagName, Flag in pairs(syde.Flags) do
-		local SavedValue = Decoded[FlagName]
-
-		if SavedValue ~= nil then
-			-- Isolate each flag so a single bad one doesn't break the whole load
-			local ok, success = pcall(ApplyFlag, Flag, SavedValue)
-			if ok and success then
-				applied = applied + 1
-			elseif not ok then
-				warn("Syde 〡 Failed to apply flag '" .. tostring(FlagName) .. "':", success)
-			end
-		end
-	end
-	syde.SuppressNotify = false
-
-	return true, applied
+	self:SaveThemeCfg()
 end
 
--- Apply a cached saved value to a flag, if one exists
-function syde:ApplyCachedFlag(Flag)
-	if not Flag or not Flag.Flag then return end
-	if not self.LoadedConfig then return end
-	local saved = self.LoadedConfig[Flag.Flag]
-	if saved == nil then return end
-	ApplyFlag(Flag, saved)
-end
+function syde:GenTheme(mainColor)
+	local r, g, b = mainColor.R * 255, mainColor.G * 255, mainColor.B * 255
+	local lum = 0.299 * r + 0.587 * g + 0.114 * b
+	local dark = lum < 128
+	local t = {Main = mainColor}
 
--- Internal Save Logic
-local function PerformSave()
-	if not syde.ConfigEnabled then syde.ConfigEnabled = true end
-	if not writefile then return end
-
-	local Data = {
-		_version = CONFIG_VERSION
-	}
-
-	for FlagName, Flag in pairs(syde.Flags) do
-		if type(Flag) == "table" then
-			if Flag.Type == "ColorPicker" or (Flag.Color and Flag.Set) then
-				if Flag.Color then
-					Data[FlagName] = { _type = "Color", R = Flag.Color.R, G = Flag.Color.G, B = Flag.Color.B }
-				end
-			elseif Flag.Key and typeof(Flag.Key) == "EnumItem" then
-				Data[FlagName] = { _type = "Key", EnumType = tostring(Flag.Key.EnumType), Name = Flag.Key.Name }
-			elseif Flag.ValueX ~= nil and Flag.ValueY ~= nil and Flag.ValueZ ~= nil then
-				Data[FlagName] = { _type = "Pbind", X = tostring(Flag.ValueX), Y = tostring(Flag.ValueY), Z = tostring(Flag.ValueZ) }
-			elseif Flag.V ~= nil then
-				Data[FlagName] = Flag.V
-			elseif Flag.Value ~= nil then
-				if typeof(Flag.Value) == "EnumItem" then
-					Data[FlagName] = { _type = "Key", EnumType = tostring(Flag.Value.EnumType), Name = Flag.Value.Name }
-				else
-					Data[FlagName] = Flag.Value
-				end
-			elseif Flag.StarterValue ~= nil then
-				Data[FlagName] = Flag.StarterValue
-			elseif Flag._textBox and Flag._textBox.Text then
-				Data[FlagName] = Flag._textBox.Text
-			end
-		end
+	if dark then
+		t.Second = Color3.fromRGB(math.clamp(r * 1.12, 0, 255), math.clamp(g * 1.12, 0, 255), math.clamp(b * 1.12, 0, 255))
+		t.Stroke = Color3.fromRGB(math.clamp(r * 1.45, 0, 255), math.clamp(g * 1.45, 0, 255), math.clamp(b * 1.45, 0, 255))
+		t.Divider = Color3.fromRGB(math.clamp(r * 1.28, 0, 255), math.clamp(g * 1.28, 0, 255), math.clamp(b * 1.28, 0, 255))
+		t.Text = Color3.fromRGB(240, 240, 242)
+		t.TextDark = Color3.fromRGB(155, 155, 160)
+		t.Accent = Color3.fromRGB(math.clamp(r * 1.85, 0, 255), math.clamp(g * 1.85, 0, 255), math.clamp(b * 1.85, 0, 255))
+		t.HitBox = t.Accent
+	else
+		t.Second = Color3.fromRGB(math.clamp(r * 0.94, 0, 255), math.clamp(g * 0.94, 0, 255), math.clamp(b * 0.94, 0, 255))
+		t.Stroke = Color3.fromRGB(math.clamp(r * 0.75, 0, 255), math.clamp(g * 0.75, 0, 255), math.clamp(b * 0.75, 0, 255))
+		t.Divider = Color3.fromRGB(math.clamp(r * 0.85, 0, 255), math.clamp(g * 0.85, 0, 255), math.clamp(b * 0.85, 0, 255))
+		t.Text = Color3.fromRGB(35, 35, 38)
+		t.TextDark = Color3.fromRGB(110, 110, 115)
+		t.Accent = Color3.fromRGB(math.clamp(r * 0.72, 0, 255), math.clamp(g * 0.72, 0, 255), math.clamp(b * 0.72, 0, 255))
+		t.HitBox = t.Accent
 	end
 
-	local folder = syde.ConfigFolder or "FireHub"
-	local file = syde.ConfigFile or "default"
+	return t
+end
 
+local function SaveCfg(Name)
+	Name = Name or (game and game.GameId) or "default"
+	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
 	if makefolder and isfolder and not isfolder(folder) then
 		pcall(makefolder, folder)
 	end
 
-	local path = string.format("%s/%s.json", folder, file)
-	pcall(function()
-		writefile(path, HttpService:JSONEncode(Data))
+	local Data = {}
+	for i, v in pairs(syde.Flags) do
+		if v and v.Save ~= false then
+			if v.Type == "MultiColorpicker" then
+				if v.Pickers and #v.Pickers > 0 then
+					local colorList = {}
+					for index, picker in ipairs(v.Pickers) do
+						colorList[index] = PackColor(picker.Value)
+					end
+					Data[i] = colorList
+				end
+			elseif v.Type == "Colorpicker" or v.Type == "ColorPicker" then
+				if v.Pickers and v.Pickers[1] then
+					Data[i] = PackColor(v.Pickers[1].Value)
+				elseif v.Value and typeof(v.Value) == "Color3" then
+					Data[i] = PackColor(v.Value)
+				elseif v.Color and typeof(v.Color) == "Color3" then
+					Data[i] = PackColor(v.Color)
+				end
+			elseif v.Type == "Bind" or v.Type == "Keybind" then
+				if typeof(v.Value) == "EnumItem" then
+					Data[i] = v.Value.Name
+				elseif typeof(v.Key) == "EnumItem" then
+					Data[i] = v.Key.Name
+				elseif typeof(v.Value) == "string" and v.Value ~= "" and v.Value ~= "NONE" then
+					Data[i] = v.Value
+				elseif typeof(v.Key) == "string" and v.Key ~= "" and v.Key ~= "NONE" then
+					Data[i] = v.Key
+				end
+			elseif v.Type == "Pbind" or (v.ValueX ~= nil and v.ValueY ~= nil and v.ValueZ ~= nil) then
+				Data[i] = { _type = "Pbind", X = tostring(v.ValueX), Y = tostring(v.ValueY), Z = tostring(v.ValueZ) }
+			else
+				if v.Value ~= nil then
+					if typeof(v.Value) == "EnumItem" then
+						Data[i] = v.Value.Name
+					else
+						Data[i] = v.Value
+					end
+				elseif v.V ~= nil then
+					Data[i] = v.V
+				elseif v.StarterValue ~= nil then
+					Data[i] = v.StarterValue
+				elseif v._textBox and v._textBox.Text then
+					Data[i] = v._textBox.Text
+				end
+			end
+		end	
+	end
+
+	if writefile then
+		pcall(function()
+			writefile(folder .. "/" .. tostring(Name) .. ".txt", tostring(HttpService:JSONEncode(Data)))
+		end)
+	end
+end
+
+local function LoadCfg(Config)
+	local ok, Data = pcall(function()
+		return HttpService:JSONDecode(Config)
+	end)
+	if not ok or type(Data) ~= "table" then return end
+
+	syde.LoadedConfig = Data
+
+	local flagsProcessed = 0
+	local totalFlags = 0
+	for _, _ in pairs(Data) do totalFlags += 1 end
+
+	for a, b in pairs(Data) do
+		if syde.Flags[a] then
+			task.spawn(function()
+				local flag = syde.Flags[a]
+				pcall(function()
+					if flag.Type == "MultiColorpicker" then
+						if type(b) == "table" and b.R == nil then
+							for index, colorData in ipairs(b) do
+								flag:Set(index, UnpackColor(colorData))
+							end
+						else
+							flag:Set(1, UnpackColor(b))
+						end
+					elseif flag.Type == "Colorpicker" or flag.Type == "ColorPicker" then
+						flag:Set(UnpackColor(b))
+					elseif flag.Type == "Bind" or flag.Type == "Keybind" then
+						local success, keyEnum = pcall(function()
+							return Enum.KeyCode[b] or Enum.UserInputType[b]
+						end)
+						if success and keyEnum then
+							flag:Set(keyEnum)
+						else
+							flag:Set(b)
+						end
+					elseif flag.Type == "Pbind" or (type(b) == "table" and b._type == "Pbind") then
+						if flag.Set then
+							flag:Set(b.X, b.Y, b.Z)
+						end
+					else
+						flag:Set(b)
+					end
+				end)
+
+				flagsProcessed += 1
+				if flagsProcessed >= totalFlags then
+					task.wait(0.05)
+					syde:SetTheme()
+				end
+			end)
+		else
+			flagsProcessed += 1
+			if flagsProcessed >= totalFlags then
+				task.wait(0.05)
+				syde:SetTheme()
+			end
+		end
+	end
+end
+
+local saveDebounce = nil
+function SaveConfig(Name)
+	if saveDebounce then
+		task.cancel(saveDebounce)
+	end
+	saveDebounce = task.delay(0.05, function()
+		saveDebounce = nil
+		SaveCfg(Name or (game and game.GameId))
 	end)
 end
 
-function SaveConfig()
-	if not syde.ConfigEnabled then syde.ConfigEnabled = true end
-	if SaveDebounce then
-		task.cancel(SaveDebounce)
-	end
-	SaveDebounce = task.delay(SAVE_DELAY or 0.3, PerformSave)
+function LoadConfig(Configuration)
+	LoadCfg(Configuration)
+	return true
 end
 
 function syde:AutoSave()
-	SaveConfig()
+	SaveCfg(game and game.GameId)
 end
 
 function syde:LoadSaveConfig(targetFile)
-	if not syde.ConfigEnabled then
-		if syde.Toast then syde:Toast({ Content = 'Configs disabled in syde:Load', Duration = 3 }) end
-		return false
-	end
-
-	local fileName = targetFile or syde.ConfigFile
-	local filePath = string.format("%s/%s.json", syde.ConfigFolder, fileName)
+	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
+	local fileName = targetFile or (game and game.GameId) or "default"
+	local filePath = string.format("%s/%s.txt", folder, fileName)
 
 	if not isfile or not isfile(filePath) then
 		if syde.Toast then
@@ -2032,37 +2133,27 @@ function syde:LoadSaveConfig(targetFile)
 		return false
 	end
 
-	local ok, decoded, applied = pcall(function()
-		return LoadConfig(readfile(filePath))
-	end)
-
-	if ok and decoded then
-		if targetFile then
-			syde.ConfigFile = targetFile
-		end
+	local ok, content = pcall(readfile, filePath)
+	if ok and content then
+		LoadCfg(content)
 		if syde.Toast then
-			syde:Toast({ Content = 'loaded your sorry ass config', Duration = 3 })
+			syde:Toast({ Content = 'Loaded config ' .. fileName, Duration = 3 })
 		end
 		return true
-	end
-
-	warn("[SYDE] Configurations Error " .. tostring(decoded))
-	if syde.Toast then
-		syde:Toast({ Content = 'Failed to load config', Duration = 3 })
 	end
 	return false
 end
 
 function syde:ListConfigs()
 	local list = {}
-	if not syde.ConfigEnabled then return list end
-	if not listfiles or not isfolder or not isfolder(syde.ConfigFolder) then return list end
+	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
+	if not listfiles or not isfolder or not isfolder(folder) then return list end
 
-	local ok, files = pcall(listfiles, syde.ConfigFolder)
+	local ok, files = pcall(listfiles, folder)
 	if not ok or type(files) ~= "table" then return list end
 
 	for _, full in ipairs(files) do
-		local name = tostring(full):match("([^/\\]+)%.json$")
+		local name = tostring(full):match("([^/\]+)%.txt$")
 		if name and name ~= "SettingsConfig" then
 			table.insert(list, name)
 		end
@@ -2072,93 +2163,30 @@ function syde:ListConfigs()
 end
 
 function syde:SaveConfigAs(name)
-	if not syde.ConfigEnabled then
-		if syde.Toast then syde:Toast({ Content = 'Configs disabled in syde:Load', Duration = 3 }) end
-		return false
-	end
 	if type(name) ~= "string" or name == "" then return false end
-	if not writefile then
-		if syde.Toast then syde:Toast({ Content = 'Executor has no writefile', Duration = 3 }) end
-		return false
+	SaveCfg(name)
+	if syde.Toast then
+		syde:Toast({ Content = 'Saved config as ' .. name, Duration = 3 })
 	end
-
-	local Data = { _version = CONFIG_VERSION }
-	local count = 0
-	for FlagName, Flag in pairs(syde.Flags) do
-		if Flag.Type == "ColorPicker" then
-			if Flag.Color then
-				Data[FlagName] = syde:ColorPack(Flag.Color)
-				count = count + 1
-			end
-		elseif Flag.V ~= nil then
-			Data[FlagName] = Flag.V
-			count = count + 1
-		elseif Flag.Color then
-			Data[FlagName] = syde:ColorPack(Flag.Color)
-			count = count + 1
-		elseif Flag.StarterValue ~= nil then
-			Data[FlagName] = Flag.StarterValue
-			count = count + 1
-		end
-	end
-
-	if makefolder and isfolder and not isfolder(syde.ConfigFolder) then
-		makefolder(syde.ConfigFolder)
-	end
-
-	local ok, err = pcall(function()
-		writefile(string.format("%s/%s.json", syde.ConfigFolder, name), HttpService:JSONEncode(Data))
-	end)
-
-	if ok then
-		syde.ConfigFile = name
-		if syde.Toast then
-			syde:Toast({ Content = 'saved your sorry ass config', Duration = 3 })
-		end
-		return true
-	else
-		warn("[SYDE] Save failed:", err)
-		if syde.Toast then
-			syde:Toast({ Content = 'Save failed: ' .. tostring(err), Duration = 3 })
-		end
-	end
-	return false
+	return true
 end
 
 function syde:DeleteConfig(name)
-	if not syde.ConfigEnabled then return false end
 	if type(name) ~= "string" or name == "" then return false end
-	local filePath = string.format("%s/%s.json", syde.ConfigFolder, name)
+	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
+	local filePath = string.format("%s/%s.txt", folder, name)
 	if isfile and isfile(filePath) and delfile then
 		return pcall(delfile, filePath)
 	end
 	return false
 end
 
-local function autoloadFilePath()
-	return string.format("%s/_autoload.txt", syde.ConfigFolder)
-end
-
-function syde:GetAutoLoad()
-	-- Default OFF unless the user explicitly enables it
-	if not syde.ConfigEnabled or not isfile then return false end
-	local path = autoloadFilePath()
-	if not isfile(path) then return false end
-	local ok, content = pcall(readfile, path)
-	if not ok or not content then return false end
-	return tostring(content):match("^%s*(.-)%s*$") == "1"
-end
-
-function syde:SetAutoLoad(enabled)
-	if not syde.ConfigEnabled or not writefile then return false end
-	if makefolder and isfolder and not isfolder(syde.ConfigFolder) then
-		makefolder(syde.ConfigFolder)
-	end
-	local ok = pcall(writefile, autoloadFilePath(), enabled and "1" or "0")
-	return ok
-end
-
-
+syde.PackColor = PackColor
+syde.UnpackColor = UnpackColor
+syde.SaveCfg = SaveCfg
+syde.LoadCfg = LoadCfg
+syde.SaveThemeCfg = syde.SaveThemeCfg
+syde.LoadThemeCfg = LoadThemeCfg
 --@UiSetup
 local ui = Library
 local window = ui.main
@@ -2668,28 +2696,44 @@ end
 
 function syde:MakeWindow(WindowConfig)
 	WindowConfig = WindowConfig or {}
-	local cfgFolder = WindowConfig.ConfigFolder or (WindowConfig.Name and WindowConfig.Name:gsub("[^%w_%-]", "") or "FireHub")
-	local cfgFile = "default"
+	WindowConfig.Name = WindowConfig.Name or "Fire Hub"
+	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name or "FireHub"
+	WindowConfig.SaveConfig = true
 
+	local cfgFolder = WindowConfig.ConfigFolder
 	syde.ConfigFolder = cfgFolder
-	syde.ConfigFile = cfgFile
+	syde.Folder = cfgFolder
+	syde.SaveCfg = true
 	syde.ConfigEnabled = true
+	syde.ConfigFile = tostring(game and game.GameId or "default")
 
-	pcall(function()
-		if isfolder and makefolder and not isfolder(cfgFolder) then
-			makefolder(cfgFolder)
-		end
-		local path = string.format("%s/%s.json", cfgFolder, cfgFile)
-		if isfile and isfile(path) then
-			local rawData = readfile(path)
-			if rawData and rawData ~= "" then
-				local decoded = https:JSONDecode(rawData)
-				if type(decoded) == "table" then
-					syde.LoadedConfig = decoded
+	if makefolder and isfolder then
+		if not isfolder(cfgFolder) then pcall(makefolder, cfgFolder) end
+		if not isfolder(THEME_FOLDER) then pcall(makefolder, THEME_FOLDER) end
+	end
+
+	-- Preload theme configuration
+	LoadThemeCfg(FILE_PATH)
+
+	-- Preload element configuration so defaults use saved values
+	local configFilePath = string.format("%s/%s.txt", cfgFolder, tostring(game and game.GameId or "default"))
+	if isfile and isfile(configFilePath) then
+		local ok, rawData = pcall(readfile, configFilePath)
+		if ok and rawData and rawData ~= "" then
+			local decodeOk, decoded = pcall(function() return HttpService:JSONDecode(rawData) end)
+			if decodeOk and type(decoded) == "table" then
+				syde.LoadedConfig = decoded
+				if decoded["ToggleUI"] then
+					local success, keyEnum = pcall(function()
+						return Enum.KeyCode[decoded["ToggleUI"]] or Enum.UserInputType[decoded["ToggleUI"]]
+					end)
+					if success and keyEnum then
+						uitoggle = keyEnum
+					end
 				end
 			end
 		end
-	end)
+	end
 
 	local libConfig = {
 		Title = WindowConfig.Name or WindowConfig.Title or "Syde",
@@ -2976,9 +3020,29 @@ syde:HidePH(pages, 'page')
 
 --@@Initialize
 function syde:Init(library)
-	if syde._currentWindow then
+	if syde._currentWindow and (not library or library == true or type(library) ~= "table" or not library.Title) then
 		pcall(function()
-			ui.Enabled = true
+			local folder = syde.Folder or syde.ConfigFolder or "FireHub"
+			local filePath = folder .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
+			if isfile and isfile(filePath) then
+				local content = readfile(filePath)
+				if content and content ~= "" then
+					LoadCfg(content)
+					if syde.MakeNotification then
+						syde:MakeNotification({
+							Name = "Configuration",
+							Content = "Auto-loaded configuration for the game " .. tostring(game.GameId) .. ".",
+							Time = 5
+						})
+					elseif syde.Notify then
+						syde:Notify({
+							Title = "Configuration",
+							Content = "Auto-loaded configuration for the game " .. tostring(game.GameId) .. ".",
+							Duration = 5
+						})
+					end
+				end
+			end
 		end)
 		return syde._currentWindow
 	end
@@ -4493,8 +4557,8 @@ function syde:Init(library)
 				end)
 
 				function data:Set(NewValue)
-
 					data.V = NewValue
+					data.Value = NewValue
 					UpdateToggleUI(NewValue)
 
 					local success, errorMsg = pcall(function()
@@ -4506,23 +4570,49 @@ function syde:Init(library)
 					if not success then
 						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 					end
-
 				end
 
+				data.Type = "Toggle"
+				data.Save = Toggle.Save ~= false
+				data.Value = data.V
+				local flagKey = Toggle.Flag or Toggle.SFlag or Toggle.Title
+				data.Flag = flagKey
+				if flagKey then
+					syde.Flags[flagKey] = data
+				end
 				if data.SFlag then
 					syde.SettingsFlags[data.SFlag] = data
 				end
+
+				return data
 			end
 
 			function telement:Keybind(Keybind)
+				local flagKey = Keybind.Flag or Keybind.SFlag or Keybind.Title or "Keybind"
+				local initialKey = Keybind.Key or Keybind.Default
+				if syde.LoadedConfig and syde.LoadedConfig[flagKey] ~= nil then
+					local saved = syde.LoadedConfig[flagKey]
+					local success, keyEnum = pcall(function()
+						return Enum.KeyCode[saved] or Enum.UserInputType[saved]
+					end)
+					if success and keyEnum then
+						initialKey = keyEnum
+					end
+				end
+
 				local data = {
-					Title = Keybind.Title;
-					Key = Keybind.Key;
+					Title = Keybind.Title or "Keybind";
+					Key = initialKey;
+					Value = initialKey and (typeof(initialKey) == "EnumItem" and initialKey.Name or tostring(initialKey)) or "NONE";
 					Desc = Keybind.Description or "";
 					CallBack = Keybind.CallBack;
 					WaitingForKey = false;
 					Hold = false;
-					Holding = false
+					Holding = false;
+					Type = "Bind";
+					Save = Keybind.Save ~= false;
+					Flag = flagKey;
+					SFlag = Keybind.SFlag;
 				}
 
 				local KeyBind = window.settings.pages.page.KeyBind:Clone()
@@ -4531,7 +4621,7 @@ function syde:Init(library)
 				KeyBind.title.Text = data.Title
 				KeyBind.Name = data.Title
 
-				KeyBind.Bind.v.Text = data.Key and data.Key.Name or "NONE"
+				KeyBind.Bind.v.Text = data.Key and (typeof(data.Key) == "EnumItem" and data.Key.Name or tostring(data.Key)) or "NONE"
 				tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
 
 				KeyBind.interact.MouseButton1Click:Connect(function()
@@ -4546,16 +4636,26 @@ function syde:Init(library)
 
 				local function SetKeybind(keyCode)
 					if keyCode and keyCode ~= Enum.KeyCode.Unknown then
+						if typeof(keyCode) == "string" then
+							keyCode = Enum.KeyCode[keyCode] or Enum.UserInputType[keyCode] or keyCode
+						end
 						data.Key = keyCode
-						KeyBind.Bind.v.Text = keyCode.Name
+						data.Value = typeof(keyCode) == "EnumItem" and keyCode.Name or tostring(keyCode)
+						KeyBind.Bind.v.Text = data.Value
 						tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
 						if typeof(Keybind.OnKeyChanged) == "function" then
 							pcall(Keybind.OnKeyChanged, keyCode)
 						end
 					else
 						data.Key = nil
+						data.Value = "NONE"
 						KeyBind.Bind.v.Text = "NONE"
 					end
+				end
+
+				function data:Set(keyCode)
+					SetKeybind(keyCode)
+					SaveCfg(game and game.GameId)
 				end
 
 				-- Main input handler
@@ -4563,17 +4663,29 @@ function syde:Init(library)
 					if data.WaitingForKey then
 						if syde:IsBindableInput(input) then
 							data.WaitingForKey = false
-							SetKeybind(input.KeyCode)
+							if input.UserInputType == Enum.UserInputType.Keyboard then
+								SetKeybind(input.KeyCode)
+							else
+								SetKeybind(input.UserInputType)
+							end
+							SaveCfg(game and game.GameId)
 						end
 						return
 					end
 
-					-- don't fire the bind while typing in a textbox (ignore processed so
-					-- keys the game also uses, e.g. RightShift shift-lock, still work)
 					if userinput:GetFocusedTextBox() then return end
 					if input.KeyCode == Enum.KeyCode.Unknown then return end
 
-					if input.KeyCode == data.Key then
+					local isMatch = false
+					if typeof(data.Key) == "EnumItem" then
+						if data.Key.EnumType == Enum.KeyCode and input.KeyCode == data.Key then
+							isMatch = true
+						elseif data.Key.EnumType == Enum.UserInputType and input.UserInputType == data.Key then
+							isMatch = true
+						end
+					end
+
+					if isMatch then
 						data.Hold = true
 
 						local holdConnection
@@ -4607,6 +4719,19 @@ function syde:Init(library)
 						end
 					end
 				end)
+
+				data._frame = KeyBind
+				data.toggle = function(self) KeyBind.Visible = not KeyBind.Visible end
+				data.remove = function(self) KeyBind:Destroy() end
+
+				if flagKey then
+					syde.Flags[flagKey] = data
+				end
+				if Keybind.SFlag then
+					syde.SettingsFlags[Keybind.SFlag] = data
+				end
+
+				return data
 			end
 
 			function telement:ColorPicker(ColorPicker)
@@ -5493,27 +5618,28 @@ function syde:Init(library)
 				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(ToggleRainbowEffect)
 
 				function data:Set(RGBColor)
-
 					if typeof(RGBColor) == "table" then
-						RGBColor = Color3.fromRGB(RGBColor.R, RGBColor.G, RGBColor.B)
+						RGBColor = UnpackColor(RGBColor)
 					end
 
 					data.Color = RGBColor
+					data.Value = RGBColor
 
 					local h, s, v = RGBColor:ToHSV()
 					HSV[1], HSV[2], HSV[3] = h, s, v
 					updatestuff()
 				end
 
+				data.Type = "Colorpicker"
+				data.Save = ColorPicker.Save ~= false
+				data.Value = data.Color
+				local flagKey = ColorPicker.Flag or ColorPicker.SFlag or ColorPicker.Title
+				data.Flag = flagKey
+				if flagKey then
+					syde.Flags[flagKey] = data
+				end
 				if data.SFlag then
 					syde.SettingsFlags[data.SFlag] = data
-				end
-
-				if syde.ConfigEnabled and data.Flag and syde.Flags[data.Flag] then
-					local existing = syde.Flags[data.Flag]
-					if existing.Color then
-						data:Set(existing.Color, true)
-					end
 				end
 
 				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(ToggleRainbowEffect)
@@ -6393,8 +6519,12 @@ function syde:Init(library)
 		a:Keybind({
 			Title = 'Toggle UI',
 			Key = uitoggle,
+			Flag = "ToggleUI",
+			SFlag = "ToggleUI",
+			Save = true,
 			OnKeyChanged = function(newKey)
 				uitoggle = newKey
+				SaveCfg(game and game.GameId)
 			end,
 			CallBack = function()
 				ToggleUI()
@@ -6406,12 +6536,16 @@ function syde:Init(library)
 			RD = false,
 			Linkable = true,
 			Color = syde.theme.Accent;
+			Flag = "Accent",
+			SFlag = 'AC',
+			Save = true,
 			CallBack = function(v)
 				syde:UpdateTheme({
 					['Accent'] = v
 				})
+				syde:SaveThemeCfg()
+				SaveCfg(game and game.GameId)
 			end,
-			SFlag = 'AC'
 		})
 
 		a:ColorPicker({
@@ -6419,12 +6553,16 @@ function syde:Init(library)
 			RD = false,
 			Linkable = true,
 			Color = syde.theme.HitBox;
+			Flag = "HitBox",
+			SFlag = 'HB',
+			Save = true,
 			CallBack = function(c)
 				syde:UpdateTheme({
 					['HitBox'] = c
 				})
+				syde:SaveThemeCfg()
+				SaveCfg(game and game.GameId)
 			end,
-			SFlag = 'HB'
 		})
 
 		local seq = syde.theme.DropShadow
@@ -6481,7 +6619,10 @@ function syde:Init(library)
 		a:Toggle({
 			Title = 'Rotate Gradient',
 			Description = 'Slowly rotates the gradient if enabled.',
-			Value = false,
+			Value = syde.LoadedConfig and syde.LoadedConfig["RotateGradient"] or false,
+			Flag = "RotateGradient",
+			SFlag = 'RG',
+			Save = true,
 			CallBack = function(v)
 				rotateGradient = v
 				local grad = window.shadow.ImageLabel.UIGradient
@@ -6489,13 +6630,17 @@ function syde:Init(library)
 				if rotateGradient and grad and grad.Enabled then
 					startGradientRotation()
 				end
+				SaveCfg(game and game.GameId)
 			end,
-			SFlag = 'RG',
 		})
 
 		a:Toggle({
 			Title = 'Glow',
 			Description = 'Shine on the ui.',
+			Value = syde.LoadedConfig and syde.LoadedConfig["Glow"] or false,
+			Flag = "Glow",
+			SFlag = 'GLOW',
+			Save = true,
 			CallBack = function (v)
 				if v then
 					glow = true
@@ -6826,72 +6971,23 @@ function syde:Init(library)
 
 
 		function syde:SaveSettingsConfig()
-			local Data = {}
-
-
-			for flag, v in pairs(syde.SettingsFlags or {}) do
-
-				if v.Type == "ColorPicker" and v.Color then
-					Data[flag] = syde:ColorPack(v.Color)
-				elseif v.V ~= nil then
-					Data[flag] = v.V
-				elseif v.StarterValue ~= nil then
-					Data[flag] = v.StarterValue
-				else
-					warn("[DEBUG] Skipping flag", flag, "no valid value found")
-				end
-			end
-
-
-			local path = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
-			local encoded = https:JSONEncode(Data)
-
-			writefile(path, encoded)
-
+			SaveCfg(game and game.GameId)
+			syde:SaveThemeCfg()
 			syde:Toast({
-				Content = 'Saved setting config';
+				Content = 'Saved settings config';
 				Duration = 3
 			})
 		end
 
 		function syde:LoadSettingsConfig()
-			local path = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
-
-			if not isfile(path) then
-
-				syde:Toast({
-					Content = 'No settings found';
-					Duration = 3
-				})
-				return
+			LoadThemeCfg(FILE_PATH)
+			local folder = syde.Folder or syde.ConfigFolder or "FireHub"
+			local filePath = folder .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
+			if isfile and isfile(filePath) then
+				LoadCfg(readfile(filePath))
 			end
-
-			local success, data = pcall(function()
-				return https:JSONDecode(readfile(path))
-			end)
-
-			if not success or typeof(data) ~= "table" then
-				warn("[DEBUG] Failed to decode settings:", data)
-				return
-			end
-
-			for flag, val in pairs(data) do
-				local setting = syde.SettingsFlags and syde.SettingsFlags[flag]
-				if setting then
-					if setting.Set then
-						setting:Set(val)
-					elseif setting.Type == "ColorPicker" and setting.Color then
-						setting.Color = syde:ColorUnpack(val)
-					elseif setting.V ~= nil then
-						setting.Value = val
-					end
-				else
-					warn("[DEBUG] No matching setting flag found for:", flag)
-				end
-			end
-
 			syde:Toast({
-				Content = 'Loaded setting config';
+				Content = 'Loaded settings config';
 				Duration = 3
 			})
 		end
@@ -6930,6 +7026,10 @@ function syde:Init(library)
 		b:Toggle({
 			Title = 'Anonymous',
 			Description = 'Hides your info in User Info.',
+			Value = syde.LoadedConfig and syde.LoadedConfig["ANON"] or false,
+			Flag = 'ANON',
+			SFlag = 'ANON',
+			Save = true,
 			CallBack = function (v)
 				if v then
 					window.user.headshot.id.username.Text = '?'
@@ -6938,8 +7038,8 @@ function syde:Init(library)
 				else
 					SetUserInfo()
 				end
+				SaveCfg(game and game.GameId)
 			end,
-			SFlag = 'ANON',
 		})
 
 		c:Paragraph({
@@ -10509,33 +10609,43 @@ function syde:Init(library)
 				Description = ToggleConfig.Description or ToggleConfig.Desc or "",
 				Value = defVal,
 				Flag = flagName,
+				Save = ToggleConfig.Save ~= false,
 				CallBack = function(v)
 					if userCb then userCb(v) end
-					SaveConfig()
+					SaveCfg(game and game.GameId)
 				end
 			})
 
+			data.Type = "Toggle"
+			data.Save = ToggleConfig.Save ~= false
+			data.Flag = flagName
+			data.Value = defVal
 			syde.Flags[flagName] = data
 			return data
 		end
 
 		function initelement:AddSlider(SliderConfig)
 			SliderConfig = SliderConfig or {}
-			local flagName = SliderConfig.Flag or SliderConfig.ValueName or SliderConfig.Name or SliderConfig.Title or "Slider"
+			local flagName = SliderConfig.Flag or SliderConfig.Name or SliderConfig.Title or SliderConfig.ValueName or "Slider"
 			local userCb = SliderConfig.Callback or SliderConfig.CallBack
 
 			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
 				SliderConfig.Default = syde.LoadedConfig[flagName]
 			end
 
+			SliderConfig.Flag = flagName
+			SliderConfig.Save = SliderConfig.Save ~= false
 			local origCb = SliderConfig.Callback or SliderConfig.CallBack
 			SliderConfig.Callback = function(val)
 				if origCb then origCb(val) end
-				SaveConfig()
+				SaveCfg(game and game.GameId)
 			end
-			SliderConfig.Flag = flagName
 
 			local sliderObj = self:Slider(SliderConfig)
+			sliderObj.Type = "Slider"
+			sliderObj.Save = SliderConfig.Save ~= false
+			sliderObj.Flag = flagName
+			sliderObj.Value = SliderConfig.Default or SliderConfig.Min or 0
 			syde.Flags[flagName] = sliderObj
 			return sliderObj
 		end
@@ -10550,12 +10660,17 @@ function syde:Init(library)
 			end
 
 			DropdownConfig.Flag = flagName
+			DropdownConfig.Save = DropdownConfig.Save ~= false
 			DropdownConfig.Callback = function(val)
 				if userCb then userCb(val) end
-				SaveConfig()
+				SaveCfg(game and game.GameId)
 			end
 
 			local dropObj = self:Dropdown(DropdownConfig)
+			dropObj.Type = "Dropdown"
+			dropObj.Save = DropdownConfig.Save ~= false
+			dropObj.Flag = flagName
+			dropObj.Value = DropdownConfig.Default
 			syde.Flags[flagName] = dropObj
 			return dropObj
 		end
@@ -10635,6 +10750,9 @@ function syde:Init(library)
 				ValueX = defX,
 				ValueY = defY,
 				ValueZ = defZ,
+				Type = "Pbind",
+				Save = PBindConfig.Save ~= false,
+				Flag = flagName,
 				_frame = pbindFrame
 			}
 
@@ -10682,7 +10800,7 @@ function syde:Init(library)
 					pbindObj.ValueY = boxes.Y and boxes.Y.Text or ""
 					pbindObj.ValueZ = boxes.Z and boxes.Z.Text or ""
 					cb(pbindObj.ValueX, pbindObj.ValueY, pbindObj.ValueZ)
-					SaveConfig()
+					SaveCfg(game and game.GameId)
 				end
 
 				tb.FocusLost:Connect(fireCallback)
@@ -10703,7 +10821,7 @@ function syde:Init(library)
 				if y ~= nil and boxes.Y then boxes.Y.Text = tostring(y) pbindObj.ValueY = tostring(y) end
 				if z ~= nil and boxes.Z then boxes.Z.Text = tostring(z) pbindObj.ValueZ = tostring(z) end
 				cb(pbindObj.ValueX, pbindObj.ValueY, pbindObj.ValueZ)
-				SaveConfig()
+				SaveCfg(game and game.GameId)
 			end
 
 			function pbindObj:toggle()
@@ -10725,12 +10843,11 @@ function syde:Init(library)
 
 			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
 				local saved = syde.LoadedConfig[flagName]
-				if type(saved) == "table" and saved._type == "Key" then
-					if saved.EnumType == "Enum.KeyCode" and Enum.KeyCode[saved.Name] then
-						key = Enum.KeyCode[saved.Name]
-					elseif saved.EnumType == "Enum.UserInputType" and Enum.UserInputType[saved.Name] then
-						key = Enum.UserInputType[saved.Name]
-					end
+				local success, keyEnum = pcall(function()
+					return Enum.KeyCode[saved] or Enum.UserInputType[saved]
+				end)
+				if success and keyEnum then
+					key = keyEnum
 				elseif typeof(saved) == "string" and Enum.KeyCode[saved] then
 					key = Enum.KeyCode[saved]
 				end
@@ -10744,20 +10861,39 @@ function syde:Init(library)
 				Key = key,
 				Flag = flagName,
 				Description = BindConfig.Description or "",
+				Save = BindConfig.Save ~= false,
+				OnKeyChanged = function(newKey)
+					if bindObj then
+						bindObj.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
+						bindObj.Key = newKey
+					end
+					SaveCfg(game and game.GameId)
+				end,
 				CallBack = cb
 			})
 
 			local bindObj = {
-				Value = key,
+				Type = "Bind",
+				Save = BindConfig.Save ~= false,
+				Flag = flagName,
+				Value = typeof(key) == "EnumItem" and key.Name or tostring(key or "NONE"),
 				Key = key,
 				_frame = bindData and bindData._frame or nil,
 				Set = function(self, newKey)
+					if typeof(newKey) == "string" then
+						local success, keyEnum = pcall(function()
+							return Enum.KeyCode[newKey] or Enum.UserInputType[newKey]
+						end)
+						if success and keyEnum then
+							newKey = keyEnum
+						end
+					end
 					if bindData and bindData.Set then
 						bindData:Set(newKey)
 					end
-					self.Value = newKey
+					self.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
 					self.Key = newKey
-					SaveConfig()
+					SaveCfg(game and game.GameId)
 				end,
 				toggle = function(self)
 					if bindData and bindData._frame then
@@ -10795,13 +10931,17 @@ function syde:Init(library)
 				ClearOnLost = clearOnLost,
 				Default = def,
 				Flag = flagName,
+				Save = TextboxConfig.Save ~= false,
 				CallBack = function(txt)
 					cb(txt)
-					SaveConfig()
+					SaveCfg(game and game.GameId)
 				end
 			})
 
 			local tbObj = {
+				Type = "Textbox",
+				Save = TextboxConfig.Save ~= false,
+				Flag = flagName,
 				Value = def,
 				_frame = inputData and inputData._frame or nil,
 				Set = function(self, val)
@@ -10811,7 +10951,7 @@ function syde:Init(library)
 					else
 						cb(tostring(val))
 					end
-					SaveConfig()
+					SaveCfg(game and game.GameId)
 				end,
 				toggle = function(self)
 					if inputData and inputData._frame then
@@ -10837,9 +10977,7 @@ function syde:Init(library)
 
 			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
 				local saved = syde.LoadedConfig[flagName]
-				if type(saved) == "table" and saved._type == "Color" and saved.R and saved.G and saved.B then
-					defColor = Color3.new(saved.R, saved.G, saved.B)
-				end
+				defColor = UnpackColor(saved)
 			end
 
 			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
@@ -10848,11 +10986,16 @@ function syde:Init(library)
 				Title = name,
 				Color = defColor,
 				Flag = flagName,
+				Save = ColorpickerConfig.Save ~= false,
 				CallBack = function(col)
-					cb(col)
-					SaveConfig()
+					if cb then cb(col) end
+					SaveCfg(game and game.GameId)
 				end
 			})
+			pickerData.Type = "Colorpicker"
+			pickerData.Save = ColorpickerConfig.Save ~= false
+			pickerData.Flag = flagName
+			pickerData.Value = defColor
 			syde.Flags[flagName] = pickerData
 			return pickerData
 		end
