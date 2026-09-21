@@ -1882,13 +1882,22 @@ local function createPerformanceOverlay()
 	local frame = Instance.new("Frame")
 	frame.Name = "PerformanceOverlay"
 	frame.AnchorPoint = Vector2.new(0.5, 0)
-	frame.BackgroundTransparency = 1
+	frame.BackgroundColor3 = Color3.fromRGB(42, 42, 46)
+	frame.BackgroundTransparency = 0.18
 	frame.BorderSizePixel = 0
 	frame.Position = UDim2.new(0.56, 0, 0, 9)
 	frame.Size = UDim2.new(0, 120, 0, 20)
 	frame.Visible = false
 	frame.ZIndex = 25
 	frame.Parent = window.top
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 7)
+	corner.Parent = frame
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(72, 72, 78)
+	stroke.Transparency = 0.35
+	stroke.Thickness = 1
+	stroke.Parent = frame
 
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
@@ -2611,6 +2620,12 @@ function opensearch()
 	searchopen = true
 	window.dim.Visible = true
 	window.search.Visible = true
+	window.search.Active = true
+	window.search.ZIndex = 30
+	window.search.Frame.ZIndex = 31
+	window.search.Frame.TextBox.Active = true
+	window.search.Frame.TextBox.Selectable = true
+	window.dim.ZIndex = 20
 	window.search.Container.Visible = true
 	window.search.Visible = true
 
