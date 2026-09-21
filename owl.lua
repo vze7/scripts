@@ -2607,7 +2607,13 @@ function opensearch()
 end
 
 function closesearch()
-	if not window.search.Visible then return end
+	if not window.search.Visible then
+		if not settingsOpen then
+			window.dim.Visible = false
+			window.dim.BackgroundTransparency = 1
+		end
+		return
+	end
 	searchopen = false
 	window.search.Container.Visible = false
 	Services.Tween:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
@@ -3591,7 +3597,13 @@ function Owl:Init(library)
 	end
 
 	function closesettings()
-		if not window.settings.Visible then return end
+		if not window.settings.Visible then
+			if not searchopen then
+				window.dim.Visible = false
+				window.dim.BackgroundTransparency = 1
+			end
+			return
+		end
 		Services.Tween:Create(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 150)}):Play()
 		Services.Tween:Create(window.dim, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
 		Services.Tween:Create(window.settings.UICorner, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0, 90)}):Play()
@@ -3615,6 +3627,13 @@ function Owl:Init(library)
 	if not settingsOpen then
 		closesettings()
 	end
+	window.settings.Visible = false
+	window.settings.pages.Visible = false
+	window.settings.tabs.Visible = false
+	window.search.Visible = false
+	window.search.Container.Visible = false
+	window.dim.Visible = false
+	window.dim.BackgroundTransparency = 1
 
 	window.top.functions.settings.interact.MouseButton1Click:Connect(function()
 		if not settingsOpen then
