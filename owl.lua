@@ -3573,7 +3573,9 @@ function Owl:Init(library)
 	function opensettings()
 		if settingsOpen and window.settings.Visible then return end
 		window.dim.ZIndex = 90
+		window.dim.Active = false
 		window.settings.ZIndex = 100
+		window.settings.Active = true
 		for _, descendant in ipairs(window.settings:GetDescendants()) do
 			if descendant:IsA("GuiObject") then
 				descendant.ZIndex = math.max(descendant.ZIndex, 101)
@@ -3601,6 +3603,7 @@ function Owl:Init(library)
 			if not searchopen then
 				window.dim.Visible = false
 				window.dim.BackgroundTransparency = 1
+				window.dim.Active = false
 			end
 			return
 		end
@@ -3619,7 +3622,9 @@ function Owl:Init(library)
 		task.delay(0.35, function()
 			if not settingsOpen then
 				window.settings.Visible = false
+				window.settings.Active = false
 				window.dim.Visible = false
+				window.dim.Active = false
 			end
 		end)
 	end
@@ -3628,12 +3633,15 @@ function Owl:Init(library)
 		closesettings()
 	end
 	window.settings.Visible = false
+	window.settings.Active = false
 	window.settings.pages.Visible = false
 	window.settings.tabs.Visible = false
 	window.search.Visible = false
+	window.search.Active = false
 	window.search.Container.Visible = false
 	window.dim.Visible = false
 	window.dim.BackgroundTransparency = 1
+	window.dim.Active = false
 
 	window.top.functions.settings.interact.MouseButton1Click:Connect(function()
 		if not settingsOpen then
