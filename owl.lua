@@ -21,6 +21,12 @@ uiAsset.Enabled = false
 for _, descendant in ipairs(uiAsset:GetDescendants()) do
 	if descendant:IsA("LocalScript") or descendant:IsA("Script") then
 		descendant.Disabled = true
+	elseif descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox") then
+		local text = string.lower(descendant.Text or "")
+		if string.find(text, "luffy", 1, true) or string.find(text, "nicko", 1, true) then
+			descendant.Text = ""
+			descendant.Visible = false
+		end
 	end
 end
 
@@ -1254,7 +1260,7 @@ function Owl:Load(config)
 	card.BackgroundTransparency = 1
 	card.BorderSizePixel = 0
 	card.Position = UDim2.fromScale(0.5, 0.5)
-	card.Size = UDim2.fromOffset(400, 186)
+	card.Size = UDim2.fromOffset(300, 110)
 	card.Parent = backdrop
 
 	local cardScale = Instance.new("UIScale")
@@ -1262,11 +1268,10 @@ function Owl:Load(config)
 	cardScale.Parent = card
 
 	local cardCorner = Instance.new("UICorner")
-	cardCorner.CornerRadius = UDim.new(0, 18)
+	cardCorner.CornerRadius = UDim.new(0, 12)
 	cardCorner.Parent = card
 
 	local cardStroke = Instance.new("UIStroke")
-	cardStroke.Color = accent
 	cardStroke.Transparency = 1
 	cardStroke.Thickness = 1
 	cardStroke.Parent = card
@@ -1274,7 +1279,7 @@ function Owl:Load(config)
 	local glow = Instance.new("Frame")
 	glow.AnchorPoint = Vector2.new(0.5, 0.5)
 	glow.BackgroundColor3 = accent
-	glow.BackgroundTransparency = 0.88
+	glow.BackgroundTransparency = 1
 	glow.BorderSizePixel = 0
 	glow.Position = UDim2.fromScale(0.78, 0.2)
 	glow.Size = UDim2.fromOffset(150, 150)
@@ -1291,6 +1296,7 @@ function Owl:Load(config)
 	owlMark.Position = UDim2.fromOffset(49, 57)
 	owlMark.Size = UDim2.fromOffset(48, 42)
 	owlMark.Parent = card
+	owlMark.Visible = false
 
 	local owlCorner = Instance.new("UICorner")
 	owlCorner.CornerRadius = UDim.new(0, 13)
@@ -1364,25 +1370,25 @@ function Owl:Load(config)
 	local titleLabel = Instance.new("TextLabel")
 	titleLabel.BackgroundTransparency = 1
 	titleLabel.Font = Enum.Font.GothamSemibold
-	titleLabel.Position = UDim2.fromOffset(84, 34)
-	titleLabel.Size = UDim2.new(1, -108, 0, 24)
+	titleLabel.Position = UDim2.new(0, 0, 0, 22)
+	titleLabel.Size = UDim2.new(1, 0, 0, 24)
 	titleLabel.Text = title
 	titleLabel.TextColor3 = Color3.fromRGB(247, 247, 250)
-	titleLabel.TextSize = 18
+	titleLabel.TextSize = 20
 	titleLabel.TextTransparency = 1
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Center
 	titleLabel.Parent = card
 
 	local statusLabel = Instance.new("TextLabel")
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.Font = Enum.Font.Gotham
-	statusLabel.Position = UDim2.fromOffset(84, 62)
-	statusLabel.Size = UDim2.new(1, -108, 0, 18)
-	statusLabel.Text = "Loading interface"
+	statusLabel.Position = UDim2.new(0, 0, 0, 51)
+	statusLabel.Size = UDim2.new(1, 0, 0, 18)
+	statusLabel.Text = "Loading"
 	statusLabel.TextColor3 = Color3.fromRGB(151, 151, 162)
 	statusLabel.TextSize = 12
 	statusLabel.TextTransparency = 1
-	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+	statusLabel.TextXAlignment = Enum.TextXAlignment.Center
 	statusLabel.Parent = card
 
 	local track = Instance.new("Frame")
@@ -1392,6 +1398,7 @@ function Owl:Load(config)
 	track.Position = UDim2.fromOffset(28, 132)
 	track.Size = UDim2.new(1, -56, 0, 4)
 	track.Parent = card
+	track.Visible = false
 
 	local trackCorner = Instance.new("UICorner")
 	trackCorner.CornerRadius = UDim.new(1, 0)
@@ -1416,61 +1423,47 @@ function Owl:Load(config)
 	fillGradient.Offset = Vector2.new(-1, 0)
 	fillGradient.Parent = fill
 
+	local dots = {}
+	for index = 1, 3 do
+		local dot = Instance.new("Frame")
+		dot.AnchorPoint = Vector2.new(0.5, 0.5)
+		dot.BackgroundColor3 = accent
+		dot.BackgroundTransparency = 0.68
+		dot.BorderSizePixel = 0
+		dot.Position = UDim2.new(0.5, (index - 2) * 12, 0, 84)
+		dot.Size = UDim2.fromOffset(5, 5)
+		dot.Parent = card
+		local dotCorner = Instance.new("UICorner")
+		dotCorner.CornerRadius = UDim.new(1, 0)
+		dotCorner.Parent = dot
+		dots[index] = dot
+	end
+
 	Services.Tween:Create(backdrop, TweenInfo.new(0.28, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.12}):Play()
-	Services.Tween:Create(card, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.03}):Play()
+	Services.Tween:Create(card, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
 	Services.Tween:Create(cardScale, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
-	Services.Tween:Create(cardStroke, TweenInfo.new(0.34, Enum.EasingStyle.Quint), {Transparency = 0.62}):Play()
 	Services.Tween:Create(titleLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {TextTransparency = 0}):Play()
 	Services.Tween:Create(statusLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {TextTransparency = 0}):Play()
-	Services.Tween:Create(track, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {BackgroundTransparency = 0}):Play()
-	Services.Tween:Create(fill, TweenInfo.new(0.92, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.fromScale(1, 1)}):Play()
-	Services.Tween:Create(fillGradient, TweenInfo.new(0.78, Enum.EasingStyle.Sine), {Offset = Vector2.new(1, 0)}):Play()
-	Services.Tween:Create(owlScale, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+	Services.Tween:Create(cardScale, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
-	local breatheTween = Services.Tween:Create(owlScale, TweenInfo.new(0.78, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Scale = 1.035})
-	local floatTween = Services.Tween:Create(owlMark, TweenInfo.new(0.78, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Position = UDim2.fromOffset(49, 54)})
-	local glowTweens = {}
-	for _, eye in ipairs(eyes) do
-		local glowTween = Services.Tween:Create(eye, TweenInfo.new(0.72, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {BackgroundColor3 = accent:Lerp(Color3.new(1, 1, 1), 0.18)})
-		glowTween:Play()
-		table.insert(glowTweens, glowTween)
-	end
 	local loadingActive = true
-	task.delay(0.3, function()
-		if loadingActive and loaderGui.Parent then
-			breatheTween:Play()
-			floatTween:Play()
-		end
-	end)
-	for _, pupil in ipairs(pupils) do
-		Services.Tween:Create(pupil, TweenInfo.new(0.38, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 1, true), {Position = UDim2.fromScale(0.68, 0.5)}):Play()
-	end
 	task.spawn(function()
-		task.wait(0.34)
 		while loadingActive and loaderGui.Parent do
-			for _, eye in ipairs(eyes) do
-				Services.Tween:Create(eye, TweenInfo.new(0.065, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.fromOffset(11, 1)}):Play()
+			for _, dot in ipairs(dots) do
+				Services.Tween:Create(dot, TweenInfo.new(0.18, Enum.EasingStyle.Sine), {BackgroundTransparency = 0}):Play()
+				task.wait(0.12)
+				Services.Tween:Create(dot, TweenInfo.new(0.22, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.68}):Play()
 			end
-			task.wait(0.07)
-			for _, eye in ipairs(eyes) do
-				Services.Tween:Create(eye, TweenInfo.new(0.13, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(11, 8)}):Play()
-			end
-			task.wait(0.72)
 		end
 	end)
 
 	task.wait(0.42)
 	Services.Tween:Create(statusLabel, TweenInfo.new(0.1), {TextTransparency = 1}):Play()
 	task.wait(0.1)
-	statusLabel.Text = "Finishing details"
+	statusLabel.Text = "Ready"
 	Services.Tween:Create(statusLabel, TweenInfo.new(0.16), {TextTransparency = 0}):Play()
 	task.wait(0.42)
 	loadingActive = false
-	breatheTween:Cancel()
-	floatTween:Cancel()
-	for _, glowTween in ipairs(glowTweens) do
-		glowTween:Cancel()
-	end
 	Services.Tween:Create(cardScale, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.98}):Play()
 	Services.Tween:Create(card, TweenInfo.new(0.22, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
 	Services.Tween:Create(backdrop, TweenInfo.new(0.25, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
@@ -2847,8 +2840,14 @@ function Owl:Init(library)
 		local PROTECTION_EVENT = Instance.new("BindableEvent")
 		local HttpService = game:GetService("HttpService")
 		local function deepCleanup()
-			for _, v in ipairs(GuiRoot:GetChildren()) do
-				if v:IsA("ScreenGui") then
+			local roots = {GuiRoot}
+			local coreGui = game:GetService("CoreGui")
+			if coreGui ~= GuiRoot then
+				table.insert(roots, coreGui)
+			end
+			for _, root in ipairs(roots) do
+				for _, v in ipairs(root:GetChildren()) do
+					if not v:IsA("ScreenGui") then continue end
 					local name = string.lower(v.Name)
 					local isLegacyUi = v:FindFirstChild(MARKER_NAME)
 						or string.find(name, "syde", 1, true)
