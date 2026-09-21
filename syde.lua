@@ -2181,6 +2181,29 @@ function syde:DeleteConfig(name)
 	return false
 end
 
+function syde:GetAutoLoad()
+	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
+	local autoloadPath = string.format("%s/_autoload.txt", folder)
+	if isfile and isfile(autoloadPath) then
+		local ok, content = pcall(readfile, autoloadPath)
+		if ok and content then
+			return tostring(content):match("^%s*(.-)%s*$") == "1"
+		end
+	end
+	return false
+end
+
+function syde:SetAutoLoad(enabled)
+	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
+	local autoloadPath = string.format("%s/_autoload.txt", folder)
+	if isfolder and not isfolder(folder) then
+		pcall(makefolder, folder)
+	end
+	if writefile then
+		pcall(writefile, autoloadPath, enabled and "1" or "0")
+	end
+end
+
 syde.PackColor = PackColor
 syde.UnpackColor = UnpackColor
 syde.SaveCfg = SaveCfg
