@@ -2488,6 +2488,18 @@ function Owl:MakeWindow(WindowConfig)
 			local decodeOk, decoded = pcall(function() return HttpService:JSONDecode(rawData) end)
 			if decodeOk and type(decoded) == "table" then
 				Owl.LoadedConfig = decoded
+				if decoded.Accent then
+					local savedAccent = UnpackColor(decoded.Accent)
+					if savedAccent then
+						Owl:UpdateTheme({Accent = savedAccent})
+					end
+				end
+				if decoded.HitBox then
+					local savedHitBox = UnpackColor(decoded.HitBox)
+					if savedHitBox then
+						Owl:UpdateTheme({HitBox = savedHitBox})
+					end
+				end
 				if decoded["ToggleUI"] then
 					local success, keyEnum = pcall(function()
 						return Enum.KeyCode[decoded["ToggleUI"]] or Enum.UserInputType[decoded["ToggleUI"]]
