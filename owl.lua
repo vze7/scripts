@@ -2891,19 +2891,12 @@ function Owl:Init(library)
 		SubText = library.SubText or "Google";
 		Home = {Enabled = false}
 	}
-	local function lockHidden(object)
-		if not object then return end
-		object.Visible = false
-		Owl:AddConnection(object:GetPropertyChangedSignal("Visible"), function()
-			if object.Visible then
-				object.Visible = false
-			end
-		end)
+	local homePage = window.pages:FindFirstChild("home")
+	if homePage then
+		homePage.Visible = false
 	end
-	lockHidden(window.pages:FindFirstChild("home"))
 	local homeTab = window.tabs:FindFirstChild("Home")
 	if homeTab then
-		lockHidden(homeTab)
 		local homeInteract = homeTab:FindFirstChild("homeicon") and homeTab.homeicon:FindFirstChild("interact")
 		if homeInteract then
 			homeInteract.Interactable = false
@@ -2911,13 +2904,13 @@ function Owl:Init(library)
 	end
 	local wallpaper = window:FindFirstChild("wallpaper")
 	if wallpaper then
-		lockHidden(wallpaper)
+		wallpaper.Visible = false
 		local wallpaperState = window.wallpaper:FindFirstChild("ison")
 		if wallpaperState then
 			wallpaperState.Value = false
 		end
 	end
-	for _, object in ipairs(ui:GetDescendants()) do
+	for _, object in ipairs(homePage and homePage:GetDescendants() or {}) do
 		if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
 			local text = string.lower(object.Text or "")
 			if string.find(text, "luffy", 1, true) or string.find(text, "nicko", 1, true) then
