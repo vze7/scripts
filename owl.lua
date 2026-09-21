@@ -3189,6 +3189,16 @@ function Owl:Init(library)
 		window.pages.home.general.presence.PlaceID.Text =
 			"Place ID: "..placeId
 		window.pages.home.general.presence.PlaceID.Visible = false
+		local homeGeneral = window.pages.home.general
+		local presence = homeGeneral.presence
+		local quick = homeGeneral.Quick
+		if presence:IsA("GuiObject") then
+			presence.Size = UDim2.new(1, 0, 0, 72)
+		end
+		if quick:IsA("GuiObject") then
+			quick.Position = UDim2.new(0, 0, 0, 82)
+			quick.Size = UDim2.new(1, 0, 0, 420)
+		end
 
 	
 
