@@ -770,7 +770,7 @@ function Bento:Update()
 			self:Tween(frame,{
 				Position = UDim2.fromOffset(0,y),
 				Size = UDim2.fromOffset(
-					containerWidth - self.RightPadding,
+					math.max(80, containerWidth - self.RightPadding),
 					original.Size.Y.Offset
 				)
 			})
@@ -841,7 +841,7 @@ function Bento:Update()
 			else
 
 				width =
-					containerWidth
+					math.max(80, containerWidth)
 				- currentX
 				- self.RightPadding
 
@@ -861,10 +861,10 @@ function Bento:Update()
 		local frame = item.Frame
 		local original = self.Original[frame]
 
-		local width =
+		local width = math.max(80,
 			containerWidth
-		- original.Position.X.Offset
-		- self.RightPadding
+			- original.Position.X.Offset
+			- self.RightPadding)
 
 		self:Tween(frame,{
 			Position = original.Position,
@@ -3187,6 +3187,7 @@ function Owl:Init(library)
 
 		window.pages.home.general.presence.PlaceID.Text =
 			"Place ID: "..placeId
+		window.pages.home.general.presence.PlaceID.Visible = false
 
 	
 
@@ -6433,6 +6434,7 @@ function Owl:Init(library)
 			end,
 			SFlag = 'WTRMK'
 		})
+		window.pages.home.general.Quick.ClipsDescendants = false
 
 		a:Toggle({
 			Title = 'Performance Overlay',
