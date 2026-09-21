@@ -2832,7 +2832,7 @@ function Owl:Init(library)
 	end
 
 	library = library or {}
-	ui.Enabled = true
+	ui.Enabled = false
 	if isLoaded == false then
 		local UI_TAG = "OwlUILoader"
 		local MARKER_NAME = "OWLUIDetector"
@@ -10517,6 +10517,29 @@ function Owl:Init(library)
 
 	end
 	Owl._currentWindow = tbdata
+	task.defer(function()
+		if not ui or not ui.Parent then return end
+		local legacyHome = window.pages:FindFirstChild("home")
+		if legacyHome then
+			legacyHome.Visible = false
+			for _, object in ipairs(legacyHome:GetDescendants()) do
+				if object:IsA("ImageLabel") or object:IsA("ImageButton") then
+					object.Image = ""
+				elseif object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+					local text = string.lower(object.Text or "")
+					if string.find(text, "luffy", 1, true) or string.find(text, "nicko", 1, true) then
+						object.Text = ""
+					end
+				end
+			end
+		end
+		local legacyHomeTab = window.tabs:FindFirstChild("Home")
+		local legacyHomeIcon = legacyHomeTab and legacyHomeTab:FindFirstChild("homeicon")
+		if legacyHomeIcon then
+			legacyHomeIcon.Visible = false
+		end
+		ui.Enabled = true
+	end)
 	return tbdata
 
 
