@@ -18,6 +18,11 @@ local isResizing = false
 local isLoaded = false
 
 uiAsset.Enabled = false
+for _, descendant in ipairs(uiAsset:GetDescendants()) do
+	if descendant:IsA("LocalScript") or descendant:IsA("Script") then
+		descendant.Disabled = true
+	end
+end
 
 local Owl = {
 
@@ -2843,10 +2848,22 @@ function Owl:Init(library)
 		local HttpService = game:GetService("HttpService")
 		local function deepCleanup()
 			for _, v in ipairs(GuiRoot:GetChildren()) do
-				if v:IsA("ScreenGui") and v:FindFirstChild(MARKER_NAME) then
-					pcall(function()
-						v:Destroy()
-					end)
+				if v:IsA("ScreenGui") then
+					local name = string.lower(v.Name)
+					local isLegacyUi = v:FindFirstChild(MARKER_NAME)
+						or string.find(name, "syde", 1, true)
+						or string.find(name, "owlui", 1, true)
+					for _, child in ipairs(v:GetDescendants()) do
+						if child:IsA("TextLabel") and string.find(string.lower(child.Text or ""), "luffyhub", 1, true) then
+							isLegacyUi = true
+							break
+						end
+					end
+					if isLegacyUi then
+						pcall(function()
+							v:Destroy()
+						end)
+					end
 				end
 			end
 		end
@@ -3586,8 +3603,16 @@ function Owl:Init(library)
 		end)
 
 	else
-		window.pages.home.Visible = false
-		window.tabs.Home.homeicon.interact.Interactable = false
+		local legacyHome = window.pages:FindFirstChild("home")
+		if legacyHome then
+			legacyHome.Visible = false
+		end
+		local legacyHomeTab = window.tabs:FindFirstChild("Home")
+		local legacyHomeButton = legacyHomeTab and legacyHomeTab:FindFirstChild("homeicon")
+		local legacyHomeInteract = legacyHomeButton and legacyHomeButton:FindFirstChild("interact")
+		if legacyHomeInteract then
+			legacyHomeInteract.Interactable = false
+		end
 	end
 
 
