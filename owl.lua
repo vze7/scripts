@@ -6096,6 +6096,31 @@ function Owl:Init(library)
 
 
 			end
+			function telement:AddPerformanceOverlay(Options)
+				Options = Options or {}
+				return self:Toggle({
+					Title = Options.Name or Options.Title or "Performance Overlay",
+					Description = Options.Description or "Show FPS and ping in the top bar",
+					Value = Options.Default == true,
+					Flag = Options.Flag or "owl_performance_overlay",
+					Save = Options.Save ~= false,
+					CallBack = function(enabled)
+						Owl:SetPerformanceOverlay(enabled)
+						if Options.Callback then Options.Callback(enabled) end
+					end,
+				})
+			end
+
+			function telement:AddUiBind()
+				return self:Keybind({
+					Title = "UI Keybind",
+					Key = uitoggle,
+					Flag = "ToggleUI",
+					Save = true,
+					CallBack = function() ToggleUI() end,
+				})
+			end
+
 			for _bn, _bf in pairs(telement) do
 				if type(_bf) == "function" then
 					telement[_bn] = Owl:Guard("Building a '" .. tostring(_bn) .. "' element", _bf)
@@ -6109,7 +6134,7 @@ function Owl:Init(library)
 		local a = settings:inittab({Title = 'Theme'})
 		local b = settings:inittab({Title = 'Privacy'})
 		local c = settings:inittab({Title = 'Info'})
-		tbdata._settingsTab = a
+		Owl._settingsTab = a
 
 		a:Keybind({
 			Title = 'Toggle UI',
@@ -6652,7 +6677,7 @@ function Owl:Init(library)
 	end
 
 	function tbdata:CreateSettingsTab(Options)
-		return self._settingsTab
+		return Owl._settingsTab
 	end
 
 	function tbdata:ChangeIcon(IconId)
