@@ -7202,16 +7202,18 @@ function Owl:Init(library)
 				closesearch()
 
 				local openedPage = ui.main.pages:FindFirstChild(page.Name)
-				if not openedPage or not openedPage:IsA("ScrollingFrame") then return end
+				if not openedPage or not openedPage:IsA("GuiObject") then return end
 				SwitchToTab(page.Name)
 
 				task.wait(0.05) -- small delay to allow UI to update
-				local y = func.AbsolutePosition.Y - openedPage.AbsolutePosition.Y + openedPage.CanvasPosition.Y
-				Services.Tween:Create(
-					openedPage,
-					TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-					{ CanvasPosition = Vector2.new(0, math.max(0, y - 20)) }
-				):Play()
+				if openedPage:IsA("ScrollingFrame") then
+					local y = func.AbsolutePosition.Y - openedPage.AbsolutePosition.Y + openedPage.CanvasPosition.Y
+					Services.Tween:Create(
+						openedPage,
+						TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+						{ CanvasPosition = Vector2.new(0, math.max(0, y - 20)) }
+					):Play()
+				end
 				local original = func.BackgroundColor3
 				Services.Tween:Create(func, TweenInfo.new(0.2), {
 					BackgroundColor3 = Owl:GetLighter(original, 0.03)
@@ -7253,7 +7255,7 @@ function Owl:Init(library)
 
 
 				for _, page in ipairs(Pages:GetChildren()) do
-					if page:IsA("ScrollingFrame") then
+					if page:IsA("GuiObject") then
 						for _, child in ipairs(page:GetDescendants()) do
 							if child:IsA("Frame") and child:GetAttribute("Searchable") then
 								local name = child.Name:lower()
@@ -7819,7 +7821,7 @@ function Owl:Init(library)
 					Increment = Options.Increment or 1;
 					Range = Options.Range or {0, 100};
 					StarterValue = Options.StarterValue or 16;
-					CallBack = Options.CallBack;
+					CallBack = Options.CallBack or function() end;
 					Flag = Options.Flag;
 				}
 
@@ -7975,6 +7977,7 @@ function Owl:Init(library)
 
 				Slider.slide.Interact.MouseButton1Down:Connect(function()
 					dragging = true
+					UpdateSlider(Services.UserInput:GetMouseLocation().X)
 				end)
 
 				Slider.slide.Interact.MouseButton1Up:Connect(function()
@@ -7989,7 +7992,7 @@ function Owl:Init(library)
 				end)
 
 				Owl:AddConnection(Services.UserInput.InputChanged, function(input)
-					if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or input.UserInputType == Enum.UserInputType.Touch  then
+					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 						UpdateSlider(input.Position.X)
 					end
 				end)
@@ -7998,9 +8001,14 @@ function Owl:Init(library)
 				Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = Owl.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = Owl.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = Owl.theme.HitBox
-				slider.slideholder.Size = UDim2.new(1,-30,0,slider.slideholder.UIListLayout.AbsoluteContentSize.Y)
-				local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
-				slider.Size = UDim2.new(1,-35,0, ss  + 20)
+				local function refreshSliderSize()
+					if not slider.Parent then return end
+					local contentHeight = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
+					slider.slideholder.Size = UDim2.new(1, -30, 0, contentHeight)
+					slider.Size = UDim2.new(1, -35, 0, math.max(78, contentHeight + 30))
+				end
+				task.defer(refreshSliderSize)
+				slider.slideholder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshSliderSize)
 
 				Owl:AddConnection(Owl.Comms.Event, function(p, color)
 					if p == 'HitBox' then
@@ -8059,7 +8067,7 @@ function Owl:Init(library)
 				end
 
 			end
-			local descLabel = slider.slideholder:FindFirstChild("Desc")
+			local descLabel = slider:FindFirstChild("Desc", true)
 
 			if descLabel then
 				if data.Desc and data.Desc ~= "" then
