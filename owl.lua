@@ -1684,57 +1684,43 @@ local function LoadCfg(Config)
 
 	Owl.LoadedConfig = Data
 
-	local flagsProcessed = 0
-	local totalFlags = 0
-	for _, _ in pairs(Data) do totalFlags += 1 end
-
 	for a, b in pairs(Data) do
 		if Owl.Flags[a] then
-			task.spawn(function()
-				local flag = Owl.Flags[a]
-				pcall(function()
-					if flag.Type == "MultiColorpicker" then
-						if type(b) == "table" and b.R == nil then
-							for index, colorData in ipairs(b) do
-								flag:Set(index, UnpackColor(colorData))
-							end
-						else
-							flag:Set(1, UnpackColor(b))
+			local flag = Owl.Flags[a]
+			pcall(function()
+				if flag.Type == "MultiColorpicker" then
+					if type(b) == "table" and b.R == nil then
+						for index, colorData in ipairs(b) do
+							flag:Set(index, UnpackColor(colorData))
 						end
-					elseif flag.Type == "Colorpicker" or flag.Type == "ColorPicker" then
-						flag:Set(UnpackColor(b))
-					elseif flag.Type == "Bind" or flag.Type == "Keybind" then
-						local success, keyEnum = pcall(function()
-							return Enum.KeyCode[b] or Enum.UserInputType[b]
-						end)
-						if success and keyEnum then
-							flag:Set(keyEnum)
-						else
-							flag:Set(b)
-						end
-					elseif flag.Type == "Pbind" or (type(b) == "table" and b._type == "Pbind") then
-						if flag.Set then
-							flag:Set(b.X, b.Y, b.Z)
-						end
+					else
+						flag:Set(1, UnpackColor(b))
+					end
+				elseif flag.Type == "Colorpicker" or flag.Type == "ColorPicker" then
+					flag:Set(UnpackColor(b))
+				elseif flag.Type == "Bind" or flag.Type == "Keybind" then
+					local success, keyEnum = pcall(function()
+						return Enum.KeyCode[b] or Enum.UserInputType[b]
+					end)
+					if success and keyEnum then
+						flag:Set(keyEnum)
 					else
 						flag:Set(b)
 					end
-				end)
-
-				flagsProcessed += 1
-				if flagsProcessed >= totalFlags then
-					task.wait(0.05)
-					Owl:SetTheme()
+				elseif flag.Type == "Pbind" or (type(b) == "table" and b._type == "Pbind") then
+					if flag.Set then
+						flag:Set(b.X, b.Y, b.Z)
+					end
+				else
+					if flag.Set then
+						flag:Set(b)
+					end
 				end
 			end)
-		else
-			flagsProcessed += 1
-			if flagsProcessed >= totalFlags then
-				task.wait(0.05)
-				Owl:SetTheme()
-			end
 		end
 	end
+	
+	Owl:SetTheme()
 end
 
 local saveDebounce = nil
@@ -2912,7 +2898,6 @@ function Owl:Init(library)
 					if not v:IsA("ScreenGui") then continue end
 					local name = string.lower(v.Name)
 					local isLegacyUi = v:FindFirstChild(MARKER_NAME)
-						or string.find(name, "syde", 1, true)
 						or string.find(name, "owlui", 1, true)
 					for _, child in ipairs(v:GetDescendants()) do
 						if child:IsA("TextLabel") and string.find(string.lower(child.Text or ""), "luffyhub", 1, true) then
@@ -3259,11 +3244,52 @@ function Owl:Init(library)
 			window.pages.home.general.presence.wallpaper.Image = ""
 		end
 		
-		local placeId = game.PlaceId
+		local placeIdLabel = window.pages.home.general.presence.PlaceID
+		placeIdLabel.Visible = true
 
-		window.pages.home.general.presence.PlaceID.Text =
-			"Place ID: "..placeId
-		window.pages.home.general.presence.PlaceID.Visible = false
+		task.spawn(function()
+			local requestFn = request or http_request or (syn and syn.request) or (http and http.request)
+			local weatherStr = ""
+			if requestFn then
+				local ok, ipRes = pcall(function() return requestFn({Url = "http://ip-api.com/json/", Method = "GET"}) end)
+				if ok and ipRes and ipRes.StatusCode == 200 then
+					local HttpService = game:GetService("HttpService")
+					local ipData = HttpService:JSONDecode(ipRes.Body)
+					if ipData and ipData.lat and ipData.lon then
+						local weatherUrl = string.format("https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true", ipData.lat, ipData.lon)
+						local wok, wRes = pcall(function() return requestFn({Url = weatherUrl, Method = "GET"}) end)
+						if wok and wRes and wRes.StatusCode == 200 then
+							local wData = HttpService:JSONDecode(wRes.Body)
+							if wData.current_weather then
+								local tempC = wData.current_weather.temperature
+								if ipData.countryCode == "US" then
+									weatherStr = " | 🌡️ " .. math.floor((tempC * 9/5) + 32) .. "°F"
+								else
+									weatherStr = " | 🌡️ " .. math.floor(tempC) .. "°C"
+								end
+							end
+						end
+					end
+				end
+			end
+			local RunService = game:GetService("RunService")
+			local frames = 0
+			local lastUpdate = os.clock()
+			local localPlayer = game:GetService("Players").LocalPlayer
+			RunService.RenderStepped:Connect(function()
+				frames += 1
+				local now = os.clock()
+				if now - lastUpdate >= 1 then
+					local fps = frames
+					frames = 0
+					lastUpdate = now
+					local ping = localPlayer:GetNetworkPing() * 1000
+					if ping == 0 and RunService:IsStudio() then ping = 50 + math.noise(os.clock()*0.5)*40 end
+					placeIdLabel.Text = string.format("Ping: %d ms | FPS: %d%s", math.floor(ping), fps, weatherStr)
+				end
+			end)
+		end)
+
 		local homeGeneral = window.pages.home.general
 		local presence = homeGeneral.presence
 		local quick = homeGeneral.Quick
@@ -3305,44 +3331,40 @@ function Owl:Init(library)
 		local homeLayoutBusy = false
 		local homeLayoutRevision = 0
 		local homeCardTweens = {}
-		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-		local function animateHomeCard(card, position, size)
-			if homeCardTweens[card] then homeCardTweens[card]:Cancel() end
-			local tween = Services.Tween:Create(card, homeMotion, {Position = position, Size = size})
-			homeCardTweens[card] = tween
-			tween:Play()
-			tween.Completed:Connect(function()
-				if homeCardTweens[card] == tween then homeCardTweens[card] = nil end
-			end)
+		local function setHomeCard(card, position, size)
+			if homeCardTweens[card] then 
+				homeCardTweens[card]:Cancel()
+				homeCardTweens[card] = nil 
+			end
+			card.Position = position
+			card.Size = size
 		end
 		local function updateHomeLayout()
 			homeLayoutRevision += 1
 			local revision = homeLayoutRevision
-			task.delay(0.12, function()
-				if revision ~= homeLayoutRevision or homeLayoutBusy then return end
-				homeLayoutBusy = true
+			task.delay(0.02, function()
+				if revision ~= homeLayoutRevision then return end
 				local width = math.max(260, quick.AbsoluteSize.X)
 				local gap = 8
 				local contentHeight
 				if width >= 560 then
 					local leftWidth = math.floor((width - gap) * 0.62)
-					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
-					animateHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
-					animateHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
-					animateHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
+					setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
+					setHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
+					setHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
+					setHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
 					contentHeight = 372
 				else
-					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
-					animateHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
-					animateHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
-					animateHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
+					setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
+					setHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
+					setHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
+					setHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
 					contentHeight = 450
 				end
 				quick.Size = UDim2.new(1, 0, 0, contentHeight)
 				if homePage:IsA("ScrollingFrame") then
 					homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
 				end
-				homeLayoutBusy = false
 			end)
 		end
 		Owl:AddConnection(quick:GetPropertyChangedSignal("AbsoluteSize"), updateHomeLayout)
