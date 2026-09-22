@@ -1896,7 +1896,7 @@ local function createPerformanceOverlay()
 		if not frame.Parent or not window.top or not window.top.functions then return end
 		local topWidth = window.top.AbsoluteSize.X
 		local controlsWidth = window.top.functions.AbsoluteSize.X
-		local rightEdge = topWidth - controlsWidth - 12
+		local rightEdge = topWidth - controlsWidth + 32
 		frame.Position = UDim2.fromOffset(math.max(120, rightEdge - frame.AbsoluteSize.X), 9)
 	end
 	window.top:GetPropertyChangedSignal("AbsoluteSize"):Connect(alignPerformanceOverlay)
@@ -1922,8 +1922,8 @@ local function createPerformanceOverlay()
 
 end
 
-function Owl:SetPerformanceOverlay(enabled)
-	performanceOverlay.enabled = enabled == true
+function Owl:SetPerformanceOverlay()
+	performanceOverlay.enabled = true
 	createPerformanceOverlay()
 	performanceOverlay.frame.Visible = performanceOverlay.enabled
 	local miniInfo = ui and ui:FindFirstChild("minihome") and ui.minihome:FindFirstChild("info")
@@ -1934,10 +1934,6 @@ function Owl:SetPerformanceOverlay(enabled)
 	if performanceOverlay.connection then
 		performanceOverlay.connection:Disconnect()
 		performanceOverlay.connection = nil
-	end
-
-	if not performanceOverlay.enabled then
-		return
 	end
 
 	performanceOverlay.frameCount = 0
@@ -2554,9 +2550,7 @@ function Owl:MakeWindow(WindowConfig)
 	end
 
 	local windowObj = Owl:Init(libConfig)
-	if WindowConfig.PerformanceOverlay == true or (Owl.LoadedConfig and Owl.LoadedConfig.owl_performance_overlay == true) then
-		Owl:SetPerformanceOverlay(true)
-	end
+	Owl:SetPerformanceOverlay()
 
 	if WindowConfig.KeyToOpenWindow or WindowConfig.Openkey then
 		local key = WindowConfig.KeyToOpenWindow or WindowConfig.Openkey
@@ -6524,20 +6518,6 @@ function Owl:Init(library)
 		})
 		window.pages.home.general.Quick.ClipsDescendants = false
 
-		a:Toggle({
-			Title = 'Performance Overlay',
-			Description = 'Shows FPS and Data Ping in the top bar.',
-			Value = (Owl.LoadedConfig and Owl.LoadedConfig["owl_performance_overlay"] == true) or performanceOverlay.enabled,
-			Flag = "owl_performance_overlay",
-			Save = true,
-			CallBack = function(enabled)
-				Owl:SetPerformanceOverlay(enabled)
-				task.defer(function()
-					SaveCfg(game and game.GameId)
-				end)
-			end,
-			SFlag = 'PERF'
-		})
 		local HttpService = game:GetService("HttpService")
 		local isDev = false
 		local baseUrl = isDev and "http://localhost:3000" or "https://Owl-auth.vercel.app"
@@ -10646,7 +10626,6 @@ function Owl:Init(library)
 				end
 			})
 
-			self:AddPerformanceOverlay()
 		end
 		for _bn, _bf in pairs(initelement) do
 			if type(_bf) == "function" then
