@@ -1920,67 +1920,41 @@ local uiRuntime = {
 }
 local isUserInfoHidden = false
 local isBlurEnabled = false
-local glow = Owl.LoadedConfig and Owl.LoadedConfig["Glow"] or false
 
 local BLUR_EFFECT_NAME = "OwlInterfaceBlur"
-local integratedGlowStroke
-local integratedGlowGradient
 
 local function setInterfaceBlur(active)
 	local lighting = game:GetService("Lighting")
 	local effect = lighting:FindFirstChild(BLUR_EFFECT_NAME)
+	if effect and not effect:IsA("BlurEffect") then
+		effect:Destroy()
+		effect = nil
+	end
+	-- Clean up the old, unnamed DOF effect created by earlier Owl versions.
+	for _, legacyEffect in ipairs(lighting:GetChildren()) do
+		if legacyEffect:IsA("DepthOfFieldEffect")
+			and legacyEffect.FocusDistance == 51.6
+			and legacyEffect.InFocusRadius == 50
+			and legacyEffect.NearIntensity == 1
+			and legacyEffect.FarIntensity == 0 then
+			legacyEffect:Destroy()
+		end
+	end
 	if active and not effect then
-		effect = Instance.new("DepthOfFieldEffect")
+		effect = Instance.new("BlurEffect")
 		effect.Name = BLUR_EFFECT_NAME
-		effect.FocusDistance = 51.6
-		effect.InFocusRadius = 50
-		effect.NearIntensity = 1
-		effect.FarIntensity = 0
+		effect.Size = 20
 		effect.Parent = lighting
 	end
-	if effect and effect:IsA("DepthOfFieldEffect") then
+	if effect and effect:IsA("BlurEffect") then
 		effect.Enabled = active
 	end
 end
 
-local function setIntegratedGlow(enabled)
-	glow = enabled
-	if integratedGlowStroke then
-		integratedGlowStroke.Color = Owl.theme.Accent or Color3.fromRGB(0, 170, 255)
-		integratedGlowStroke.Enabled = enabled
-	end
-	if integratedGlowGradient then
-		local accent = Owl.theme.Accent or Color3.fromRGB(0, 170, 255)
-		integratedGlowGradient.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.18)),
-			ColorSequenceKeypoint.new(0.5, accent),
-			ColorSequenceKeypoint.new(1, accent:Lerp(Color3.new(1, 1, 1), 0.32)),
-		})
-	end
-	if window and window:FindFirstChild("shadow") then
-		local shadow = window.shadow
-		if shadow:FindFirstChild("glow") then shadow.glow.Visible = false end
-		if shadow:FindFirstChild("glow1") then shadow.glow1.Visible = false end
-	end
-end
-
-integratedGlowStroke = window:FindFirstChild("OwlIntegratedGlow")
-if not integratedGlowStroke then
-	integratedGlowStroke = Instance.new("UIStroke")
-	integratedGlowStroke.Name = "OwlIntegratedGlow"
-	integratedGlowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	integratedGlowStroke.Thickness = 1.5
-	integratedGlowStroke.Transparency = 0.32
-	integratedGlowStroke.Parent = window
-end
-integratedGlowGradient = integratedGlowStroke:FindFirstChildOfClass("UIGradient")
-if not integratedGlowGradient then
-	integratedGlowGradient = Instance.new("UIGradient")
-	integratedGlowGradient.Rotation = 0
-	integratedGlowGradient.Parent = integratedGlowStroke
-end
-integratedGlowStroke.Enabled = false
-setIntegratedGlow(glow)
+if window.shadow:FindFirstChild("glow") then window.shadow.glow.Visible = false end
+if window.shadow:FindFirstChild("glow1") then window.shadow.glow1.Visible = false end
+local oldIntegratedGlow = window:FindFirstChild("OwlIntegratedGlow")
+if oldIntegratedGlow then oldIntegratedGlow:Destroy() end
 
 local uitoggle = Enum.KeyCode.RightShift
 local performanceOverlay = {
@@ -2024,7 +1998,7 @@ local function createPerformanceOverlay()
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamSemibold
 	label.Size = UDim2.fromScale(1, 1)
-	label.Text = "-- FPS  ·  -- ms"
+	label.Text = "-- FPS"
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.TextSize = 10
 	label.ZIndex = 6
@@ -2066,25 +2040,8 @@ function Owl:SetPerformanceOverlay(enabled)
 		end
 
 		local fps = math.floor(performanceOverlay.frameCount / performanceOverlay.elapsed + 0.5)
-		local pingMilliseconds = nil
-		local dataPingOk, dataPingValue = pcall(function()
-			return Services.Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-		end)
-		if dataPingOk and type(dataPingValue) == "number" then
-			pingMilliseconds = math.floor(dataPingValue + 0.5)
-		else
-			local localPlayer = Services.Players.LocalPlayer
-			if localPlayer then
-				local networkPingOk, pingSeconds = pcall(localPlayer.GetNetworkPing, localPlayer)
-				if networkPingOk and type(pingSeconds) == "number" then
-					pingMilliseconds = math.floor(pingSeconds * 1000 + 0.5)
-				end
-			end
-		end
-		pingMilliseconds = pingMilliseconds or 0
-
 		if performanceOverlay.label and performanceOverlay.label.Parent then
-			performanceOverlay.label.Text = string.format("%d FPS  ·  %d ms", fps, pingMilliseconds)
+			performanceOverlay.label.Text = string.format("%d FPS", fps)
 			performanceOverlay.label.TextColor3 = Color3.fromRGB(255, 255, 255)
 		end
 
@@ -2716,7 +2673,7 @@ function Owl:Destroy()
 	Owl._destroyed = true
 	setInterfaceBlur(false)
 	local blurEffect = game:GetService("Lighting"):FindFirstChild(BLUR_EFFECT_NAME)
-	if blurEffect and blurEffect:IsA("DepthOfFieldEffect") then
+	if blurEffect and blurEffect:IsA("BlurEffect") then
 		blurEffect:Destroy()
 	end
 
@@ -2884,7 +2841,6 @@ function openui()
 	Services.Tween:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 0.5 }):Play()
 	Services.Tween:Create(window.resize, fastTween, {ImageTransparency = 0.3}):Play()
 
-	setIntegratedGlow(glow)
 end
 
 function closeui()
@@ -3157,23 +3113,6 @@ function Owl:Init(library)
 	}
 	local lastTime = tick()
 	local frames = 0
-	local function getWatermarkPing()
-		local statsOk, statsPing = pcall(function()
-			return Services.Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-		end)
-		if statsOk and type(statsPing) == "number" and statsPing > 0 then
-			return math.floor(statsPing + 0.5)
-		end
-		local localPlayer = Services.Players.LocalPlayer
-		if localPlayer then
-			local pingOk, pingSeconds = pcall(localPlayer.GetNetworkPing, localPlayer)
-			if pingOk and type(pingSeconds) == "number" then
-				return math.max(0, math.floor(pingSeconds * 1000 + 0.5))
-			end
-		end
-		return 0
-	end
-
 	if isMinihomeRuntimeActive then
 		rs = RunService.RenderStepped:Connect(function()
 			local info = Minihome and Minihome:FindFirstChild("info")
@@ -3190,7 +3129,7 @@ function Owl:Init(library)
 				frames = 0
 
 				info.fps.Visible = true
-				info.fps.Text = string.format("%d FPS  ·  %d ms", fps, getWatermarkPing())
+				info.fps.Text = string.format("%d FPS", fps)
 			end
 			local hour = tonumber(os.date("%I"))
 			info.time.Text = hour .. os.date(":%M")
@@ -3204,11 +3143,13 @@ function Owl:Init(library)
 	end
 
 
-	ui.minihome.open.quickfunc.interact.MouseButton1Click:Connect(function()
-		if uiRuntime.isClosed then
+	local watermarkToggle = ui.minihome.open.quickfunc.interact
+	if watermarkToggle:IsA("GuiButton") then
+		watermarkToggle.Active = true
+		Owl:AddConnection(watermarkToggle.Activated, function()
 			ToggleUI()
-		end
-	end)
+		end)
+	end
 	top.title.Text = Data.Title
 	top.title.sub.Text = Data.SubText
 	local pluginButton = top.functions:FindFirstChild("plugins")
@@ -3374,8 +3315,6 @@ function Owl:Init(library)
 					Services.Tween:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
 				end
 			end
-			Services.Tween:Create(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
-			Services.Tween:Create(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
 		end
 	end)
 	SetUserInfo()
@@ -6431,7 +6370,7 @@ function Owl:Init(library)
 				Options = Options or {}
 				local performanceToggle = self:Toggle({
 					Title = Options.Name or Options.Title or "Performance Overlay",
-					Description = Options.Description or "Show FPS and ping in the top bar",
+					Description = Options.Description or "Show FPS in the top bar",
 					Value = Options.Default ~= false,
 					Flag = Options.Flag or "owl_performance_overlay",
 					Save = Options.Save ~= false,
@@ -6558,19 +6497,6 @@ function Owl:Init(library)
 				end
 				SaveCfg(game and game.GameId)
 			end,
-		})
-
-		a:Toggle({
-			Title = 'Glow',
-			Description = 'Shine on the ui.',
-			Value = Owl.LoadedConfig and Owl.LoadedConfig["Glow"] or false,
-			Flag = "Glow",
-			SFlag = 'GLOW',
-			Save = true,
-			CallBack = function (v)
-				setIntegratedGlow(v)
-			end,
-			SFlag = 'GLW',
 		})
 
 		a:Toggle({
@@ -7257,7 +7183,6 @@ function Owl:Init(library)
 
 		Owl:AddConnection(Owl.Comms.Event, function(p, color)
 			if p == 'Accent' then
-				setIntegratedGlow(glow)
 				if tbdata.first ~= tdata.Title then return end
 				Services.Tween:Create(Tab.indicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
 					BackgroundColor3 = color
@@ -11108,7 +11033,7 @@ function Owl:Init(library)
 			Options = Options or {}
 			local performanceToggle = self:AddToggle({
 				Name = Options.Name or "Performance Overlay",
-				Description = Options.Description or "Show FPS and ping in the top bar",
+					Description = Options.Description or "Show FPS in the top bar",
 				Flag = Options.Flag or "owl_performance_overlay",
 				Default = Options.Default ~= false,
 				Save = Options.Save ~= false,
