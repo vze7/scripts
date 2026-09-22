@@ -2732,7 +2732,7 @@ function openui()
 	end
 
 	for i,v in pairs(window.top.functions:GetChildren()) do
-		if v:IsA("Frame") then
+		if v:IsA("Frame") and v.Name ~= "plugins" then
 			Services.Tween:Create(v, fastTween, {BackgroundTransparency = 0.8 }):Play()
 			v.Visible = true
 			for i,v2 in pairs(v:GetChildren()) do
@@ -3062,6 +3062,14 @@ function Owl:Init(library)
 	end)
 	top.title.Text = Data.Title
 	top.title.sub.Text = Data.SubText
+	local pluginButton = top.functions:FindFirstChild("plugins")
+	if pluginButton then
+		pluginButton.Visible = false
+		local pluginInteract = pluginButton:FindFirstChild("interact", true)
+		if pluginInteract and pluginInteract:IsA("GuiButton") then
+			pluginInteract.Active = false
+		end
+	end
 	Owl:AddDrag(top, window, true)
 	if Minihome then
 		Owl:AddDrag(Minihome, Minihome) -- make the watermark draggable
@@ -5646,7 +5654,7 @@ function Owl:Init(library)
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							dropdown.dropholder.drop.Selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = OptionText
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -5756,7 +5764,7 @@ function Owl:Init(library)
 					}
 
 					Slider.Name = Options.Title
-					Slider.Title.Text = Options.Title
+					Slider.title.Text = Options.Title
 					Options.Value = Options.StarterValue
 
 					local dragging = false
@@ -5883,7 +5891,7 @@ function Owl:Init(library)
 							Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
 
-							Services.Tween:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+							Services.Tween:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 							local success, errorMsg = pcall(function()
 								Options.CallBack(newValue)
@@ -5907,7 +5915,7 @@ function Owl:Init(library)
 					Owl:AddConnection(Services.UserInput.InputEnded, function(input, processed)
 						if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 							dragging = false
-							Services.Tween:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+							Services.Tween:Create(Slider.title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 						end
 					end)
 
@@ -5960,7 +5968,7 @@ function Owl:Init(library)
 							NewVal,
 							Options.Range[2]
 						)
-						Services.Tween:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+						Services.Tween:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 							TextTransparency = 0
 						}):Play()
 						local success, result = pcall(function()
@@ -7816,7 +7824,7 @@ function Owl:Init(library)
 				}
 
 				Slider.Name = Options.Title
-				Slider.Title.Text = Options.Title
+					Slider.title.Text = Options.Title
 				Options.Value = Options.StarterValue
 
 				local dragging = false
@@ -7949,7 +7957,7 @@ function Owl:Init(library)
 						local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 						Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
-						Services.Tween:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+							Services.Tween:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 						local success, errorMsg = pcall(function()
 							Options.CallBack(newValue)
@@ -7976,7 +7984,7 @@ function Owl:Init(library)
 				Owl:AddConnection(Services.UserInput.InputEnded, function(input, processed)
 					if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = false
-						Services.Tween:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+							Services.Tween:Create(Slider.title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 					end
 				end)
 
@@ -8022,7 +8030,7 @@ function Owl:Init(library)
 					) 
 					local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 					Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", NewVal, Options.Range[2])
-					Services.Tween:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+						Services.Tween:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 						TextTransparency = 0
 					}):Play()
 					local success, result = pcall(function()
@@ -8981,7 +8989,7 @@ function Owl:Init(library)
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						dropdown.dropholder.drop.Selected.Text = OptionText
+						dropdown.dropholder.drop.selected.Text = OptionText
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
