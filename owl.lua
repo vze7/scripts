@@ -7148,6 +7148,8 @@ function Owl:Init(library)
 		local Pages = ui.main.pages
 		local Results = window.search.Container
 		local Template = Results.option
+		Results.Visible = true
+		Results.ZIndex = 32
 		if not Results:FindFirstChildOfClass("UIListLayout") then
 			local listLayout = Instance.new("UIListLayout")
 			listLayout.Padding = UDim.new(0, 6)
@@ -7194,6 +7196,8 @@ function Owl:Init(library)
 			result.TextColor3 = Color3.fromRGB(235, 235, 238)
 			result.TextSize = 12
 			result.TextXAlignment = Enum.TextXAlignment.Left
+			result.Visible = true
+			result.ZIndex = 33
 			result.LayoutOrder = resultOrder
 			result.Parent = Results
 			local padding = Instance.new("UIPadding")
@@ -7231,6 +7235,12 @@ function Owl:Init(library)
 				if query == "" then return end
 
 
+				for _, pageCandidate in ipairs(Pages:GetChildren()) do
+					if pageCandidate:IsA("GuiObject") and pageCandidate.Name:lower():find(query, 1, true) then
+						createResult(pageCandidate, pageCandidate)
+					end
+				end
+
 				for _, child in ipairs(Pages:GetDescendants()) do
 					if child:IsA("GuiObject") and child:GetAttribute("Searchable") then
 						local page = child
@@ -7239,8 +7249,14 @@ function Owl:Init(library)
 						end
 						if page.Parent == Pages then
 							local name = child.Name:lower()
+							local indexedText = name
+							for _, textObject in ipairs(child:GetDescendants()) do
+								if textObject:IsA("TextLabel") or textObject:IsA("TextButton") or textObject:IsA("TextBox") then
+									indexedText ..= " " .. string.lower(textObject.Text or "")
+								end
+							end
 							local ftype = getFunctionType(child):lower()
-							if name:find(query, 1, true) or ftype:find(query, 1, true) then
+							if indexedText:find(query, 1, true) or ftype:find(query, 1, true) then
 								createResult(page, child)
 							end
 						end
@@ -7250,7 +7266,10 @@ function Owl:Init(library)
 		end
 
 		local SearchBox = window.search.Frame.TextBox
-		SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		if Owl._searchTextConnection then
+			Owl._searchTextConnection:Disconnect()
+		end
+		Owl._searchTextConnection = SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
 			searchFunctions(SearchBox.Text)
 			Services.Tween:Create(window.search, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0, 230)}):Play()
 			Services.Tween:Create(window.search.UICorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(0,25)}):Play()
@@ -8210,6 +8229,8 @@ function Owl:Init(library)
 
 			local dragging = false
 			local data = {Value = value, Flag = config.Flag, Save = config.Save ~= false, Type = "Slider"}
+			local fillTween
+			local knobTween
 			local function setValue(nextValue, skipCallback)
 				nextValue = math.clamp(tonumber(nextValue) or minimum, minimum, maximum)
 				nextValue = math.floor((nextValue - minimum) / increment + 0.5) * increment + minimum
@@ -8217,8 +8238,13 @@ function Owl:Init(library)
 				value = math.clamp(nextValue, minimum, maximum)
 				data.Value = value
 				local alpha = (value - minimum) / (maximum - minimum)
-				fill.Size = UDim2.new(alpha, 0, 1, 0)
-				knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+				if fillTween then fillTween:Cancel() end
+				if knobTween then knobTween:Cancel() end
+				local motion = TweenInfo.new(dragging and 0.06 or 0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+				fillTween = Services.Tween:Create(fill, motion, {Size = UDim2.new(alpha, 0, 1, 0)})
+				knobTween = Services.Tween:Create(knob, motion, {Position = UDim2.new(alpha, 0, 0.5, 0)})
+				fillTween:Play()
+				knobTween:Play()
 				valueLabel.Text = string.format("%g / %g", value, maximum)
 				if not skipCallback then
 					local ok, err = pcall(callback, value)
@@ -8892,6 +8918,7 @@ function Owl:Init(library)
 			local OptionButton = dropdown.dropholder.drop.Container.Option
 			local SelectedOptions = {}
 			local SelectedOrder = {}
+			local OptionLabels = {}
 			local function normalizeOption(option)
 				if type(option) == "table" then
 					local name = tostring(option.Name or option.Value or option.Label or "Option")
@@ -9028,7 +9055,7 @@ function Owl:Init(library)
 							local optionGroup = selectedContainer.result:Clone()
 							optionGroup.Visible = true
 							optionGroup.Name = option
-							optionGroup.TextLabel.Text = option
+							optionGroup.TextLabel.Text = OptionLabels[option] or option
 							optionGroup.X.MouseButton1Click:Connect(function()
 								RemoveFromSelected(option)
 								UpdateSelectedText()
@@ -9063,7 +9090,7 @@ function Owl:Init(library)
 				else
 					dropdown.dropholder.drop.selected.Visible = true
 					if #SelectedOrder > 0 then
-						dropdown.dropholder.drop.selected.Text = SelectedOrder[1]
+						dropdown.dropholder.drop.selected.Text = OptionLabels[SelectedOrder[1]] or SelectedOrder[1]
 					else
 						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 					end
@@ -9072,15 +9099,15 @@ function Owl:Init(library)
 			dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
 				local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
 
-				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-					if option:IsA("Frame") and option:FindFirstChild("Title") then
-						local optionText = option.Title.Text:lower()
-						local isTemplate = option.Name == "Option"
-						local showldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
+					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+						if option:IsA("Frame") and option:FindFirstChild("Title") then
+							local optionText = option.Title.Text:lower()
+							local isTemplate = option.Name == "Option"
+							local showldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Name])
 
 						if showldShow then
 							option.Visible = true
-							if SelectedOptions[option.Title.Text] then
+								if SelectedOptions[option.Name] then
 								Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 								Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
 								Services.Tween:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
@@ -9122,12 +9149,14 @@ function Owl:Init(library)
 				local starterSet = false
 				for _, optionEntry in ipairs(data.Options) do
 					local OptionText, optionData = normalizeOption(optionEntry)
+					local displayText = tostring(optionData.Label or optionData.DisplayName or OptionText)
+					OptionLabels[OptionText] = displayText
 					local option = OptionButton:Clone()
-					option.Title.Text = tostring(optionData.Label or OptionText)
+					option.Title.Text = displayText
 					option.Parent = dropdown.dropholder.drop.Container
 					option.Visible = true
 					option.Name = OptionText
-					local image = tostring(optionData.Image or "")
+					local image = tostring(optionData.Image or optionData.Icon or optionData.ImageId or optionData.Decal or "")
 					if image ~= "" then
 						if not string.find(image, "://", 1, true) then
 							image = "rbxassetid://" .. image
@@ -9138,16 +9167,20 @@ function Owl:Init(library)
 						thumbnail.Image = image
 						thumbnail.Position = UDim2.new(0, 10, 0.5, -10)
 						thumbnail.Size = UDim2.fromOffset(20, 20)
+						thumbnail.ZIndex = math.max(option.ZIndex + 3, 4)
 						thumbnail.Parent = option
 						local imageCorner = Instance.new("UICorner")
 						imageCorner.CornerRadius = UDim.new(1, 0)
 						imageCorner.Parent = thumbnail
-						option.Title.Position = UDim2.new(0, 40, option.Title.Position.Y.Scale, option.Title.Position.Y.Offset)
+						option.ClipsDescendants = false
+						option.Title.Position = UDim2.new(0, 40, 0, 0)
+						option.Title.Size = UDim2.new(1, -78, 1, 0)
+						option.Title.ZIndex = thumbnail.ZIndex
 					end
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						dropdown.dropholder.drop.selected.Text = OptionText
+						dropdown.dropholder.drop.selected.Text = displayText
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
@@ -9171,7 +9204,7 @@ function Owl:Init(library)
 								data.CallBack(SelectedOrder)
 							end
 						else
-							dropdown.dropholder.drop.selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = displayText
 
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
@@ -9211,6 +9244,7 @@ function Owl:Init(library)
 
 			function data:Refresh(newOptions, clearCurrent)
 				data.Options = newOptions or {}
+				table.clear(OptionLabels)
 				if clearCurrent then
 					SelectedOptions = {}
 					SelectedOrder = {}
@@ -9240,10 +9274,10 @@ function Owl:Init(library)
 				else
 					SelectedOptions = {[value] = true}
 					SelectedOrder = {value}
-					dropdown.dropholder.drop.selected.Text = tostring(value)
+					dropdown.dropholder.drop.selected.Text = OptionLabels[value] or tostring(value)
 					for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if opt:IsA("Frame") and opt:FindFirstChild("Title") then
-							local isMatch = (opt.Title.Text == value)
+							local isMatch = (opt.Name == value)
 							opt.BackgroundColor3 = isMatch and Color3.fromRGB(39, 39, 39) or Color3.fromRGB(33, 33, 33)
 							if opt:FindFirstChild("ImageLabel") then
 								opt.ImageLabel.ImageTransparency = isMatch and 0 or 0.9
