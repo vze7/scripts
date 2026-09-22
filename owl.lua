@@ -1,3 +1,4 @@
+-- Made: By iceboy
 local Services = {
 	Http = game:GetService("HttpService"),
 	Insert = game:GetService("InsertService"),
@@ -943,13 +944,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 					newHeight = newWidth / aspectRatio
 				end
 
-				Object:TweenSize(
-					UDim2.fromOffset(newWidth, newHeight),
-					Enum.EasingDirection.Out,
-					Enum.EasingStyle.Quint,
-					0.4,
-					true
-				)
+				Object.Size = UDim2.fromOffset(newWidth, newHeight)
 
 				if Callback then
 					Callback(Vector2.new(newWidth, newHeight))
@@ -1480,10 +1475,7 @@ if makefolder and isfolder and not isfolder(THEME_FOLDER) then
 	pcall(makefolder, THEME_FOLDER)
 end
 
-local LoadedThemeFile = false
-local ThemeColorsToSave = {}
-
-local function Round(Number, Factor)
+	local function Round(Number, Factor)
 	local Result = math.floor(Number/Factor + (math.sign(Number) * 0.5)) * Factor
 	if Result < 0 then Result = Result + Factor end
 	return Result
@@ -1503,70 +1495,6 @@ local function UnpackColor(Color)
 	return Color3.fromRGB(math.clamp(red, 0, 255), math.clamp(green, 0, 255), math.clamp(blue, 0, 255))
 end
 
-function Owl:SaveThemeCfg()
-	if not LoadedThemeFile then return end
-
-	local Data = {}
-	local themeData = (self.Themes and self.SelectedTheme and self.Themes[self.SelectedTheme]) or self.theme
-
-	if themeData then
-		for typeName, value in pairs(themeData) do
-			if typeof(value) == "Color3" then
-				ThemeColorsToSave[typeName] = PackColor(value)
-			end
-		end
-	end
-
-	if self.theme then
-		if self.theme.Accent then ThemeColorsToSave["Accent"] = PackColor(self.theme.Accent) end
-		if self.theme.HitBox then ThemeColorsToSave["HitBox"] = PackColor(self.theme.HitBox) end
-	end
-
-	if makefolder and isfolder and not isfolder(THEME_FOLDER) then
-		pcall(makefolder, THEME_FOLDER)
-	end
-	if writefile then
-		pcall(function()
-			writefile(FILE_PATH, HttpService:JSONEncode(ThemeColorsToSave))
-		end)
-	end
-end
-
-local function LoadThemeCfg(Config)
-	Config = Config or FILE_PATH
-	if isfile and isfile(Config) then
-		local ok, dataOrErr = pcall(function()
-			return HttpService:JSONDecode(readfile(Config))
-		end)
-
-		if ok and type(dataOrErr) == "table" then
-			local Data = dataOrErr
-			Owl.Themes = Owl.Themes or {}
-			Owl.Themes.Custom = Owl.Themes.Custom or {}
-
-			for TypeName, Value in pairs(Data) do
-				local c = UnpackColor(Value)
-				Owl.Themes.Custom[TypeName] = c
-				if TypeName == "Accent" or TypeName == "HitBox" then
-					if Owl.theme then
-						Owl.theme[TypeName] = c
-					end
-				end
-			end
-
-			Owl.SelectedTheme = "Custom"
-			LoadedThemeFile = true
-
-			task.wait(0.02)
-			Owl:SetTheme()
-		else
-			LoadedThemeFile = true
-		end
-	else
-		LoadedThemeFile = true
-	end
-end
-
 function Owl:SetTheme()
 	local themeData = (self.Themes and self.SelectedTheme and self.Themes[self.SelectedTheme]) or self.theme
 	if not themeData then return end
@@ -1582,8 +1510,6 @@ function Owl:SetTheme()
 		self.theme.HitBox = hitbox
 		self.Comms:Fire("HitBox", hitbox)
 	end
-
-	self:SaveThemeCfg()
 end
 
 function Owl:GenTheme(mainColor)
@@ -2523,7 +2449,7 @@ function Owl:MakeWindow(WindowConfig)
 		if not isfolder(cfgFolder) then pcall(makefolder, cfgFolder) end
 		if not isfolder(THEME_FOLDER) then pcall(makefolder, THEME_FOLDER) end
 	end
-	LoadThemeCfg(FILE_PATH)
+	
 	local configFilePath = string.format("%s/%s.txt", cfgFolder, tostring(game and game.GameId or "default"))
 	if isfile and isfile(configFilePath) then
 		local ok, rawData = pcall(readfile, configFilePath)
@@ -3376,32 +3302,27 @@ function Owl:Init(library)
 			card.Size = size
 		end
 		local function updateHomeLayout()
-			homeLayoutRevision += 1
-			local revision = homeLayoutRevision
-			task.delay(0.02, function()
-				if revision ~= homeLayoutRevision then return end
-				local width = math.max(260, quick.AbsoluteSize.X)
-				local gap = 8
-				local contentHeight
-				if width >= 560 then
-					local leftWidth = math.floor((width - gap) * 0.62)
-					setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
-					setHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
-					setHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
-					setHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
-					contentHeight = 372
-				else
-					setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
-					setHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
-					setHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
-					setHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
-					contentHeight = 450
-				end
-				quick.Size = UDim2.new(1, 0, 0, contentHeight)
-				if homePage:IsA("ScrollingFrame") then
-					homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
-				end
-			end)
+			local width = math.max(260, quick.AbsoluteSize.X)
+			local gap = 8
+			local contentHeight
+			if width >= 560 then
+				local leftWidth = math.floor((width - gap) * 0.62)
+				setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
+				setHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
+				setHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
+				setHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
+				contentHeight = 372
+			else
+				setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
+				setHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
+				setHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
+				setHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
+				contentHeight = 450
+			end
+			quick.Size = UDim2.new(1, 0, 0, contentHeight)
+			if homePage:IsA("ScrollingFrame") then
+				homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
+			end
 		end
 		Owl:AddConnection(quick:GetPropertyChangedSignal("AbsoluteSize"), updateHomeLayout)
 		updateHomeLayout()
@@ -3680,26 +3601,30 @@ function Owl:Init(library)
 
 		local function ServerHop()
 			task.spawn(function()
-				local urls = {
-					"https://games.roblox.com/v2/games/" .. placeId .. "/servers/Public?cursor=&sortOrder=Desc&excludeFullGames=true&orderBy=BestLatency",
-					"https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100",
-				}
+				local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
 				local candidates = {}
-				for _, url in ipairs(urls) do
-					local ok, response = pcall(function()
-						return HttpService:JSONDecode(httpGet(url))
+				
+				local ok, response = pcall(function()
+					return HttpService:JSONDecode(httpGet(url))
+				end)
+				
+				if ok and type(response) == "table" and type(response.data) == "table" then
+					local servers = response.data
+					table.sort(servers, function(a, b)
+						local pingA = type(a.ping) == "number" and a.ping or math.huge
+						local pingB = type(b.ping) == "number" and b.ping or math.huge
+						return pingA < pingB
 					end)
-					if ok and type(response) == "table" and type(response.data) == "table" then
-						for _, server in ipairs(response.data) do
-							local playing = tonumber(server.playing) or math.huge
-							local maxPlayers = tonumber(server.maxPlayers) or 0
-							if server.id and server.id ~= game.JobId and playing < maxPlayers then
-								table.insert(candidates, server.id)
-							end
+					
+					for _, server in ipairs(servers) do
+						local playing = tonumber(server.playing) or math.huge
+						local maxPlayers = tonumber(server.maxPlayers) or 0
+						if server.id and server.id ~= game.JobId and playing < maxPlayers then
+							table.insert(candidates, server.id)
 						end
 					end
-					if #candidates > 0 then break end
 				end
+				
 				if #candidates == 0 then
 					Owl:Notify({Title = "Server Hop", Content = "No available server was found.", Duration = 3})
 					return
@@ -6761,7 +6686,7 @@ function Owl:Init(library)
 		end
 
 		function Owl:LoadSettingsConfig()
-			LoadThemeCfg(FILE_PATH)
+			
 			local folder = Owl.Folder or Owl.ConfigFolder or "OwlHub"
 			local filePath = folder .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
 			if isfile and isfile(filePath) then
@@ -10473,85 +10398,68 @@ function Owl:Init(library)
 			return Owl:Modal(ModalConfig)
 		end
 
-		function initelement:AddToggle(ToggleConfig)
-			ToggleConfig = ToggleConfig or {}
-			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
-			local defVal = ToggleConfig.Default ~= nil and ToggleConfig.Default or (ToggleConfig.Value ~= nil and ToggleConfig.Value or false)
-
+		local function WrapConfig(config, defaultName, valKey)
+			config = config or {}
+			local flagName = config.Flag or config.Name or config.Title or config.ValueName or defaultName
 			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
-				defVal = Owl.LoadedConfig[flagName]
-			end
-
-			local userCb = ToggleConfig.Callback or ToggleConfig.CallBack
-			local data = self:Toggle({
-				Title = ToggleConfig.Name or ToggleConfig.Title or "Toggle",
-				Description = ToggleConfig.Description or ToggleConfig.Desc or "",
-				Value = defVal,
-				Flag = flagName,
-				Save = ToggleConfig.Save ~= false,
-				CallBack = function(v)
-					if userCb then userCb(v) end
-					SaveCfg(game and game.GameId)
+				local savedVal = Owl.LoadedConfig[flagName]
+				if config.Type == "Colorpicker" then
+					config[valKey] = UnpackColor(savedVal)
+				elseif config.Type == "Bind" then
+					local success, keyEnum = pcall(function() return Enum.KeyCode[savedVal] or Enum.UserInputType[savedVal] end)
+					if success and keyEnum then config[valKey] = keyEnum elseif typeof(savedVal) == "string" and Enum.KeyCode[savedVal] then config[valKey] = Enum.KeyCode[savedVal] end
+				else
+					config[valKey] = savedVal
 				end
-			})
+			end
+			config.Flag = flagName
+			config.Save = config.Save ~= false
+			local origCb = config.Callback or config.CallBack
+			config.Callback = function(...)
+				if origCb then origCb(...) end
+				SaveCfg(game and game.GameId)
+			end
+			config.CallBack = config.Callback
+			return config, flagName
+		end
 
+		function initelement:AddToggle(ToggleConfig)
+			ToggleConfig.Type = "Toggle"
+			local cfg, flag = WrapConfig(ToggleConfig, "Toggle", "Value")
+			cfg.Title = cfg.Name or cfg.Title or "Toggle"
+			cfg.Description = cfg.Description or cfg.Desc or ""
+			cfg.Value = cfg.Value ~= nil and cfg.Value or (cfg.Default ~= nil and cfg.Default or false)
+			local data = self:Toggle(cfg)
 			data.Type = "Toggle"
-			data.Save = ToggleConfig.Save ~= false
-			data.Flag = flagName
-			data.Value = defVal
-			Owl.Flags[flagName] = data
+			data.Save = cfg.Save
+			data.Flag = flag
+			data.Value = cfg.Value
+			Owl.Flags[flag] = data
 			return data
 		end
 
 		function initelement:AddSlider(SliderConfig)
-			SliderConfig = SliderConfig or {}
-			local flagName = SliderConfig.Flag or SliderConfig.Name or SliderConfig.Title or SliderConfig.ValueName or "Slider"
-			local userCb = SliderConfig.Callback or SliderConfig.CallBack
-
-			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
-				SliderConfig.Default = Owl.LoadedConfig[flagName]
-			end
-
-			SliderConfig.Flag = flagName
-			SliderConfig.Save = SliderConfig.Save ~= false
-			local origCb = SliderConfig.Callback or SliderConfig.CallBack
-			SliderConfig.Callback = function(val)
-				if origCb then origCb(val) end
-				SaveCfg(game and game.GameId)
-			end
-
-			local sliderObj = self:Slider(SliderConfig)
-			sliderObj.Type = "Slider"
-			sliderObj.Save = SliderConfig.Save ~= false
-			sliderObj.Flag = flagName
-			sliderObj.Value = SliderConfig.Default or SliderConfig.Min or 0
-			Owl.Flags[flagName] = sliderObj
-			return sliderObj
+			SliderConfig.Type = "Slider"
+			local cfg, flag = WrapConfig(SliderConfig, "Slider", "Default")
+			local data = self:Slider(cfg)
+			data.Type = "Slider"
+			data.Save = cfg.Save
+			data.Flag = flag
+			data.Value = cfg.Default or cfg.Min or 0
+			Owl.Flags[flag] = data
+			return data
 		end
 
 		function initelement:AddDropdown(DropdownConfig)
-			DropdownConfig = DropdownConfig or {}
-			local flagName = DropdownConfig.Flag or DropdownConfig.Name or DropdownConfig.Title or "Dropdown"
-			local userCb = DropdownConfig.Callback or DropdownConfig.CallBack
-
-			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
-				DropdownConfig.Default = Owl.LoadedConfig[flagName]
-			end
-
-			DropdownConfig.Flag = flagName
-			DropdownConfig.Save = DropdownConfig.Save ~= false
-			DropdownConfig.Callback = function(val)
-				if userCb then userCb(val) end
-				SaveCfg(game and game.GameId)
-			end
-
-			local dropObj = self:Dropdown(DropdownConfig)
-			dropObj.Type = "Dropdown"
-			dropObj.Save = DropdownConfig.Save ~= false
-			dropObj.Flag = flagName
-			dropObj.Value = DropdownConfig.Default
-			Owl.Flags[flagName] = dropObj
-			return dropObj
+			DropdownConfig.Type = "Dropdown"
+			local cfg, flag = WrapConfig(DropdownConfig, "Dropdown", "Default")
+			local data = self:Dropdown(cfg)
+			data.Type = "Dropdown"
+			data.Save = cfg.Save
+			data.Flag = flag
+			data.Value = cfg.Default
+			Owl.Flags[flag] = data
+			return data
 		end
 
 		function initelement:AddButton(ButtonConfig)
@@ -10581,6 +10489,7 @@ function Owl:Init(library)
 		end
 
 		function initelement:AddPbind(PBindConfig)
+			-- PBind left as is because it's too custom for WrapConfig
 			PBindConfig = PBindConfig or {}
 			local name = PBindConfig.Name or "Position"
 			local flagName = PBindConfig.Flag or name
@@ -10716,166 +10625,80 @@ function Owl:Init(library)
 		end
 
 		function initelement:AddBind(BindConfig)
-			BindConfig = BindConfig or {}
-			local flagName = BindConfig.Flag or BindConfig.Name or BindConfig.Title or "Bind"
-			local key = BindConfig.Default or BindConfig.Key or Enum.KeyCode.Unknown
-
-			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
-				local saved = Owl.LoadedConfig[flagName]
-				local success, keyEnum = pcall(function()
-					return Enum.KeyCode[saved] or Enum.UserInputType[saved]
-				end)
-				if success and keyEnum then
-					key = keyEnum
-				elseif typeof(saved) == "string" and Enum.KeyCode[saved] then
-					key = Enum.KeyCode[saved]
+			BindConfig.Type = "Bind"
+			local cfg, flag = WrapConfig(BindConfig, "Bind", "Key")
+			cfg.Title = cfg.Name or cfg.Title or "Bind"
+			cfg.Key = cfg.Key or cfg.Default or Enum.KeyCode.Unknown
+			cfg.OnKeyChanged = function(newKey)
+				if cfg._obj then
+					cfg._obj.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
+					cfg._obj.Key = newKey
 				end
+				cfg.Callback(newKey)
 			end
-
-			local cb = BindConfig.Callback or BindConfig.CallBack or function() end
-			local name = BindConfig.Name or BindConfig.Title or "Bind"
-
-			local bindData = self:Keybind({
-				Title = name,
-				Key = key,
-				Flag = flagName,
-				Description = BindConfig.Description or "",
-				Save = BindConfig.Save ~= false,
-				OnKeyChanged = function(newKey)
-					if bindObj then
-						bindObj.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
-						bindObj.Key = newKey
-					end
-					SaveCfg(game and game.GameId)
-				end,
-				CallBack = cb
-			})
-
+			local bindData = self:Keybind(cfg)
 			local bindObj = {
 				Type = "Bind",
-				Save = BindConfig.Save ~= false,
-				Flag = flagName,
-				Value = typeof(key) == "EnumItem" and key.Name or tostring(key or "NONE"),
-				Key = key,
+				Save = cfg.Save,
+				Flag = flag,
+				Value = typeof(cfg.Key) == "EnumItem" and cfg.Key.Name or tostring(cfg.Key or "NONE"),
+				Key = cfg.Key,
 				_frame = bindData and bindData._frame or nil,
 				Set = function(self, newKey)
 					if typeof(newKey) == "string" then
-						local success, keyEnum = pcall(function()
-							return Enum.KeyCode[newKey] or Enum.UserInputType[newKey]
-						end)
-						if success and keyEnum then
-							newKey = keyEnum
-						end
+						local success, keyEnum = pcall(function() return Enum.KeyCode[newKey] or Enum.UserInputType[newKey] end)
+						if success and keyEnum then newKey = keyEnum end
 					end
-					if bindData and bindData.Set then
-						bindData:Set(newKey)
-					end
+					if bindData and bindData.Set then bindData:Set(newKey) end
 					self.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
 					self.Key = newKey
 					SaveCfg(game and game.GameId)
 				end,
-				toggle = function(self)
-					if bindData and bindData._frame then
-						bindData._frame.Visible = not bindData._frame.Visible
-					end
-				end,
-				remove = function(self)
-					if bindData and bindData._frame then
-						bindData._frame:Destroy()
-					end
-				end
+				toggle = function(self) if bindData and bindData._frame then bindData._frame.Visible = not bindData._frame.Visible end end,
+				remove = function(self) if bindData and bindData._frame then bindData._frame:Destroy() end end
 			}
-
-			Owl.Flags[flagName] = bindObj
+			cfg._obj = bindObj
+			Owl.Flags[flag] = bindObj
 			return bindObj
 		end
 
 		function initelement:AddTextbox(TextboxConfig)
-			TextboxConfig = TextboxConfig or {}
-			local name = TextboxConfig.Name or TextboxConfig.Title or "Textbox"
-			local flagName = TextboxConfig.Flag or name
-			local def = TextboxConfig.Default ~= nil and tostring(TextboxConfig.Default) or ""
-
-			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
-				def = tostring(Owl.LoadedConfig[flagName])
-			end
-
-			local placeholder = TextboxConfig.BackGrountText or TextboxConfig.PlaceHolder or TextboxConfig.Placeholder or "Enter..."
-			local clearOnLost = TextboxConfig.TextDisappear ~= false
-			local cb = TextboxConfig.Callback or TextboxConfig.CallBack or function() end
-
-			local inputData = self:TextInput({
-				Title = name,
-				PlaceHolder = placeholder,
-				ClearOnLost = clearOnLost,
-				Default = def,
-				Flag = flagName,
-				Save = TextboxConfig.Save ~= false,
-				CallBack = function(txt)
-					cb(txt)
-					SaveCfg(game and game.GameId)
-				end
-			})
-
+			TextboxConfig.Type = "Textbox"
+			local cfg, flag = WrapConfig(TextboxConfig, "Textbox", "Default")
+			cfg.Title = cfg.Name or cfg.Title or "Textbox"
+			cfg.PlaceHolder = cfg.BackGrountText or cfg.PlaceHolder or cfg.Placeholder or "Enter..."
+			cfg.ClearOnLost = cfg.TextDisappear ~= false
+			cfg.Default = cfg.Default ~= nil and tostring(cfg.Default) or ""
+			local inputData = self:TextInput(cfg)
 			local tbObj = {
 				Type = "Textbox",
-				Save = TextboxConfig.Save ~= false,
-				Flag = flagName,
-				Value = def,
+				Save = cfg.Save,
+				Flag = flag,
+				Value = cfg.Default,
 				_frame = inputData and inputData._frame or nil,
 				Set = function(self, val)
 					self.Value = tostring(val)
-					if inputData and inputData.Set then
-						inputData:Set(val)
-					else
-						cb(tostring(val))
-					end
+					if inputData and inputData.Set then inputData:Set(val) else cfg.Callback(tostring(val)) end
 					SaveCfg(game and game.GameId)
 				end,
-				toggle = function(self)
-					if inputData and inputData._frame then
-						inputData._frame.Visible = not inputData._frame.Visible
-					end
-				end,
-				remove = function(self)
-					if inputData and inputData._frame then
-						inputData._frame:Destroy()
-					end
-				end
+				toggle = function(self) if inputData and inputData._frame then inputData._frame.Visible = not inputData._frame.Visible end end,
+				remove = function(self) if inputData and inputData._frame then inputData._frame:Destroy() end end
 			}
-
-			Owl.Flags[flagName] = tbObj
+			Owl.Flags[flag] = tbObj
 			return tbObj
 		end
 
 		function initelement:AddColorpicker(ColorpickerConfig)
-			ColorpickerConfig = ColorpickerConfig or {}
-			local name = ColorpickerConfig.Name or ColorpickerConfig.Title or "Color Picker"
-			local flagName = ColorpickerConfig.Flag or name
-			local defColor = ColorpickerConfig.Default or ColorpickerConfig.Color or Color3.fromRGB(255, 255, 255)
-
-			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
-				local saved = Owl.LoadedConfig[flagName]
-				defColor = UnpackColor(saved)
-			end
-
-			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
-
-			local pickerData = self:ColorPicker({
-				Title = name,
-				Color = defColor,
-				Flag = flagName,
-				Save = ColorpickerConfig.Save ~= false,
-				CallBack = function(col)
-					if cb then cb(col) end
-					SaveCfg(game and game.GameId)
-				end
-			})
+			ColorpickerConfig.Type = "Colorpicker"
+			local cfg, flag = WrapConfig(ColorpickerConfig, "Color Picker", "Color")
+			cfg.Title = cfg.Name or cfg.Title or "Color Picker"
+			cfg.Color = cfg.Color or cfg.Default or Color3.fromRGB(255, 255, 255)
+			local pickerData = self:ColorPicker(cfg)
 			pickerData.Type = "Colorpicker"
-			pickerData.Save = ColorpickerConfig.Save ~= false
-			pickerData.Flag = flagName
-			pickerData.Value = defColor
-			Owl.Flags[flagName] = pickerData
+			pickerData.Save = cfg.Save
+			pickerData.Flag = flag
+			pickerData.Value = cfg.Color
+			Owl.Flags[flag] = pickerData
 			return pickerData
 		end
 
@@ -11050,6 +10873,7 @@ function Owl:Init(library)
 		function initelement:AddSmartTheme()
 			self:AddColorpicker({
 				Name = "Base Accent Color",
+				SFlag = "BaseAccentColor",
 				Default = Owl.theme.Accent or Color3.fromRGB(255, 151, 227),
 				Callback = function(Value)
 					Owl:UpdateTheme({
