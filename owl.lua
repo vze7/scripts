@@ -3303,9 +3303,8 @@ function Owl:Init(library)
 		end
 
 		local homeLayoutBusy = false
-		local homeLayoutRevision = 0
 		local homeCardTweens = {}
-		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		local homeMotion = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 		local function animateHomeCard(card, position, size)
 			if homeCardTweens[card] then homeCardTweens[card]:Cancel() end
 			local tween = Services.Tween:Create(card, homeMotion, {Position = position, Size = size})
@@ -3316,11 +3315,9 @@ function Owl:Init(library)
 			end)
 		end
 		local function updateHomeLayout()
-			homeLayoutRevision += 1
-			local revision = homeLayoutRevision
-			task.delay(0.12, function()
-				if revision ~= homeLayoutRevision or homeLayoutBusy then return end
-				homeLayoutBusy = true
+			if homeLayoutBusy then return end
+			homeLayoutBusy = true
+			task.defer(function()
 				local width = math.max(260, quick.AbsoluteSize.X)
 				local gap = 8
 				local contentHeight
