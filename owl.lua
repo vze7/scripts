@@ -1885,7 +1885,7 @@ local function createPerformanceOverlay()
 	frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 	frame.BackgroundTransparency = 0
 	frame.BorderSizePixel = 0
-	frame.Position = UDim2.new(1, -190, 0, 9)
+	frame.Position = UDim2.new(1, -250, 0, 9)
 	frame.Size = UDim2.new(0, 104, 0, 20)
 	frame.Visible = false
 	frame.ZIndex = 25
@@ -2624,9 +2624,18 @@ function opensearch()
 	window.search.Frame.ZIndex = 31
 	window.search.Frame.TextBox.Active = true
 	window.search.Frame.TextBox.Selectable = true
+	window.search.Frame.TextBox.TextEditable = true
+	window.search.Frame.TextBox.ClearTextOnFocus = false
+	window.search.Frame.TextBox.ZIndex = 32
 	window.dim.ZIndex = 20
+	window.dim.Active = false
 	window.search.Container.Visible = true
 	window.search.Visible = true
+	task.defer(function()
+		if searchopen and window.search.Frame.TextBox.Visible then
+			window.search.Frame.TextBox:CaptureFocus()
+		end
+	end)
 
 
 	if window.search.Frame.TextBox.Text ~= '' then
@@ -7213,7 +7222,7 @@ function Owl:Init(library)
 
 				for _, page in ipairs(Pages:GetChildren()) do
 					if page:IsA("ScrollingFrame") then
-						for _, child in ipairs(page:GetChildren()) do
+						for _, child in ipairs(page:GetDescendants()) do
 							if child:IsA("Frame") and child:GetAttribute("Searchable") then
 								local name = child.Name:lower()
 								local ftype = getFunctionType(child):lower()
