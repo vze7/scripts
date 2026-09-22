@@ -3286,6 +3286,7 @@ function Owl:Init(library)
 		for _, card in ipairs({quickPlayCard, playerCard, settingsCard, latencyCard}) do
 			card.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
 			card.BackgroundTransparency = 0.04
+			card.BorderSizePixel = 0
 			local corner = card:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
 			corner.CornerRadius = UDim.new(0, 14)
 			corner.Parent = card
@@ -3302,6 +3303,7 @@ function Owl:Init(library)
 		end
 
 		local homeLayoutBusy = false
+		local homeLayoutRevision = 0
 		local homeCardTweens = {}
 		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 		local function animateHomeCard(card, position, size)
@@ -3314,9 +3316,11 @@ function Owl:Init(library)
 			end)
 		end
 		local function updateHomeLayout()
-			if homeLayoutBusy then return end
-			homeLayoutBusy = true
-			task.defer(function()
+			homeLayoutRevision += 1
+			local revision = homeLayoutRevision
+			task.delay(0.12, function()
+				if revision ~= homeLayoutRevision or homeLayoutBusy then return end
+				homeLayoutBusy = true
 				local width = math.max(260, quick.AbsoluteSize.X)
 				local gap = 8
 				local contentHeight
