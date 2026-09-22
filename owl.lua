@@ -8948,8 +8948,15 @@ function Owl:Init(library)
 				DropOpen = true
 				dropdown.dropholder.drop.Container.Visible = true
 				dropdown.dropholder.drop.search.Visible = true
+				local optionCount = 0
+				for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+					if child:IsA("Frame") and child ~= OptionButton and child.Visible then
+						optionCount += 1
+					end
+				end
+				local openHeight = 142 + math.min(math.max(optionCount, 1), 4) * 42
 
-				Services.Tween:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
+				Services.Tween:Create(dropdown, TweenInfo.new(0.45, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, openHeight) }):Play()
 				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
 				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
 				Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
@@ -9156,6 +9163,22 @@ function Owl:Init(library)
 					option.Parent = dropdown.dropholder.drop.Container
 					option.Visible = true
 					option.Name = OptionText
+					option.ClipsDescendants = false
+					option.Title.Visible = false
+					local displayLabel = Instance.new("TextLabel")
+					displayLabel.Name = "OptionDisplayText"
+					displayLabel.BackgroundTransparency = 1
+					displayLabel.Font = option.Title.Font
+					displayLabel.Text = displayText
+					displayLabel.TextColor3 = option.Title.TextColor3
+					displayLabel.TextSize = option.Title.TextSize
+					displayLabel.TextTransparency = 0
+					displayLabel.TextTruncate = Enum.TextTruncate.AtEnd
+					displayLabel.TextXAlignment = Enum.TextXAlignment.Left
+					displayLabel.Position = UDim2.new(0, 12, 0, 0)
+					displayLabel.Size = UDim2.new(1, -50, 1, 0)
+					displayLabel.ZIndex = math.max(option.ZIndex + 3, 4)
+					displayLabel.Parent = option
 					local image = tostring(optionData.Image or optionData.Icon or optionData.ImageId or optionData.Decal or "")
 					if image ~= "" then
 						if not string.find(image, "://", 1, true) then
@@ -9172,10 +9195,9 @@ function Owl:Init(library)
 						local imageCorner = Instance.new("UICorner")
 						imageCorner.CornerRadius = UDim.new(1, 0)
 						imageCorner.Parent = thumbnail
-						option.ClipsDescendants = false
-						option.Title.Position = UDim2.new(0, 40, 0, 0)
-						option.Title.Size = UDim2.new(1, -78, 1, 0)
-						option.Title.ZIndex = thumbnail.ZIndex
+						displayLabel.Position = UDim2.new(0, 40, 0, 0)
+						displayLabel.Size = UDim2.new(1, -78, 1, 0)
+						displayLabel.ZIndex = thumbnail.ZIndex
 					end
 
 					if OptionText == data.StarterOption and not starterSet then
@@ -9306,14 +9328,10 @@ function Owl:Init(library)
 			local originalCallback = config.Callback or config.CallBack
 
 			local function playerOption(target)
-				local thumbnail = ""
-				pcall(function()
-					thumbnail = playerService:GetUserThumbnailAsync(
-						target.UserId,
-						Enum.ThumbnailType.HeadShot,
-						Enum.ThumbnailSize.Size48x48
-					)
-				end)
+				local thumbnail = string.format(
+					"rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48",
+					target.UserId
+				)
 				return {
 					Name = target.Name,
 					Label = target.DisplayName .. " (@" .. target.Name .. ")",
