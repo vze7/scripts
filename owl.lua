@@ -3284,19 +3284,35 @@ function Owl:Init(library)
 		local settingsCard = quick.QuickSettings
 		local latencyCard = quick.Latency
 		for _, card in ipairs({quickPlayCard, playerCard, settingsCard, latencyCard}) do
-			card.BackgroundColor3 = Color3.fromRGB(13, 13, 15)
-			card.BackgroundTransparency = 0.08
+			card.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
+			card.BackgroundTransparency = 0.04
 			local corner = card:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 12)
+			corner.CornerRadius = UDim.new(0, 14)
 			corner.Parent = card
-			local stroke = card:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
-			stroke.Color = Owl.theme.Accent
-			stroke.Transparency = 0.9
-			stroke.Thickness = 1
-			stroke.Parent = card
+			local stroke = card:FindFirstChildOfClass("UIStroke")
+			if stroke then stroke:Destroy() end
+			local gradient = card:FindFirstChild("HomeGradient") or Instance.new("UIGradient")
+			gradient.Name = "HomeGradient"
+			gradient.Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(19, 19, 22)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(11, 11, 13)),
+			})
+			gradient.Rotation = 90
+			gradient.Parent = card
 		end
 
 		local homeLayoutBusy = false
+		local homeCardTweens = {}
+		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		local function animateHomeCard(card, position, size)
+			if homeCardTweens[card] then homeCardTweens[card]:Cancel() end
+			local tween = Services.Tween:Create(card, homeMotion, {Position = position, Size = size})
+			homeCardTweens[card] = tween
+			tween:Play()
+			tween.Completed:Connect(function()
+				if homeCardTweens[card] == tween then homeCardTweens[card] = nil end
+			end)
+		end
 		local function updateHomeLayout()
 			if homeLayoutBusy then return end
 			homeLayoutBusy = true
@@ -3306,24 +3322,16 @@ function Owl:Init(library)
 				local contentHeight
 				if width >= 560 then
 					local leftWidth = math.floor((width - gap) * 0.62)
-					quickPlayCard.Position = UDim2.fromOffset(0, 0)
-					quickPlayCard.Size = UDim2.fromOffset(leftWidth, 128)
-					playerCard.Position = UDim2.fromOffset(leftWidth + gap, 0)
-					playerCard.Size = UDim2.fromOffset(width - leftWidth - gap, 128)
-					settingsCard.Position = UDim2.fromOffset(0, 136)
-					settingsCard.Size = UDim2.fromOffset(width, 96)
-					latencyCard.Position = UDim2.fromOffset(0, 240)
-					latencyCard.Size = UDim2.fromOffset(width, 132)
+					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
+					animateHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
+					animateHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
+					animateHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
 					contentHeight = 372
 				else
-					quickPlayCard.Position = UDim2.fromOffset(0, 0)
-					quickPlayCard.Size = UDim2.fromOffset(width, 116)
-					playerCard.Position = UDim2.fromOffset(0, 124)
-					playerCard.Size = UDim2.fromOffset(width, 88)
-					settingsCard.Position = UDim2.fromOffset(0, 220)
-					settingsCard.Size = UDim2.fromOffset(width, 96)
-					latencyCard.Position = UDim2.fromOffset(0, 324)
-					latencyCard.Size = UDim2.fromOffset(width, 126)
+					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
+					animateHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
+					animateHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
+					animateHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
 					contentHeight = 450
 				end
 				quick.Size = UDim2.new(1, 0, 0, contentHeight)
