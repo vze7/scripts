@@ -907,6 +907,41 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	local startPosition, startSize = nil, nil
 	local activeResizeInput = nil
+	local targetSize = nil
+	local resizeConnection = nil
+	local resizePointerActive = false
+	local function animateResizeHandle(size, color)
+		local handle = uiAsset and uiAsset:FindFirstChild("main") and uiAsset.main:FindFirstChild("resize")
+		if not handle or not handle.Parent then return end
+		Services.Tween:Create(handle, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = size}):Play()
+		Services.Tween:Create(handle, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = color}):Play()
+	end
+	local function completeResize()
+		isResizing = false
+		startPosition, startSize, activeResizeInput, targetSize = nil, nil, nil, nil
+		resizePointerActive = false
+		animateResizeHandle(UDim2.new(0, 20,0, 20), Color3.fromRGB(53, 53, 53))
+	end
+	local function startResizeSmoothing()
+		if resizeConnection then return end
+		resizeConnection = Services.Run.RenderStepped:Connect(function(deltaTime)
+			if not Object.Parent or not targetSize then
+				if resizeConnection then resizeConnection:Disconnect(); resizeConnection = nil end
+				completeResize()
+				return
+			end
+			local currentSize = Object.AbsoluteSize
+			local alpha = 1 - math.exp(-18 * deltaTime)
+			local nextSize = currentSize:Lerp(targetSize, alpha)
+			if not resizePointerActive and (targetSize - nextSize).Magnitude < 0.65 then
+				Object.Size = UDim2.fromOffset(targetSize.X, targetSize.Y)
+				if resizeConnection then resizeConnection:Disconnect(); resizeConnection = nil end
+				completeResize()
+			else
+				Object.Size = UDim2.fromOffset(nextSize.X, nextSize.Y)
+			end
+		end)
+	end
 	local function getInputPos(input)
 		if input.UserInputType == Enum.UserInputType.Touch then
 			return Vector2.new(input.Position.X, input.Position.Y)
@@ -918,16 +953,17 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	local function onInputBegan(input)
 		if not isResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 			isResizing = true
+			resizePointerActive = true
 			activeResizeInput = input.UserInputType == Enum.UserInputType.Touch and input or nil
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
-			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
-			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+			targetSize = startSize
+			animateResizeHandle(UDim2.new(0, 15,0, 15), Color3.fromRGB(255, 255, 255))
 		end
 	end
 
 	local function onInputChanged(input)
-		if isResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		if isResizing and resizePointerActive and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local mouse = getInputPos(input)
 			if startPosition and mouse then
 				local delta = mouse - startPosition
@@ -952,8 +988,9 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 					end
 				end
 
-				Object.Size = UDim2.fromOffset(newWidth, newHeight)
-				Owl._windowSize = Vector2.new(newWidth, newHeight)
+				targetSize = Vector2.new(newWidth, newHeight)
+				Owl._windowSize = targetSize
+				startResizeSmoothing()
 
 				if Callback then
 					Callback(Vector2.new(newWidth, newHeight))
@@ -966,11 +1003,12 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 		local isActiveTouch = activeResizeInput ~= nil and input == activeResizeInput
 		local isActiveMouse = activeResizeInput == nil and input.UserInputType == Enum.UserInputType.MouseButton1
 		if isResizing and (isActiveMouse or isActiveTouch) then
-			isResizing = false
-			activeResizeInput = nil
-			startPosition, startSize = nil, nil
-			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
-			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
+			resizePointerActive = false
+			if resizeConnection then
+				startResizeSmoothing()
+			else
+				completeResize()
+			end
 		end
 	end
 
@@ -1882,7 +1920,67 @@ local uiRuntime = {
 }
 local isUserInfoHidden = false
 local isBlurEnabled = false
-local glow = false
+local glow = Owl.LoadedConfig and Owl.LoadedConfig["Glow"] or false
+
+local BLUR_EFFECT_NAME = "OwlInterfaceBlur"
+local integratedGlowStroke
+local integratedGlowGradient
+
+local function setInterfaceBlur(active)
+	local lighting = game:GetService("Lighting")
+	local effect = lighting:FindFirstChild(BLUR_EFFECT_NAME)
+	if active and not effect then
+		effect = Instance.new("DepthOfFieldEffect")
+		effect.Name = BLUR_EFFECT_NAME
+		effect.FocusDistance = 51.6
+		effect.InFocusRadius = 50
+		effect.NearIntensity = 1
+		effect.FarIntensity = 0
+		effect.Parent = lighting
+	end
+	if effect and effect:IsA("DepthOfFieldEffect") then
+		effect.Enabled = active
+	end
+end
+
+local function setIntegratedGlow(enabled)
+	glow = enabled
+	if integratedGlowStroke then
+		integratedGlowStroke.Color = Owl.theme.Accent or Color3.fromRGB(0, 170, 255)
+		integratedGlowStroke.Enabled = enabled
+	end
+	if integratedGlowGradient then
+		local accent = Owl.theme.Accent or Color3.fromRGB(0, 170, 255)
+		integratedGlowGradient.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.18)),
+			ColorSequenceKeypoint.new(0.5, accent),
+			ColorSequenceKeypoint.new(1, accent:Lerp(Color3.new(1, 1, 1), 0.32)),
+		})
+	end
+	if window and window:FindFirstChild("shadow") then
+		local shadow = window.shadow
+		if shadow:FindFirstChild("glow") then shadow.glow.Visible = false end
+		if shadow:FindFirstChild("glow1") then shadow.glow1.Visible = false end
+	end
+end
+
+integratedGlowStroke = window:FindFirstChild("OwlIntegratedGlow")
+if not integratedGlowStroke then
+	integratedGlowStroke = Instance.new("UIStroke")
+	integratedGlowStroke.Name = "OwlIntegratedGlow"
+	integratedGlowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	integratedGlowStroke.Thickness = 1.5
+	integratedGlowStroke.Transparency = 0.32
+	integratedGlowStroke.Parent = window
+end
+integratedGlowGradient = integratedGlowStroke:FindFirstChildOfClass("UIGradient")
+if not integratedGlowGradient then
+	integratedGlowGradient = Instance.new("UIGradient")
+	integratedGlowGradient.Rotation = 0
+	integratedGlowGradient.Parent = integratedGlowStroke
+end
+integratedGlowStroke.Enabled = false
+setIntegratedGlow(glow)
 
 local uitoggle = Enum.KeyCode.RightShift
 local performanceOverlay = {
@@ -1947,7 +2045,7 @@ function Owl:SetPerformanceOverlay(enabled)
 	performanceOverlay.frame.Visible = performanceOverlay.enabled
 	local miniInfo = ui and ui:FindFirstChild("minihome") and ui.minihome:FindFirstChild("info")
 	if miniInfo and miniInfo:FindFirstChild("fps") then
-		miniInfo.fps.Visible = not performanceOverlay.enabled
+		miniInfo.fps.Visible = true
 	end
 
 	if performanceOverlay.connection then
@@ -2616,6 +2714,11 @@ function Owl:Destroy()
 		return
 	end
 	Owl._destroyed = true
+	setInterfaceBlur(false)
+	local blurEffect = game:GetService("Lighting"):FindFirstChild(BLUR_EFFECT_NAME)
+	if blurEffect and blurEffect:IsA("DepthOfFieldEffect") then
+		blurEffect:Destroy()
+	end
 
 	if performanceOverlay.connection then
 		performanceOverlay.connection:Disconnect()
@@ -2748,15 +2851,8 @@ function openui()
 
 	local fastTween = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-	if isBlurEnabled then
-		Owl:BindFrame(window, {
-			Transparency = 0.98;
-			BrickColor = BrickColor.new('Institutional white');
-		})
-		Services.Tween:Create(window, fastTween, {BackgroundTransparency = 0.45 }):Play()
-	else
-		Services.Tween:Create(window, fastTween, {BackgroundTransparency = 0 }):Play()
-	end
+	setInterfaceBlur(isBlurEnabled)
+	Services.Tween:Create(window, fastTween, {BackgroundTransparency = 0 }):Play()
 	local restoreSize = Owl._windowSize or window.AbsoluteSize
 	Services.Tween:Create(window, fastTween, {Size = UDim2.fromOffset(restoreSize.X, restoreSize.Y)}):Play()
 
@@ -2788,21 +2884,14 @@ function openui()
 	Services.Tween:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 0.5 }):Play()
 	Services.Tween:Create(window.resize, fastTween, {ImageTransparency = 0.3}):Play()
 
-	if glow == true then
-		for i, g in pairs(window.clipframe:GetChildren()) do
-			if g:IsA("ImageLabel") then
-				Services.Tween:Create(g, fastTween, {ImageTransparency = 0.8}):Play()
-			end
-		end
-		Services.Tween:Create(window.shadow.glow, fastTween, {ImageTransparency = 0.9}):Play()
-		Services.Tween:Create(window.shadow.glow1, fastTween, {ImageTransparency = 0.9}):Play()
-	end
+	setIntegratedGlow(glow)
 end
 
 function closeui()
 	uiRuntime.transitionId += 1
 	local closeTransitionId = uiRuntime.transitionId
 	uiRuntime.isClosed = true
+	setInterfaceBlur(false)
 	local fastTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	pages.Visible = false
@@ -2822,7 +2911,9 @@ function closeui()
 		Services.Tween:Create(window.wallpaper, fastTween, {ImageTransparency = 1 }):Play()
 	end
 
-	Owl:UnbindFrame(window)
+	if Owl:HasBinding(window) then
+		Owl:UnbindFrame(window)
+	end
 	Services.Tween:Create(window.top.functions, fastTween, {BackgroundTransparency = 1 }):Play()
 
 	for i,v in pairs(window.top.functions:GetChildren()) do
@@ -3066,6 +3157,22 @@ function Owl:Init(library)
 	}
 	local lastTime = tick()
 	local frames = 0
+	local function getWatermarkPing()
+		local statsOk, statsPing = pcall(function()
+			return Services.Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+		end)
+		if statsOk and type(statsPing) == "number" and statsPing > 0 then
+			return math.floor(statsPing + 0.5)
+		end
+		local localPlayer = Services.Players.LocalPlayer
+		if localPlayer then
+			local pingOk, pingSeconds = pcall(localPlayer.GetNetworkPing, localPlayer)
+			if pingOk and type(pingSeconds) == "number" then
+				return math.max(0, math.floor(pingSeconds * 1000 + 0.5))
+			end
+		end
+		return 0
+	end
 
 	if isMinihomeRuntimeActive then
 		rs = RunService.RenderStepped:Connect(function()
@@ -3082,7 +3189,8 @@ function Owl:Init(library)
 				lastTime = now
 				frames = 0
 
-				info.fps.Text = fps .. " FPS"
+				info.fps.Visible = true
+				info.fps.Text = string.format("%d FPS  ·  %d ms", fps, getWatermarkPing())
 			end
 			local hour = tonumber(os.date("%I"))
 			info.time.Text = hour .. os.date(":%M")
@@ -3362,7 +3470,6 @@ function Owl:Init(library)
 		end
 
 		local homeLayoutBusy = false
-		local homeLayoutRevision = 0
 		local homeCardTweens = {}
 		local homeLayoutInitialized = false
 		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
@@ -3381,35 +3488,31 @@ function Owl:Init(library)
 			end)
 		end
 		local function updateHomeLayout()
-			homeLayoutRevision += 1
-			local revision = homeLayoutRevision
-			task.delay(0.12, function()
-				if revision ~= homeLayoutRevision or homeLayoutBusy then return end
-				homeLayoutBusy = true
-				local width = math.max(1, quick.AbsoluteSize.X)
-				local gap = 8
-				local contentHeight
-				if width >= 560 then
-					local leftWidth = math.floor((width - gap) * 0.62)
-					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
-					animateHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
-					animateHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
-					animateHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
-					contentHeight = 372
-				else
-					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
-					animateHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
-					animateHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
-					animateHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
-					contentHeight = 450
-				end
-				quick.Size = UDim2.new(1, 0, 0, contentHeight)
-				if homePage:IsA("ScrollingFrame") then
-					homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
-				end
-				homeLayoutInitialized = true
-				homeLayoutBusy = false
-			end)
+			if homeLayoutBusy then return end
+			homeLayoutBusy = true
+			local width = math.max(1, quick.AbsoluteSize.X)
+			local gap = 8
+			local contentHeight
+			if width >= 560 then
+				local leftWidth = math.floor((width - gap) * 0.62)
+				animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
+				animateHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
+				animateHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
+				animateHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
+				contentHeight = 372
+			else
+				animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
+				animateHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
+				animateHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
+				animateHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
+				contentHeight = 450
+			end
+			quick.Size = UDim2.new(1, 0, 0, contentHeight)
+			if homePage:IsA("ScrollingFrame") then
+				homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
+			end
+			homeLayoutInitialized = true
+			homeLayoutBusy = false
 		end
 		Owl:AddConnection(quick:GetPropertyChangedSignal("AbsoluteSize"), updateHomeLayout)
 		updateHomeLayout()
@@ -6465,38 +6568,7 @@ function Owl:Init(library)
 			SFlag = 'GLOW',
 			Save = true,
 			CallBack = function (v)
-				if v then
-					glow = true
-					for i, glow in pairs(window.clipframe:GetChildren()) do
-						if glow:IsA("ImageLabel") then
-							Services.Tween:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
-						end
-					end
-					window.pages.v0.Visible = false
-
-					window.pages.clipframe.v1.Visible = false
-					window.pages.clipframe.v1.Visible = false
-					window.shadow.glow.Visible = true
-					window.shadow.glow1.Visible = true
-
-				else
-					glow = false
-					for i, glow in pairs(window.clipframe:GetChildren()) do
-						if glow:IsA("ImageLabel") then
-							Services.Tween:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
-						end
-					end
-					window.shadow.glow.Visible = false
-					window.shadow.glow1.Visible = false
-
-					if isBlurEnabled then
-						window.pages.v0.Visible = false
-					else
-						window.pages.v0.Visible = true
-						window.pages.clipframe.v1.Visible = true
-						window.pages.clipframe.v1.Visible = true
-					end
-				end
+				setIntegratedGlow(v)
 			end,
 			SFlag = 'GLW',
 		})
@@ -6505,45 +6577,10 @@ function Owl:Init(library)
 			Title = 'Blur',
 			Description = 'Make sure your graphics are above 8.',
 			CallBack = function (v)
-				if v then
-					window.shadow.ImageLabel.Visible = false
-					window.BackgroundTransparency = 0.45
-
-					window.pages.v1.Visible = false
-					window.pages.v0.Visible = false
-
-					window.pages.clipframe.v1.Visible = false
-					window.pages.clipframe.v0.Visible = false
-
-					Owl:BindFrame(window, {
-						Transparency = 0.98;
-						BrickColor = BrickColor.new('Institutional white');
-					})
-
-					local dof = Instance.new('DepthOfFieldEffect')
-					dof.Parent = game.Lighting
-					dof.Enabled = true
-					dof.FocusDistance = 51.6
-					dof.InFocusRadius = 50
-					dof.NearIntensity = 1
-					dof.FarIntensity = 0
-
-					isBlurEnabled = true
-
-				else
-					window.shadow.ImageLabel.Visible = true
-					window.BackgroundTransparency = 0
-
-					window.pages.v1.Visible = true
-					window.pages.v0.Visible = true
-
-					window.pages.clipframe.v1.Visible = true
-					window.pages.clipframe.v0.Visible = true
-
-					Owl:UnbindFrame(window)
-
-					isBlurEnabled = false
-				end
+				isBlurEnabled = v
+				window.BackgroundTransparency = 0
+				window.shadow.ImageLabel.Visible = true
+				setInterfaceBlur(v and not uiRuntime.isClosed)
 			end,
 			SFlag = 'BLUR',
 		})
@@ -7220,6 +7257,7 @@ function Owl:Init(library)
 
 		Owl:AddConnection(Owl.Comms.Event, function(p, color)
 			if p == 'Accent' then
+				setIntegratedGlow(glow)
 				if tbdata.first ~= tdata.Title then return end
 				Services.Tween:Create(Tab.indicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
 					BackgroundColor3 = color
