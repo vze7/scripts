@@ -909,7 +909,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	local userInput = game:GetService("UserInputService")
 
 	local startPosition, startSize = nil, nil
-	local isResizing = false
+	local _isResizing = false
 	local function getInputPos(input)
 		if input.UserInputType == Enum.UserInputType.Touch then
 			return Vector2.new(input.Position.X, input.Position.Y)
@@ -920,7 +920,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	local function onInputBegan(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			isResizing = true
+			_isResizing = true
 			isResizing = true
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
@@ -930,7 +930,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	end
 
 	local function onInputChanged(input)
-		if isResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		if _isResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local mouse = getInputPos(input)
 			if startPosition and mouse then
 				local delta = mouse - startPosition
@@ -960,7 +960,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	local function onInputEnded(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			isResizing = false
+			_isResizing = false
 			isResizing = false
 			startPosition, startSize = nil, nil
 			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
@@ -2707,7 +2707,7 @@ function openui()
 		Owl:UnlockMouse(true)
 	end
 
-	local fastTween = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	local fastTween = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 	if isBlurEnabled then
 		Owl:BindFrame(window, {
@@ -2763,7 +2763,7 @@ function closeui()
 	uiRuntime.transitionId += 1
 	local closeTransitionId = uiRuntime.transitionId
 	uiRuntime.isClosed = true
-	local fastTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	local fastTween = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 	pages.Visible = false
 	window.tabs.Visible = false
@@ -2773,7 +2773,7 @@ function closeui()
 	end
 
 	Services.Tween:Create(window, fastTween, {BackgroundTransparency = 1 }):Play()
-	Services.Tween:Create(window, fastTween, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 120) }):Play()
+	Services.Tween:Create(window, fastTween, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200) }):Play()
 	Services.Tween:Create(window.top.separator, fastTween, {BackgroundTransparency = 1 }):Play()
 	Services.Tween:Create(window.top.title, fastTween, {TextTransparency = 1 }):Play()
 	Services.Tween:Create(window.top.title.sub, fastTween, {TextTransparency = 1 }):Play()
@@ -2807,7 +2807,7 @@ function closeui()
 		Owl:UnlockMouse(false)
 	end
 
-	task.delay(0.2, function()
+	task.delay(0.4, function()
 		if uiRuntime.isClosed and uiRuntime.transitionId == closeTransitionId then
 			window.Visible = false
 		end
@@ -2836,12 +2836,12 @@ function ToggleUI()
 
 	if uiRuntime.isClosed then
 		openui()
-		updateLayout()
+		-- updateLayout() removed to prevent conflicting tweens causing lag
 	else
 		closeui()
 	end
 
-	task.delay(0.2, function()
+	task.delay(0.4, function()
 		uiRuntime.isTransitionLocked = false
 	end)
 end
