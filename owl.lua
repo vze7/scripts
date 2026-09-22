@@ -7231,16 +7231,17 @@ function Owl:Init(library)
 				if query == "" then return end
 
 
-				for _, page in ipairs(Pages:GetChildren()) do
-					if page:IsA("GuiObject") then
-						for _, child in ipairs(page:GetDescendants()) do
-							if child:IsA("Frame") and child:GetAttribute("Searchable") then
-								local name = child.Name:lower()
-								local ftype = getFunctionType(child):lower()
-
-								if name:find(query) or ftype:find(query) then
-									createResult(page, child)
-								end
+				for _, child in ipairs(Pages:GetDescendants()) do
+					if child:IsA("GuiObject") and child:GetAttribute("Searchable") then
+						local page = child
+						while page.Parent and page.Parent ~= Pages do
+							page = page.Parent
+						end
+						if page.Parent == Pages then
+							local name = child.Name:lower()
+							local ftype = getFunctionType(child):lower()
+							if name:find(query, 1, true) or ftype:find(query, 1, true) then
+								createResult(page, child)
 							end
 						end
 					end
@@ -8112,6 +8113,151 @@ function Owl:Init(library)
 
 			return data
 
+		end
+		function initelement:Slider(config)
+			config = config or {}
+			local range = config.Range or {config.Min or 0, config.Max or 100}
+			local minimum = tonumber(range[1]) or 0
+			local maximum = tonumber(range[2]) or 100
+			if maximum <= minimum then maximum = minimum + 1 end
+			local increment = math.max(tonumber(config.Increment) or 1, 0.001)
+			local value = config.Default ~= nil and config.Default or (config.StarterValue ~= nil and config.StarterValue or minimum)
+			local callback = config.Callback or config.CallBack or function() end
+			local title = config.Title or config.Name or "Slider"
+
+			local frame = Instance.new("Frame")
+			frame.Name = title
+			frame.BackgroundColor3 = Color3.fromRGB(15, 15, 16)
+			frame.BorderSizePixel = 0
+			frame.Size = UDim2.new(1, -35, 0, config.Description and 92 or 70)
+			frame.Parent = Page
+			frame:SetAttribute("Searchable", true)
+			frame:SetAttribute("FunctionType", "Slider")
+			local frameCorner = Instance.new("UICorner")
+			frameCorner.CornerRadius = UDim.new(0, 12)
+			frameCorner.Parent = frame
+
+			local titleLabel = Instance.new("TextLabel")
+			titleLabel.BackgroundTransparency = 1
+			titleLabel.Position = UDim2.fromOffset(14, 9)
+			titleLabel.Size = UDim2.new(1, -110, 0, 18)
+			titleLabel.Font = Enum.Font.GothamMedium
+			titleLabel.Text = title
+			titleLabel.TextColor3 = Color3.fromRGB(242, 242, 245)
+			titleLabel.TextSize = 13
+			titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+			titleLabel.Parent = frame
+
+			local valueLabel = Instance.new("TextLabel")
+			valueLabel.BackgroundTransparency = 1
+			valueLabel.Position = UDim2.new(1, -86, 0, 9)
+			valueLabel.Size = UDim2.fromOffset(72, 18)
+			valueLabel.Font = Enum.Font.Gotham
+			valueLabel.TextColor3 = Color3.fromRGB(180, 180, 188)
+			valueLabel.TextSize = 12
+			valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+			valueLabel.Parent = frame
+
+			if config.Description then
+				local description = Instance.new("TextLabel")
+				description.BackgroundTransparency = 1
+				description.Position = UDim2.fromOffset(14, 28)
+				description.Size = UDim2.new(1, -28, 0, 15)
+				description.Font = Enum.Font.Gotham
+				description.Text = tostring(config.Description)
+				description.TextColor3 = Color3.fromRGB(125, 125, 133)
+				description.TextSize = 11
+				description.TextXAlignment = Enum.TextXAlignment.Left
+				description.Parent = frame
+			end
+
+			local track = Instance.new("Frame")
+			track.BackgroundColor3 = Color3.fromRGB(37, 37, 41)
+			track.BorderSizePixel = 0
+			track.Position = UDim2.new(0, 14, 1, -22)
+			track.Size = UDim2.new(1, -28, 0, 5)
+			track.Parent = frame
+			local trackCorner = Instance.new("UICorner")
+			trackCorner.CornerRadius = UDim.new(1, 0)
+			trackCorner.Parent = track
+
+			local fill = Instance.new("Frame")
+			fill.BackgroundColor3 = Owl.theme.Accent
+			fill.BorderSizePixel = 0
+			fill.Size = UDim2.new(0, 0, 1, 0)
+			fill.Parent = track
+			local fillCorner = Instance.new("UICorner")
+			fillCorner.CornerRadius = UDim.new(1, 0)
+			fillCorner.Parent = fill
+
+			local knob = Instance.new("Frame")
+			knob.AnchorPoint = Vector2.new(0.5, 0.5)
+			knob.BackgroundColor3 = Color3.fromRGB(245, 245, 248)
+			knob.BorderSizePixel = 0
+			knob.Position = UDim2.new(0, 0, 0.5, 0)
+			knob.Size = UDim2.fromOffset(11, 11)
+			knob.Parent = track
+			local knobCorner = Instance.new("UICorner")
+			knobCorner.CornerRadius = UDim.new(1, 0)
+			knobCorner.Parent = knob
+
+			local hitbox = Instance.new("TextButton")
+			hitbox.BackgroundTransparency = 1
+			hitbox.Text = ""
+			hitbox.Size = UDim2.new(1, 0, 1, 18)
+			hitbox.Position = UDim2.new(0, 0, 0.5, -9)
+			hitbox.Parent = track
+
+			local dragging = false
+			local data = {Value = value, Flag = config.Flag, Save = config.Save ~= false, Type = "Slider"}
+			local function setValue(nextValue, skipCallback)
+				nextValue = math.clamp(tonumber(nextValue) or minimum, minimum, maximum)
+				nextValue = math.floor((nextValue - minimum) / increment + 0.5) * increment + minimum
+				nextValue = Owl:RoundTo(nextValue, Owl:DecimalPlaces(increment))
+				value = math.clamp(nextValue, minimum, maximum)
+				data.Value = value
+				local alpha = (value - minimum) / (maximum - minimum)
+				fill.Size = UDim2.new(alpha, 0, 1, 0)
+				knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+				valueLabel.Text = string.format("%g / %g", value, maximum)
+				if not skipCallback then
+					local ok, err = pcall(callback, value)
+					if not ok then Owl:Report("Slider '" .. title .. "' callback", err) end
+				end
+			end
+			local function updateFromX(x)
+				local width = track.AbsoluteSize.X
+				if width <= 0 then return end
+				local alpha = math.clamp((x - track.AbsolutePosition.X) / width, 0, 1)
+				setValue(minimum + (maximum - minimum) * alpha)
+			end
+			hitbox.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					dragging = true
+					updateFromX(input.Position.X)
+				end
+			end)
+			Owl:AddConnection(Services.UserInput.InputChanged, function(input)
+				if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+					updateFromX(input.Position.X)
+				end
+			end)
+			Owl:AddConnection(Services.UserInput.InputEnded, function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+			end)
+			Owl:AddConnection(Owl.Comms.Event, function(kind, color)
+				if kind == "Accent" then fill.BackgroundColor3 = color end
+			end)
+			data.Set = setValue
+			data._frame = frame
+			data.toggle = function() frame.Visible = not frame.Visible end
+			data.remove = function() frame:Destroy() end
+			setValue(value, true)
+			if Owl.ConfigEnabled and data.Flag then
+				Owl.Flags[data.Flag] = data
+				if Owl.LoadedConfig and Owl.LoadedConfig[data.Flag] ~= nil then data.Set(Owl.LoadedConfig[data.Flag]) end
+			end
+			return data
 		end
 		function initelement:Keybind(Keybind)
 			Keybind = Keybind or {}
