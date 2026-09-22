@@ -2679,6 +2679,9 @@ function openui()
 	window.tabs.Visible = true
 	window.user.Visible = true
 	window.Visible = true
+	if performanceOverlay.frame then
+		performanceOverlay.frame.Visible = performanceOverlay.enabled
+	end
 
 	if Owl.FreeMouse ~= false then
 		Owl:UnlockMouse(true)
@@ -2745,6 +2748,9 @@ function closeui()
 	pages.Visible = false
 	window.tabs.Visible = false
 	window.user.Visible = false
+	if performanceOverlay.frame then
+		performanceOverlay.frame.Visible = false
+	end
 
 	Services.Tween:Create(window, fastTween, {BackgroundTransparency = 1 }):Play()
 	Services.Tween:Create(window, fastTween, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 120) }):Play()
@@ -2793,9 +2799,9 @@ function closeui()
 	end)
 
 	local currentToggle = uitoggle
-	local toggleFlag = Owl.Flags and Owl.Flags.ToggleUI
+	local toggleFlag = (Owl.Flags and Owl.Flags.ToggleUI) or (Owl.SettingsFlags and Owl.SettingsFlags.ToggleUI)
 	if toggleFlag then
-		currentToggle = toggleFlag.Value or toggleFlag.Key or currentToggle
+		currentToggle = toggleFlag.Value or toggleFlag.Key or toggleFlag.Current or currentToggle
 	end
 	local toggleName = typeof(currentToggle) == "EnumItem" and currentToggle.Name or tostring(currentToggle)
 	Owl:Toast({
@@ -10606,6 +10612,10 @@ function Owl:Init(library)
 	Owl._currentWindow = tbdata
 	task.defer(function()
 		if not ui or not ui.Parent then return end
+		Owl:SetTheme()
+		if performanceOverlay.enabled then
+			Owl:SetPerformanceOverlay(true)
+		end
 		local legacyHome = window.pages:FindFirstChild("home")
 		if legacyHome then
 			legacyHome.Visible = Data.Home.Enabled
