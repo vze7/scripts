@@ -3,7 +3,6 @@ local Services = {
 	Insert = game:GetService("InsertService"),
 	Players = game:GetService("Players"),
 	Run = game:GetService("RunService"),
-	Stats = game:GetService("Stats"),
 	Text = game:GetService("TextService"),
 	Tween = game:GetService("TweenService"),
 	UserInput = game:GetService("UserInputService"),
@@ -278,6 +277,35 @@ function Owl:AttachSliderInput(Slider, Options)
 	end)
 
 	return editBox
+end
+
+function Owl:SetSliderGradient(fill, accent)
+	if typeof(fill) ~= "Instance" or not fill:IsA("GuiObject") then return end
+	accent = accent or (Owl.theme and Owl.theme.Accent) or Color3.fromRGB(0, 170, 255)
+	local gradient = fill:FindFirstChild("OwlSliderGradient")
+	if not gradient then
+		gradient = Instance.new("UIGradient")
+		gradient.Name = "OwlSliderGradient"
+		gradient.Rotation = 0
+		gradient.Parent = fill
+	end
+	fill.BackgroundColor3 = Color3.new(1, 1, 1)
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.1)),
+		ColorSequenceKeypoint.new(1, accent),
+	})
+end
+
+local function normalizeSliderOptions(options)
+	local range = type(options.Range) == "table" and options.Range or {0, 100}
+	local minimum = tonumber(range[1]) or 0
+	local maximum = tonumber(range[2]) or 100
+	if maximum <= minimum then maximum = minimum + 1 end
+	options.Range = {minimum, maximum}
+	options.Increment = math.max(tonumber(options.Increment) or 1, 0.001)
+	options.StarterValue = math.clamp(tonumber(options.StarterValue) or minimum, minimum, maximum)
+	if type(options.CallBack) ~= "function" then options.CallBack = function() end end
+	return options
 end
 
 local RunService = game:GetService'RunService'
@@ -594,15 +622,6 @@ function Owl:AddConnection(Type, Callback)
 			end
 		end
 	end
-
-	task.spawn(function()
-		task.wait(10)
-		for i = #Owl.Connections, 1, -1 do
-			if not Owl.Connections[i].Connection.Connected then
-				table.remove(Owl.Connections, i)
-			end
-		end
-	end)
 
 	return Connection, Disconnect
 end
@@ -1173,31 +1192,19 @@ function Owl:AddDrag(Object, Main, ConstrainToParent)
 	assert(typeof(Main) == "Instance" and Main:IsA("GuiObject"), "[AddDrag] Main must be a GuiObject")
 
 	local userInput = game:GetService("UserInputService")
-	local tweenService = game:GetService("TweenService")
+	local dragging = false
+	local touchInput = nil
+	local startPointer = nil
+	local targetPosition = nil
+	local renderConnection = nil
 
-	local dragging, dragInput, startMousePos, startFramePos = false, nil, nil, nil
-
-	local function getConstrainedPosition(newPos)
-		if not LockToScreen then
-			return newPos
+	local function getParentBounds()
+		local parent = Main.Parent
+		if parent and parent:IsA("GuiObject") then
+			return parent.AbsolutePosition, parent.AbsoluteSize
 		end
-
-		local viewportSize = workspace.CurrentCamera.ViewportSize
-		local frameSize = Main.AbsoluteSize
-		local anchorPoint = Main.AnchorPoint
-		local absX = newPos.X.Offset
-		local absY = newPos.Y.Offset
-
-		local minX = 0 + (frameSize.X * anchorPoint.X)
-		local maxX = viewportSize.X - (frameSize.X * (1 - anchorPoint.X))
-
-		local minY = 0 + (frameSize.Y * anchorPoint.Y)
-		local maxY = viewportSize.Y - (frameSize.Y * (1 - anchorPoint.Y))
-
-		local clampedX = math.clamp(absX, minX, maxX)
-		local clampedY = math.clamp(absY, minY, maxY)
-
-		return UDim2.new(0, clampedX, 0, clampedY)
+		local camera = workspace.CurrentCamera
+		return Vector2.zero, camera and camera.ViewportSize or Vector2.zero
 	end
 
 	local function getInputPos(input)
@@ -1212,39 +1219,66 @@ function Owl:AddDrag(Object, Main, ConstrainToParent)
 
 
 	Owl:AddConnection(Object.InputBegan, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			startMousePos = getInputPos(input)
+		if dragging or (input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch) then return end
+		dragging = true
+		touchInput = input.UserInputType == Enum.UserInputType.Touch and input or nil
+		startPointer = getInputPos(input)
+		local parentOrigin = getParentBounds()
+		local anchorOffset = Vector2.new(Main.AbsoluteSize.X * Main.AnchorPoint.X, Main.AbsoluteSize.Y * Main.AnchorPoint.Y)
+		local anchorPosition = Main.AbsolutePosition + anchorOffset - parentOrigin
+		targetPosition = anchorPosition
+		Main.Position = UDim2.fromOffset(anchorPosition.X, anchorPosition.Y)
 
-			local viewportSize = workspace.CurrentCamera.ViewportSize
-			local absX = viewportSize.X * Main.Position.X.Scale + Main.Position.X.Offset
-			local absY = viewportSize.Y * Main.Position.Y.Scale + Main.Position.Y.Offset
-
-			Main.Position = UDim2.new(0, absX, 0, absY)
-			startFramePos = Main.Position
-		end
+		if renderConnection then renderConnection:Disconnect() end
+		renderConnection = Services.Run.RenderStepped:Connect(function(deltaTime)
+			if not Main.Parent then
+				renderConnection:Disconnect()
+				renderConnection = nil
+				dragging = false
+				return
+			end
+			local current = Vector2.new(Main.Position.X.Offset, Main.Position.Y.Offset)
+			local rate = math.clamp((1 - dragSpeed) * 40, 12, 36)
+			local nextPosition = current:Lerp(targetPosition, 1 - math.exp(-rate * deltaTime))
+			if not dragging and (targetPosition - nextPosition).Magnitude < 0.5 then
+				Main.Position = UDim2.fromOffset(targetPosition.X, targetPosition.Y)
+				renderConnection:Disconnect()
+				renderConnection = nil
+			else
+				Main.Position = UDim2.fromOffset(nextPosition.X, nextPosition.Y)
+			end
+		end)
 	end)
 
 
 	Owl:AddConnection(userInput.InputChanged, function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			local currentMousePos = getInputPos(input)
-			if currentMousePos and startMousePos then
-				local delta = currentMousePos - startMousePos
-
-				local newPos = UDim2.new(
-					startFramePos.X.Scale, startFramePos.X.Offset + delta.X,
-					startFramePos.Y.Scale, startFramePos.Y.Offset + delta.Y
-				)
-
-				Main:TweenPosition(getConstrainedPosition(newPos), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, dragSpeed, true)
-			end
+		if not dragging or not startPointer then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+		if touchInput and input ~= touchInput then return end
+		local pointer = getInputPos(input)
+		local delta = pointer - startPointer
+		startPointer = pointer
+		local _, parentSize = getParentBounds()
+		targetPosition += delta
+		if LockToScreen or ConstrainToParent == true then
+			local size = Main.AbsoluteSize
+			local anchor = Main.AnchorPoint
+			local minX = size.X * anchor.X + 8
+			local maxX = parentSize.X - size.X * (1 - anchor.X) - 8
+			local minY = size.Y * anchor.Y + 8
+			local maxY = parentSize.Y - size.Y * (1 - anchor.Y) - 8
+			if maxX < minX then minX, maxX = parentSize.X * anchor.X, parentSize.X * anchor.X end
+			if maxY < minY then minY, maxY = parentSize.Y * anchor.Y, parentSize.Y * anchor.Y end
+			targetPosition = Vector2.new(math.clamp(targetPosition.X, minX, maxX), math.clamp(targetPosition.Y, minY, maxY))
 		end
 	end)
 	Owl:AddConnection(userInput.InputEnded, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
+		local endedMouse = touchInput == nil and input.UserInputType == Enum.UserInputType.MouseButton1
+		local endedTouch = touchInput ~= nil and input == touchInput
+		if not dragging or (not endedMouse and not endedTouch) then return end
+		dragging = false
+		touchInput = nil
+		startPointer = nil
 	end)
 end
 
@@ -1951,8 +1985,30 @@ local function setInterfaceBlur(active)
 	end
 end
 
-if window.shadow:FindFirstChild("glow") then window.shadow.glow.Visible = false end
-if window.shadow:FindFirstChild("glow1") then window.shadow.glow1.Visible = false end
+local glowEnabled = Owl.LoadedConfig and Owl.LoadedConfig.Glow == true or false
+local function setHubGlow(enabled, accent)
+	glowEnabled = enabled == true
+	accent = accent or Owl.theme.Accent
+	for _, name in ipairs({"glow", "glow1"}) do
+		local image = window.shadow:FindFirstChild(name)
+		if image and image:IsA("ImageLabel") then
+			image.ImageColor3 = accent
+			if glowEnabled then image.Visible = true end
+			local tween = Services.Tween:Create(image, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				ImageTransparency = glowEnabled and (name == "glow" and 0.82 or 0.9) or 1,
+			})
+			if glowEnabled then
+				tween:Play()
+			else
+				tween.Completed:Connect(function()
+					if not glowEnabled and image.Parent then image.Visible = false end
+				end)
+				tween:Play()
+			end
+		end
+	end
+end
+setHubGlow(glowEnabled)
 local oldIntegratedGlow = window:FindFirstChild("OwlIntegratedGlow")
 if oldIntegratedGlow then oldIntegratedGlow:Destroy() end
 
@@ -1975,7 +2031,7 @@ local function createPerformanceOverlay()
 	frame.Name = "PerformanceOverlay"
 	frame.BackgroundTransparency = 1
 	frame.BorderSizePixel = 0
-	frame.Size = UDim2.new(0, 104, 0, 20)
+	frame.Size = UDim2.new(0, 142, 0, 20)
 	frame.Visible = false
 	frame.ZIndex = 5
 	frame.Parent = window.top
@@ -1998,7 +2054,7 @@ local function createPerformanceOverlay()
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamSemibold
 	label.Size = UDim2.fromScale(1, 1)
-	label.Text = "-- FPS"
+	label.Text = "-- FPS  ·  -- ms"
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.TextSize = 10
 	label.ZIndex = 6
@@ -2040,8 +2096,16 @@ function Owl:SetPerformanceOverlay(enabled)
 		end
 
 		local fps = math.floor(performanceOverlay.frameCount / performanceOverlay.elapsed + 0.5)
+		local ping
+		local localPlayer = Services.Players.LocalPlayer
+		local pingOk, pingSeconds = pcall(function()
+			return localPlayer and localPlayer:GetNetworkPing()
+		end)
+		if pingOk and type(pingSeconds) == "number" then
+			ping = math.floor(math.max(0, pingSeconds) * 1000 + 0.5)
+		end
 		if performanceOverlay.label and performanceOverlay.label.Parent then
-			performanceOverlay.label.Text = string.format("%d FPS", fps)
+			performanceOverlay.label.Text = string.format("%d FPS  ·  %s ms", fps, ping and tostring(ping) or "--")
 			performanceOverlay.label.TextColor3 = Color3.fromRGB(255, 255, 255)
 		end
 
@@ -2414,7 +2478,7 @@ local toasts = {}
 local toastSpacing = 8
 
 local tweenInfo = TweenInfo.new(
-	0.55,
+	0.2,
 	Enum.EasingStyle.Exponential,
 	Enum.EasingDirection.Out
 )
@@ -2454,11 +2518,21 @@ function Owl:Toast(Toasty)
 		Toast.AnchorPoint = Vector2.new(0.5, 0)
 		Toast.Content.Text = Data.Content
 
-		Toast.Size = UDim2.new(1, Toast.Content.TextBounds.X - 140 ,0, 40)
+		local toastWidth = math.clamp(Toast.Content.TextBounds.X + 56, 240, 420)
+		Toast.Size = UDim2.new(0, toastWidth, 0, 44)
 
-		if Data.Icon ~= "" then
-			Toast.icon.ImageLabel.Image = "rbxassetid://" .. Data.Icon
-			Toast.icon.ImageLabel.ImageTransparency = 0
+		local toastIcon = Toast:FindFirstChild("icon")
+		local toastImage = toastIcon and toastIcon:FindFirstChild("ImageLabel")
+		if toastImage then
+			if Data.Icon ~= "" then
+				local icon = tostring(Data.Icon)
+				if not icon:match("^%a+://") then icon = "rbxassetid://" .. icon end
+				toastImage.Image = icon
+				toastIcon.Visible = true
+				toastImage.ImageTransparency = 0
+			else
+				toastIcon.Visible = false
+			end
 		end
 		Toast.Position = UDim2.new(
 			0.5, 0,
@@ -2473,7 +2547,7 @@ function Owl:Toast(Toasty)
 
 			Services.Tween:Create(
 				Toast,
-				TweenInfo.new(0.4, Enum.EasingStyle.Exponential),
+				TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 				{
 					Position = Toast.Position - UDim2.fromOffset(0, 30),
 					BackgroundTransparency = 1
@@ -2482,21 +2556,21 @@ function Owl:Toast(Toasty)
 
 			for _, v in ipairs(Toast:GetDescendants()) do
 				if v:IsA("TextLabel") then
-					Services.Tween:Create(v, TweenInfo.new(0.3), {
+					Services.Tween:Create(v, TweenInfo.new(0.18), {
 						TextTransparency = 1
 					}):Play()
 				elseif v:IsA("ImageLabel") then
-					Services.Tween:Create(v, TweenInfo.new(0.3), {
+					Services.Tween:Create(v, TweenInfo.new(0.18), {
 						ImageTransparency = 1
 					}):Play()
 				elseif v:IsA("Frame") then
-					Services.Tween:Create(v, TweenInfo.new(0.3), {
+					Services.Tween:Create(v, TweenInfo.new(0.18), {
 						BackgroundTransparency = 1
 					}):Play()
 				end
 			end
 
-			task.wait(0.35)
+			task.wait(0.22)
 			Toast:Destroy()
 			updateToastPositions()
 		end)
@@ -2681,6 +2755,10 @@ function Owl:Destroy()
 		performanceOverlay.connection:Disconnect()
 		performanceOverlay.connection = nil
 	end
+	if rs and rs.Connected then
+		rs:Disconnect()
+		rs = nil
+	end
 
 	for index = #Owl.Connections, 1, -1 do
 		local connectionData = Owl.Connections[index]
@@ -2749,19 +2827,19 @@ function opensearch()
 
 
 	if window.search.Frame.TextBox.Text ~= '' then
-		Services.Tween:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 230) }):Play()
+		Services.Tween:Create(window.search, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0, 350,0, 230) }):Play()
 	else
-		Services.Tween:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
+		Services.Tween:Create(window.search, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0, 350,0, 60) }):Play()
 	end
 
-	Services.Tween:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-	Services.Tween:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	Services.Tween:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	Services.Tween:Create(window.dim, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 0.45 }):Play()
+	Services.Tween:Create(window.search, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
+	Services.Tween:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { ImageTransparency = 0 }):Play()
 
-	Services.Tween:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	Services.Tween:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	Services.Tween:Create(window.search.close, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
+	Services.Tween:Create(window.search.close.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { ImageTransparency = 0 }):Play()
 
-	Services.Tween:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	Services.Tween:Create(window.search.Frame.TextBox, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { TextTransparency = 0 }):Play()
 end
 
 function closesearch()
@@ -2772,18 +2850,22 @@ function closesearch()
 		end
 		return
 	end
+	local searchTextBox = window.search.Frame.TextBox
+	if searchTextBox:IsFocused() then
+		searchTextBox:ReleaseFocus(false)
+	end
 	searchopen = false
 	window.search.Container.Visible = false
-	Services.Tween:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
-	Services.Tween:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-	Services.Tween:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	Services.Tween:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.Tween:Create(window.search, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0, 350,0, 60) }):Play()
+	Services.Tween:Create(window.dim, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+	Services.Tween:Create(window.search, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 1}):Play()
+	Services.Tween:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { ImageTransparency = 1 }):Play()
 
-	Services.Tween:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	Services.Tween:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.Tween:Create(window.search.close, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 1}):Play()
+	Services.Tween:Create(window.search.close.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { ImageTransparency = 1 }):Play()
 
-	Services.Tween:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-	task.delay(0.5, function()
+	Services.Tween:Create(window.search.Frame.TextBox, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { TextTransparency = 1 }):Play()
+	task.delay(0.2, function()
 		if not searchopen then
 			window.dim.Visible = false
 			window.search.Visible = false
@@ -3111,7 +3193,7 @@ function Owl:Init(library)
 	local MinihomeData = {
 		QuickActions = library.QuickActions or false;
 	}
-	local lastTime = tick()
+	local lastTime = os.clock()
 	local frames = 0
 	if isMinihomeRuntimeActive then
 		rs = RunService.RenderStepped:Connect(function()
@@ -3121,7 +3203,7 @@ function Owl:Init(library)
 				return
 			end
 			frames += 1
-			local now = tick()
+			local now = os.clock()
 
 			if now - lastTime >= 1 then
 				local fps = math.floor(frames / (now - lastTime))
@@ -3130,9 +3212,9 @@ function Owl:Init(library)
 
 				info.fps.Visible = true
 				info.fps.Text = string.format("%d FPS", fps)
+				local hour = tonumber(os.date("%I"))
+				info.time.Text = hour .. os.date(":%M")
 			end
-			local hour = tonumber(os.date("%I"))
-			info.time.Text = hour .. os.date(":%M")
 		end)
 
 
@@ -3305,11 +3387,23 @@ function Owl:Init(library)
 		-- makes a single click/tap toggle the search twice on supported controls.
 		searchButton.Activated:Connect(toggleSearch)
 	end
+	Owl:AddConnection(Services.UserInput.InputBegan, function(input)
+		if not searchopen or (input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch) then return end
+		local pointer = input.UserInputType == Enum.UserInputType.Touch and Vector2.new(input.Position.X, input.Position.Y) or Services.UserInput:GetMouseLocation()
+		local function hitTest(object)
+			if not object or not object.Visible then return false end
+			local position, size = object.AbsolutePosition, object.AbsoluteSize
+			return pointer.X >= position.X and pointer.X <= position.X + size.X
+				and pointer.Y >= position.Y and pointer.Y <= position.Y + size.Y
+		end
+		if not hitTest(window.search) and not hitTest(searchButton) then closesearch() end
+	end)
 
 
 
 	Owl:AddConnection(Owl.Comms.Event, function(p, value)
 		if p == "Accent" then
+			setHubGlow(glowEnabled, value)
 			for i, glow in pairs(window.clipframe:GetChildren()) do
 				if glow:IsA("ImageLabel") then
 					Services.Tween:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
@@ -3490,16 +3584,7 @@ function Owl:Init(library)
 
 
 		local Players = game:GetService("Players")
-		local RunService = game:GetService("RunService")
-		local Stats = game:GetService("Stats")
-
 		local function getPing()
-			local statsOk, statsPing = pcall(function()
-				return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-			end)
-			if statsOk and type(statsPing) == "number" and statsPing > 0 then
-				return math.floor(statsPing + 0.5)
-			end
 			local localPlayer = Players.LocalPlayer
 			if not localPlayer then return 0 end
 			local ok, pingSeconds = pcall(function()
@@ -3507,9 +3592,6 @@ function Owl:Init(library)
 			end)
 			if not ok or type(pingSeconds) ~= "number" then return 0 end
 			local ping = math.max(0, math.floor(pingSeconds * 1000 + 0.5))
-			if ping == 0 and RunService:IsStudio() then
-				return math.floor(50 + math.noise(os.clock() * 0.5) * 40 + 0.5)
-			end
 			return ping
 		end
 
@@ -3931,7 +4013,7 @@ function Owl:Init(library)
 	else
 		minimizeButton.Active = true
 		minimizeButton.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+							if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				if not uiRuntime.isClosed then ToggleUI() end
 			end
 		end)
@@ -5572,7 +5654,7 @@ function Owl:Init(library)
 				dropdown.Name = data.Title
 				dropdown.dropholder.drop.Container.Option.Visible = false
 				dropdown.dropholder.drop.Container.Visible = false
-				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
 				dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
 
 				local DropOpen = false
@@ -5585,7 +5667,7 @@ function Owl:Init(library)
 					local yOffset = 0
 					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option.Visible then
-							Services.Tween:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+							option.Position = UDim2.new(0, 0, 0, yOffset)
 							yOffset = yOffset + option.Size.Y.Offset + 7
 						end
 					end
@@ -5596,35 +5678,35 @@ function Owl:Init(library)
 					dropdown.dropholder.drop.Container.Visible = true
 					dropdown.dropholder.drop.search.Visible = true
 
-					Services.Tween:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+					Services.Tween:Create(dropdown, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
 					Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 				end
 
 				local function CloseDrop()
 					DropOpen = false
-					Services.Tween:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 					Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
-					task.wait(0.6)
+					task.wait(0.18)
 					dropdown.dropholder.drop.Container.Visible = false
 					dropdown.dropholder.drop.search.Visible = false
 
@@ -5640,7 +5722,7 @@ function Owl:Init(library)
 						OpenDrop()
 					end
 
-					task.delay(1.2, function()
+					task.delay(0.25, function()
 						DeBounce = false
 					end)
 				end)
@@ -5751,37 +5833,20 @@ function Owl:Init(library)
 					end
 				end
 				dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-					local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
+					local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower():match("^%s*(.-)%s*$")
+					local function matchesSearch(text)
+						text = tostring(text or ""):lower()
+						for term in searchText:gmatch("%S+") do
+							if not text:find(term, 1, true) then return false end
+						end
+						return true
+					end
 
 					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option:FindFirstChild("Title") then
 							local optionText = option.Title.Text:lower()
 							local isTemplate = option.Name == "Option"
-							local showldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
-
-							if showldShow then
-								option.Visible = true
-								if SelectedOptions[option.Title.Text] then
-									Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									Services.Tween:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-									Services.Tween:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-									Services.Tween:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-								else
-									Services.Tween:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									Services.Tween:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									Services.Tween:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-									Services.Tween:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									Services.Tween:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-								end
-							else
-								Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-								Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								Services.Tween:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-								Services.Tween:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								Services.Tween:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-								option.Visible = false
-							end
+							option.Visible = not isTemplate and (matchesSearch(optionText) or SelectedOptions[option.Title.Text])
 						end
 					end
 
@@ -5905,13 +5970,14 @@ function Owl:Init(library)
 						Increment = Options.Increment or 1;
 						Range = Options.Range or {0, 100};
 						StarterValue = Options.StarterValue or 16;
-						CallBack = Options.CallBack;
+						CallBack = Options.CallBack or function() end;
 						Flag = Options.Flag or Options.SFlag or Options.Title;
 						Save = Options.Save ~= false;
 						SFlag = Options.SFlag;
 						SettingsConfig = true;
 						Type = "Slider";
 					}
+					Options = normalizeSliderOptions(Options)
 					Options.Value = Options.StarterValue
 
 					Slider.Name = Options.Title
@@ -5919,6 +5985,7 @@ function Owl:Init(library)
 					Options.Value = Options.StarterValue
 
 					local dragging = false
+					local activeTouch = nil
 					Slider.Visible = true
 					Slider.Parent = slider.slideholder
 
@@ -5933,16 +6000,7 @@ function Owl:Init(library)
 					end
 
 
-					Slider.slide.slideframe:TweenSize(UDim2.new(SliderPosition, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.5, true)
-
-					Owl:registerLoadTween(
-						Slider.slide.slideframe,
-						{Size = UDim2.new(SliderPosition, 0, 1, 0)},
-						{Size = UDim2.new(0, 100,1, 0)},
-						TweenInfo.new(0.85, Enum.EasingStyle.Quint)
-					)
-
-					Owl:replayLoadTweens(Slider.slide.slideframe)
+					Slider.slide.slideframe.Size = UDim2.new(SliderPosition, 0, 1, 0)
 
 					local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 					Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", Options.StarterValue, Options.Range[2])
@@ -5969,9 +6027,8 @@ function Owl:Init(library)
 							return
 						end
 
-						local tickCount = math.floor(range / increment) + 1
+						local tickCount = math.min(math.floor(range / increment) + 1, 25)
 						if tickCount < 2 then return end
-						task.wait()
 
 						local width = ticksFrame.AbsoluteSize.X
 						local height = ticksFrame.AbsoluteSize.Y
@@ -5991,15 +6048,8 @@ function Owl:Init(library)
 							tick.BorderSizePixel = 0
 							tick.Parent = ticksFrame
 
-							local finalPos = UDim2.fromOffset(i * spacing, height / 1.5)
-							Services.Tween:Create(
-								tick,
-								TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-								{
-									Position = finalPos,
-									BackgroundTransparency = 0.85
-								}
-							):Play()
+							tick.Position = UDim2.fromOffset(i * spacing, height / 1.5)
+							tick.BackgroundTransparency = 0.85
 						end
 						for i = tickCount + 1, #existingTicks do
 							existingTicks[i]:Destroy()
@@ -6029,6 +6079,7 @@ function Owl:Init(library)
 						if dragging then
 							local sliderStart = Slider.slide.AbsolutePosition.X
 							local sliderWidth = Slider.slide.AbsoluteSize.X
+							if sliderWidth <= 0 then return end
 							local sliderPosition = (x - sliderStart) / sliderWidth
 							sliderPosition = math.clamp(sliderPosition, 0, 1)
 
@@ -6037,12 +6088,10 @@ function Owl:Init(library)
 							newValue = math.floor((newValue - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
 							newValue = Owl:RoundTo(newValue, Owl:DecimalPlaces(Options.Increment))
 							local snapPosition = (newValue - Options.Range[1]) / range
-							Slider.slide.slideframe:TweenSize(UDim2.new(snapPosition, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.55, true)
+							Slider.slide.slideframe.Size = UDim2.new(snapPosition, 0, 1, 0)
 							local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 							Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
-
-							Services.Tween:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 							local success, errorMsg = pcall(function()
 								Options.CallBack(newValue)
@@ -6053,35 +6102,34 @@ function Owl:Init(library)
 
 							Options.StarterValue = newValue
 							Options.Value = newValue
-							if Options.Save and Options.Flag then SaveConfig(game and game.GameId) end
 						end
 					end
 
 					Slider.slide.Interact.InputBegan:Connect(function(input)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 							dragging = true
+							activeTouch = input.UserInputType == Enum.UserInputType.Touch and input or nil
 							UpdateSlider(input.Position.X)
 						end
 					end)
 
-					Slider.slide.Interact.MouseButton1Up:Connect(function()
-						dragging = false
-					end)
-
 					Owl:AddConnection(Services.UserInput.InputEnded, function(input, processed)
-						if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
+						local endedMouse = activeTouch == nil and input.UserInputType == Enum.UserInputType.MouseButton1
+						local endedTouch = activeTouch ~= nil and input == activeTouch
+						if dragging and (endedMouse or endedTouch) then
 							dragging = false
-							Services.Tween:Create(Slider.title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+							activeTouch = nil
+							if Options.Save and Options.Flag then SaveConfig(game and game.GameId) end
 						end
 					end)
 
 					Owl:AddConnection(Services.UserInput.InputChanged, function(input)
-						if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+						if dragging and ((not activeTouch and input.UserInputType == Enum.UserInputType.MouseMovement) or input == activeTouch) then
 							UpdateSlider(input.Position.X)
 						end
 					end)
 
-					Slider.slide.slideframe.BackgroundColor3 = Owl.theme.HitBox
+					Owl:SetSliderGradient(Slider.slide.slideframe, Owl.theme.Accent)
 					Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = Owl.theme.HitBox
 					Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = Owl.theme.HitBox
 					Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = Owl.theme.HitBox
@@ -6090,8 +6138,9 @@ function Owl:Init(library)
 					slider.Size = UDim2.new(1,-35,0, ss  + 20)
 
 					Owl:AddConnection(Owl.Comms.Event, function(p, color)
-						if p == 'HitBox' then
-							Slider.slide.slideframe.BackgroundColor3 = color
+						if p == 'Accent' then
+							Owl:SetSliderGradient(Slider.slide.slideframe, color)
+						elseif p == 'HitBox' then
 							Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
 							Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = color
 							Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = color
@@ -6111,12 +6160,6 @@ function Owl:Init(library)
 							Enum.EasingStyle.Quint,
 							0.55,
 							true
-						)
-						Owl:registerLoadTween(
-							Slider.slide.slideframe,
-							{Size = UDim2.new(sliderPosition, 0, 1, 0)},
-							{Size = UDim2.new(0, 100, 1, 0)},
-							TweenInfo.new(0.85, Enum.EasingStyle.Quint)
 						)
 						local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 						Slider.v.Text = string.format(
@@ -6591,58 +6634,67 @@ function Owl:Init(library)
 
 
 		a:Toggle({
-			Title = 'LockToScreen',
+			Title = 'Lock to screen',
 			Description = 'Prevents UI from moving off screen.',
-			Value = LockToScreen,
+			Value = Owl.LoadedConfig and Owl.LoadedConfig.LS == true or LockToScreen,
 			CallBack = function (v)
 				LockToScreen = v
 			end,
 			SFlag = 'LS'
 		})
+		a:Toggle({
+			Title = 'Glow',
+			Description = 'Subtle accent glow around the hub.',
+			Value = glowEnabled,
+			CallBack = function(v)
+				setHubGlow(v)
+			end,
+			SFlag = 'Glow'
+		})
 
 		a:Toggle({
-			Title = 'Watermark',
-			Description = 'Toggles the draggable watermark display.',
+			Title = 'Mobile Btn',
+			Description = 'Shows the draggable button used to reopen the hub.',
 			Value = Owl.WatermarkEnabled,
 			CallBack = function (v)
 				Owl:SetWatermarkEnabled(v)
-				SaveConfig(game and game.GameId)
 			end,
 			SFlag = 'WTRMK'
 		})
 		window.pages.home.general.Quick.ClipsDescendants = false
 
 		local HttpService = game:GetService("HttpService")
-		local isDev = false
-		local baseUrl = isDev and "http://localhost:3000" or "https://Owl-auth.vercel.app"
+		local baseUrl = tostring(Owl.DiscordAuthBaseUrl or "https://owl-auth.vercel.app"):gsub("/+$", "")
 		local loginUrl = baseUrl .. "/api/login"
 		local VERIFY_ENDPOINT = baseUrl .. "/api/verify?id="
 		local currentDiscordId = nil
 		local lastCheck = 0
 		local debounceTime = 1.5 -- seconds
 		local function openURL(url)
-			local success = false
-			pcall(function()
-				if syn and syn.openurl then
-					syn.openurl(url)
-					success = true
-				elseif getgenv().is_sirhurt_closure then
-					game:GetService("GuiService"):OpenBrowserWindow(url)
-					success = true
-				elseif KRNL_LOADED then
-					setclipboard(url)
-					success = true
-				end
-			end)
-
-			if not success and setclipboard then
-				setclipboard(url)
-				Owl:Notify({
-					Title = "Link Copied",
-					Content = "OAuth link copied to clipboard. Paste in your browser.",
-					Duration = 5
-				})
+			local opened = false
+			local synApi = type(syn) == "table" and syn or nil
+			if synApi and type(synApi.openurl) == "function" then
+				opened = pcall(synApi.openurl, url)
 			end
+			local environment = type(getgenv) == "function" and getgenv() or nil
+			if not opened and environment and type(environment.open_url) == "function" then
+				opened = pcall(environment.open_url, url)
+			end
+			if not opened and type(setclipboard) == "function" then
+				local copied = pcall(setclipboard, url)
+				if copied then
+					Owl:Notify({
+						Title = "Link Copied",
+						Content = "OAuth link copied to clipboard. Paste in your browser.",
+						Duration = 5
+					})
+					return true
+				end
+			end
+			if not opened then
+				Owl:Notify({Title = "Discord", Content = "Could not open the login link in this client.", Duration = 5})
+			end
+			return opened
 		end
 		b:Button({
 			Title = "Connect Discord",
@@ -6653,41 +6705,33 @@ function Owl:Init(library)
 		})
 
 		local function verifyDiscord(id)
-			if HttpService.HttpEnabled then
-				local ok, res = pcall(function()
-					return HttpService:GetAsync(VERIFY_ENDPOINT .. id, true)
-				end)
-				if ok and res then
-					local decodedOk, decoded = pcall(function()
-						return HttpService:JSONDecode(res)
-					end)
-					if decodedOk and type(decoded) == "table" and decoded.verified then
-						return true, decoded.discordUsername or nil
+			id = tostring(id or ""):match("^%s*(.-)%s*$")
+			if not id or not id:match("^%d+$") then return false, nil end
+			local endpoint = VERIFY_ENDPOINT .. HttpService:UrlEncode(id)
+			local function decodeResponse(body)
+				if type(body) ~= "string" or body == "" then return false, nil end
+				local ok, decoded = pcall(HttpService.JSONDecode, HttpService, body)
+				if not ok or type(decoded) ~= "table" or decoded.verified ~= true then return false, nil end
+				return true, type(decoded.discordUsername) == "string" and decoded.discordUsername or nil
+			end
+			local synApi = type(syn) == "table" and syn or nil
+			local environment = type(getgenv) == "function" and getgenv() or nil
+			local requestFunction = (synApi and synApi.request) or (environment and environment.request) or request
+			if type(requestFunction) == "function" then
+				local ok, response = pcall(requestFunction, {Url = endpoint, Method = "GET"})
+				if ok and type(response) == "table" then
+					local status = tonumber(response.StatusCode or response.Status or 200)
+					if status and status >= 200 and status < 300 then
+						local verified, username = decodeResponse(response.Body or response.body)
+						if verified then return true, username end
 					end
 				end
-				return false, nil
 			end
-			local success, result = pcall(function()
-				if syn and syn.request then
-					local r = syn.request({ Url = VERIFY_ENDPOINT .. id, Method = "GET" })
-					local decoded = HttpService:JSONDecode(r.Body)
-					if decoded.verified then
-						return decoded.discordUsername or nil
-					end
-				elseif request then
-					local r = request({ Url = VERIFY_ENDPOINT .. id, Method = "GET" })
-					local decoded = HttpService:JSONDecode(r.Body)
-					if decoded.verified then
-						return decoded.discordUsername or nil
-					end
-				end
-				return nil
-			end)
-
-			if success and result then
-				return true, result
+			local httpCheckOk, httpEnabled = pcall(function() return HttpService.HttpEnabled end)
+			if httpCheckOk and httpEnabled then
+				local ok, body = pcall(HttpService.GetAsync, HttpService, endpoint, true)
+				if ok then return decodeResponse(body) end
 			end
-
 			return false, nil
 		end
 		b:TextInput({
@@ -6697,7 +6741,7 @@ function Owl:Init(library)
 			CallBack = function(v)
 				currentDiscordId = v
 
-				if not currentDiscordId or currentDiscordId == "" then
+				if not currentDiscordId or not tostring(currentDiscordId):match("^%s*%d+%s*$") then
 					window.user.headshot.Status.BackgroundColor3 = Color3.fromRGB(255, 101, 104)
 					return
 				end
@@ -7316,17 +7360,24 @@ function Owl:Init(library)
 		local function searchFunctions(query)
 			searchDebounce += 1
 			local thisSearch = searchDebounce
+			query = tostring(query or ""):lower():match("^%s*(.-)%s*$")
 
 			task.delay(0.05, function()
 				if thisSearch ~= searchDebounce then return end
 
 				clearResults()
-				query = query:lower()
 				if query == "" then return end
+				local function matchesAllTerms(text)
+					text = tostring(text or ""):lower()
+					for term in query:gmatch("%S+") do
+						if not text:find(term, 1, true) then return false end
+					end
+					return true
+				end
 
 
 				for _, pageCandidate in ipairs(Pages:GetChildren()) do
-					if pageCandidate:IsA("GuiObject") and pageCandidate.Name:lower():find(query, 1, true) then
+					if pageCandidate:IsA("GuiObject") and matchesAllTerms(pageCandidate.Name) then
 						createResult(pageCandidate, pageCandidate)
 					end
 				end
@@ -7346,7 +7397,7 @@ function Owl:Init(library)
 								end
 							end
 							local ftype = getFunctionType(child):lower()
-							if indexedText:find(query, 1, true) or ftype:find(query, 1, true) then
+							if matchesAllTerms(indexedText) or matchesAllTerms(ftype) then
 								createResult(page, child)
 							end
 						end
@@ -7361,12 +7412,12 @@ function Owl:Init(library)
 		end
 		Owl._searchTextConnection = SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
 			searchFunctions(SearchBox.Text)
-			Services.Tween:Create(window.search, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0, 230)}):Play()
-			Services.Tween:Create(window.search.UICorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(0,25)}):Play()
-			if SearchBox.Text == '' then
-				Services.Tween:Create(window.search, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0,60)}):Play()
-				Services.Tween:Create(window.search.UICorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(1,0)}):Play()
-			end
+			local hasQuery = SearchBox.Text ~= ""
+			local targetSize = hasQuery and UDim2.new(0, 350, 0, 230) or UDim2.new(0, 350, 0, 60)
+			local targetCorner = hasQuery and UDim.new(0, 25) or UDim.new(1, 0)
+			local motion = TweenInfo.new(0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			Services.Tween:Create(window.search, motion, {Size = targetSize}):Play()
+			Services.Tween:Create(window.search.UICorner, motion, {CornerRadius = targetCorner}):Play()
 		end)
 
 
@@ -7927,12 +7978,14 @@ function Owl:Init(library)
 					CallBack = Options.CallBack or function() end;
 					Flag = Options.Flag;
 				}
+				Options = normalizeSliderOptions(Options)
 
 				Slider.Name = Options.Title
 					Slider.title.Text = Options.Title
 				Options.Value = Options.StarterValue
 
 				local dragging = false
+				local activeTouch = nil
 				Slider.Visible = true
 				Slider.Parent = slider.slideholder
 
@@ -7947,16 +8000,7 @@ function Owl:Init(library)
 				end
 
 
-				Slider.slide.slideframe:TweenSize(UDim2.new(SliderPosition, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.5, true)
-
-				Owl:registerLoadTween(
-					Slider.slide.slideframe,
-					{Size = UDim2.new(SliderPosition, 0, 1, 0)},
-					{Size = UDim2.new(0, 100,1, 0)},
-					TweenInfo.new(0.85, Enum.EasingStyle.Quint)
-				)
-
-				Owl:replayLoadTweens(Slider.slide.slideframe)
+				Slider.slide.slideframe.Size = UDim2.new(SliderPosition, 0, 1, 0)
 
 				local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 				Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", Options.StarterValue, Options.Range[2])
@@ -7983,9 +8027,8 @@ function Owl:Init(library)
 						return
 					end
 
-					local tickCount = math.floor(range / increment) + 1
+					local tickCount = math.min(math.floor(range / increment) + 1, 25)
 					if tickCount < 2 then return end
-					task.wait()
 
 					local width = ticksFrame.AbsoluteSize.X
 					local height = ticksFrame.AbsoluteSize.Y
@@ -8005,15 +8048,8 @@ function Owl:Init(library)
 						tick.BorderSizePixel = 0
 						tick.Parent = ticksFrame
 
-						local finalPos = UDim2.fromOffset(i * spacing, height / 1.5)
-						Services.Tween:Create(
-							tick,
-							TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-							{
-								Position = finalPos,
-								BackgroundTransparency = 0.85
-							}
-						):Play()
+						tick.Position = UDim2.fromOffset(i * spacing, height / 1.5)
+						tick.BackgroundTransparency = 0.85
 					end
 					for i = tickCount + 1, #existingTicks do
 						existingTicks[i]:Destroy()
@@ -8043,6 +8079,7 @@ function Owl:Init(library)
 					if dragging then
 						local sliderStart = Slider.slide.AbsolutePosition.X
 						local sliderWidth = Slider.slide.AbsoluteSize.X
+						if sliderWidth <= 0 then return end
 						local sliderPosition = (x - sliderStart) / sliderWidth
 						sliderPosition = math.clamp(sliderPosition, 0, 1)
 
@@ -8051,18 +8088,9 @@ function Owl:Init(library)
 						newValue = math.floor((newValue - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
 						newValue = Owl:RoundTo(newValue, Owl:DecimalPlaces(Options.Increment))
 						local snapPosition = (newValue - Options.Range[1]) / range
-						Slider.slide.slideframe:TweenSize(UDim2.new(snapPosition, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.55, true)
-
-						Owl:registerLoadTween(
-							Slider.slide.slideframe,
-							{Size = UDim2.new(snapPosition, 0, 1, 0)},
-							{Size = UDim2.new(0, 100,1, 0)},
-							TweenInfo.new(0.85, Enum.EasingStyle.Quint)
-						)
+						Slider.slide.slideframe.Size = UDim2.new(snapPosition, 0, 1, 0)
 						local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 						Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
-
-							Services.Tween:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 						local success, errorMsg = pcall(function()
 							Options.CallBack(newValue)
@@ -8072,7 +8100,8 @@ function Owl:Init(library)
 						end
 
 
-						Options:Set(newValue)
+						Options.StarterValue = newValue
+						Options.Value = newValue
 
 					end
 				end
@@ -8081,28 +8110,28 @@ function Owl:Init(library)
 				Slider.slide.Interact.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = true
+						activeTouch = input.UserInputType == Enum.UserInputType.Touch and input or nil
 						UpdateSlider(input.Position.X)
 					end
 				end)
 
-				Slider.slide.Interact.MouseButton1Up:Connect(function()
-					dragging = false
-				end)
-
 				Owl:AddConnection(Services.UserInput.InputEnded, function(input, processed)
-					if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
+					local endedMouse = activeTouch == nil and input.UserInputType == Enum.UserInputType.MouseButton1
+					local endedTouch = activeTouch ~= nil and input == activeTouch
+					if dragging and (endedMouse or endedTouch) then
 						dragging = false
-							Services.Tween:Create(Slider.title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+						activeTouch = nil
+						if Options.Save and Options.Flag then SaveConfig(game and game.GameId) end
 					end
 				end)
 
 				Owl:AddConnection(Services.UserInput.InputChanged, function(input)
-					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+					if dragging and ((not activeTouch and input.UserInputType == Enum.UserInputType.MouseMovement) or input == activeTouch) then
 						UpdateSlider(input.Position.X)
 					end
 				end)
 
-				Slider.slide.slideframe.BackgroundColor3 = Owl.theme.HitBox
+				Owl:SetSliderGradient(Slider.slide.slideframe, Owl.theme.Accent)
 				Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = Owl.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = Owl.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = Owl.theme.HitBox
@@ -8116,8 +8145,9 @@ function Owl:Init(library)
 				slider.slideholder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshSliderSize)
 
 				Owl:AddConnection(Owl.Comms.Event, function(p, color)
-					if p == 'HitBox' then
-						Slider.slide.slideframe.BackgroundColor3 = color
+					if p == 'Accent' then
+						Owl:SetSliderGradient(Slider.slide.slideframe, color)
+					elseif p == 'HitBox' then
 						Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
 						Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = color
 						Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = color
@@ -8126,26 +8156,14 @@ function Owl:Init(library)
 
 				function Options:Set(NewVal, skipSave)
 					local range = Options.Range[2] - Options.Range[1]
+					NewVal = math.clamp(tonumber(NewVal) or Options.Range[1], Options.Range[1], Options.Range[2])
+					NewVal = math.floor((NewVal - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
+					NewVal = Owl:RoundTo(NewVal, Owl:DecimalPlaces(Options.Increment))
 					local sliderPosition = (NewVal - Options.Range[1]) / range
 
-					Slider.slide.slideframe:TweenSize(
-						UDim2.new(sliderPosition, 0, 1, 0),
-						Enum.EasingDirection.Out,
-						Enum.EasingStyle.Quint,
-						0.55,
-						true
-					)
-					Owl:registerLoadTween(
-						Slider.slide.slideframe,
-						{Size = UDim2.new(sliderPosition, 0, 1, 0)},
-						{Size = UDim2.new(0, 100, 1, 0)},
-						TweenInfo.new(0.85, Enum.EasingStyle.Quint)
-					) 
+				Slider.slide.slideframe.Size = UDim2.new(sliderPosition, 0, 1, 0)
 					local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 					Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", NewVal, Options.Range[2])
-						Services.Tween:Create(Slider.title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
-						TextTransparency = 0
-					}):Play()
 					local success, result = pcall(function()
 						Options.CallBack(NewVal)
 					end)
@@ -8154,6 +8172,7 @@ function Owl:Init(library)
 					end
 
 					Options.StarterValue = NewVal
+					Options.Value = NewVal
 				end
 				Owl:AttachSliderInput(Slider, Options)
 
@@ -8309,10 +8328,17 @@ function Owl:Init(library)
 			trackCorner.Parent = track
 
 			local fill = Instance.new("Frame")
-			fill.BackgroundColor3 = Owl.theme.Accent
+			fill.BackgroundColor3 = Color3.new(1, 1, 1)
 			fill.BorderSizePixel = 0
 			fill.Size = UDim2.new(0, 0, 1, 0)
 			fill.Parent = track
+			local fillGradient = Instance.new("UIGradient")
+			local initialAccent = Owl.theme.Accent or Color3.fromRGB(0, 170, 255)
+			fillGradient.Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, initialAccent:Lerp(Color3.new(1, 1, 1), 0.12)),
+				ColorSequenceKeypoint.new(1, initialAccent),
+			})
+			fillGradient.Parent = fill
 			local fillCorner = Instance.new("UICorner")
 			fillCorner.CornerRadius = UDim.new(1, 0)
 			fillCorner.Parent = fill
@@ -8336,17 +8362,23 @@ function Owl:Init(library)
 			hitbox.Parent = track
 
 			local dragging = false
+			local touchInput = nil
 			local data = {Value = value, Flag = config.Flag, Save = config.Save ~= false, Type = "Slider"}
-			local function setValue(nextValue, skipCallback)
+			local function setValue(nextValue, skipCallback, instant)
 				nextValue = math.clamp(tonumber(nextValue) or minimum, minimum, maximum)
 				nextValue = math.floor((nextValue - minimum) / increment + 0.5) * increment + minimum
 				nextValue = Owl:RoundTo(nextValue, Owl:DecimalPlaces(increment))
 				value = math.clamp(nextValue, minimum, maximum)
 				data.Value = value
 				local alpha = (value - minimum) / (maximum - minimum)
-				local motion = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-				Services.Tween:Create(fill, motion, {Size = UDim2.new(alpha, 0, 1, 0)}):Play()
-				Services.Tween:Create(knob, motion, {Position = UDim2.new(alpha, 0, 0.5, 0)}):Play()
+				if instant then
+					fill.Size = UDim2.new(alpha, 0, 1, 0)
+					knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+				else
+					local motion = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+					Services.Tween:Create(fill, motion, {Size = UDim2.new(alpha, 0, 1, 0)}):Play()
+					Services.Tween:Create(knob, motion, {Position = UDim2.new(alpha, 0, 0.5, 0)}):Play()
+				end
 				valueLabel.Text = string.format("%g / %g", value, maximum)
 				if not skipCallback then
 					local ok, err = pcall(callback, value)
@@ -8357,29 +8389,46 @@ function Owl:Init(library)
 				local width = track.AbsoluteSize.X
 				if width <= 0 then return end
 				local alpha = math.clamp((x - track.AbsolutePosition.X) / width, 0, 1)
-				setValue(minimum + (maximum - minimum) * alpha)
+				setValue(minimum + (maximum - minimum) * alpha, false, true)
 			end
-			hitbox.InputBegan:Connect(function(input)
+			Owl:AddConnection(hitbox.InputBegan, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					dragging = true
+					touchInput = input.UserInputType == Enum.UserInputType.Touch and input or nil
 					updateFromX(input.Position.X)
 				end
 			end)
 			Owl:AddConnection(Services.UserInput.InputChanged, function(input)
-				if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				if dragging and not touchInput and input.UserInputType == Enum.UserInputType.MouseMovement then
+					updateFromX(input.Position.X)
+				elseif dragging and touchInput and input == touchInput then
 					updateFromX(input.Position.X)
 				end
 			end)
 			Owl:AddConnection(Services.UserInput.InputEnded, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+				local endedMouse = touchInput == nil and input.UserInputType == Enum.UserInputType.MouseButton1
+				local endedTouch = touchInput ~= nil and input == touchInput
+				if dragging and (endedMouse or endedTouch) then
+					dragging = false
+					touchInput = nil
+					if Owl.ConfigEnabled and data.Save and data.Flag then SaveConfig(game and game.GameId) end
+				end
 			end)
-			Owl:AddConnection(Owl.Comms.Event, function(kind, color)
-				if kind == "Accent" then fill.BackgroundColor3 = color end
+			local _, disconnectGradient = Owl:AddConnection(Owl.Comms.Event, function(kind, color)
+				if kind == "Accent" then
+					fillGradient.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, color:Lerp(Color3.new(1, 1, 1), 0.12)),
+						ColorSequenceKeypoint.new(1, color),
+					})
+				end
 			end)
 			data.Set = setValue
 			data._frame = frame
 			data.toggle = function() frame.Visible = not frame.Visible end
-			data.remove = function() frame:Destroy() end
+			data.remove = function()
+				disconnectGradient()
+				frame:Destroy()
+			end
 			setValue(value, true)
 			if Owl.ConfigEnabled and data.Flag then
 				Owl.Flags[data.Flag] = data
@@ -9011,7 +9060,7 @@ function Owl:Init(library)
 			dropdown.Name = data.Title
 			dropdown.dropholder.drop.Container.Option.Visible = false
 			dropdown.dropholder.drop.Container.Visible = false
-			Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+			Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
 			dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
 			dropdown:SetAttribute("Searchable", true)
 
@@ -9040,7 +9089,7 @@ function Owl:Init(library)
 				local yOffset = 0
 				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option.Visible then
-						Services.Tween:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+						option.Position = UDim2.new(0, 0, 0, yOffset)
 						yOffset = yOffset + option.Size.Y.Offset + 7
 					end
 				end
@@ -9067,32 +9116,32 @@ function Owl:Init(library)
 				local openHeight = 122 + math.max(contentHeight, 38)
 
 				Services.Tween:Create(dropdown, TweenInfo.new(0.45, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, openHeight) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
 				Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 			end
 
 			local function CloseDrop()
 				DropOpen = false
-				Services.Tween:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 				Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
-				task.wait(0.6)
+				task.wait(0.18)
 				dropdown.dropholder.drop.Container.Visible = false
 				dropdown.dropholder.drop.search.Visible = false
 
@@ -9108,7 +9157,7 @@ function Owl:Init(library)
 					OpenDrop()
 				end
 
-				task.delay(1.2, function()
+				task.delay(0.25, function()
 					DeBounce = false
 				end)
 			end)
@@ -9214,7 +9263,14 @@ function Owl:Init(library)
 				end
 			end
 			dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-				local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
+				local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower():match("^%s*(.-)%s*$")
+				local function matchesSearch(text)
+					text = tostring(text or ""):lower()
+					for term in searchText:gmatch("%S+") do
+						if not text:find(term, 1, true) then return false end
+					end
+					return true
+				end
 
 					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option:FindFirstChild("Title") then
@@ -9224,31 +9280,7 @@ function Owl:Init(library)
 								optionText ..= " " .. subtitle.Text:lower()
 							end
 							local isTemplate = option.Name == "Option"
-							local showldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Name])
-
-						if showldShow then
-							option.Visible = true
-								if SelectedOptions[option.Name] then
-								Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								Services.Tween:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-								Services.Tween:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								Services.Tween:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-							else
-								Services.Tween:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								Services.Tween:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								Services.Tween:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-								Services.Tween:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-								Services.Tween:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-							end
-						else
-							Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-							Services.Tween:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-							Services.Tween:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-							Services.Tween:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							Services.Tween:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-							option.Visible = false
-						end
+							option.Visible = not isTemplate and (matchesSearch(optionText) or SelectedOptions[option.Name])
 					end
 				end
 
