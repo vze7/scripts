@@ -2042,7 +2042,7 @@ end
 function Owl:Notify(Notification)
 	if Owl.SuppressNotify then return end
 	Notification = Notification or {}
-	if Notification.Varient ~= "Options" then
+	if Notification.Varient ~= "Options" and not Notification.Icon then
 		local title = tostring(Notification.Title or "Owl")
 		local content = tostring(Notification.Content or "")
 		Owl:Toast({
@@ -2072,7 +2072,11 @@ function Owl:Notify(Notification)
 		Notification.Title.Text = NotifData.Title
 		Notification.Content.Text = NotifData.Content
 		Notification.Content.Size = UDim2.new(0, 200,0, Notification.Content.TextBounds.Y )
-		Notification.icon.Image = 'rbxassetid://'..NotifData.Icon
+		local icon = tostring(NotifData.Icon or "")
+		if icon ~= "" and not string.find(icon, "://", 1, true) then
+			icon = "rbxassetid://" .. icon
+		end
+		Notification.icon.Image = icon
 		Notification.icon.Visible = true
 
 
@@ -8742,6 +8746,20 @@ function Owl:Init(library)
 			local OptionButton = dropdown.dropholder.drop.Container.Option
 			local SelectedOptions = {}
 			local SelectedOrder = {}
+			local function normalizeOption(option)
+				if type(option) == "table" then
+					local name = tostring(option.Name or option.Value or option.Label or "Option")
+					return name, option
+				end
+				return tostring(option), {Name = tostring(option)}
+			end
+			local function optionIndex(name)
+				for index, entry in ipairs(data.Options) do
+					local entryName = normalizeOption(entry)
+					if entryName == name then return index end
+				end
+				return math.huge
+			end
 
 			local function UpdateCustomLayout()
 				local yOffset = 0
@@ -8810,16 +8828,11 @@ function Owl:Init(library)
 					SelectedOptions[option] = true
 
 					local originalIndex
-					for i, opt in ipairs(data.Options) do
-						if opt == option then
-							originalIndex = i
-							break
-						end
-					end
+					originalIndex = optionIndex(option)
 
 					local insertIndex = 1
 					for i, selected in ipairs(SelectedOrder) do
-						local selectedIndex = table.find(data.Options, selected)
+						local selectedIndex = optionIndex(selected)
 						if selectedIndex and selectedIndex < originalIndex then
 							insertIndex = i + 1
 						else
@@ -8961,12 +8974,30 @@ function Owl:Init(library)
 			local function SetDropdownOptions()
 				ClearDropdownOptions()
 				local starterSet = false
-				for _, OptionText in ipairs(data.Options) do
+				for _, optionEntry in ipairs(data.Options) do
+					local OptionText, optionData = normalizeOption(optionEntry)
 					local option = OptionButton:Clone()
-					option.Title.Text = OptionText
+					option.Title.Text = tostring(optionData.Label or OptionText)
 					option.Parent = dropdown.dropholder.drop.Container
 					option.Visible = true
 					option.Name = OptionText
+					local image = tostring(optionData.Image or "")
+					if image ~= "" then
+						if not string.find(image, "://", 1, true) then
+							image = "rbxassetid://" .. image
+						end
+						local thumbnail = Instance.new("ImageLabel")
+						thumbnail.Name = "OptionImage"
+						thumbnail.BackgroundTransparency = 1
+						thumbnail.Image = image
+						thumbnail.Position = UDim2.new(0, 10, 0.5, -10)
+						thumbnail.Size = UDim2.fromOffset(20, 20)
+						thumbnail.Parent = option
+						local imageCorner = Instance.new("UICorner")
+						imageCorner.CornerRadius = UDim.new(1, 0)
+						imageCorner.Parent = thumbnail
+						option.Title.Position = UDim2.new(0, 40, option.Title.Position.Y.Scale, option.Title.Position.Y.Offset)
+					end
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
@@ -9088,6 +9119,81 @@ function Owl:Init(library)
 			return data
 
 		end
+		function initelement:PlayerDropdown(config)
+			config = config or {}
+			local playerService = Services.Players
+			local selectedNames = {}
+			local originalCallback = config.Callback or config.CallBack
+
+			local function playerOption(target)
+				local thumbnail = ""
+				pcall(function()
+					thumbnail = playerService:GetUserThumbnailAsync(
+						target.UserId,
+						Enum.ThumbnailType.HeadShot,
+						Enum.ThumbnailSize.Size48x48
+					)
+				end)
+				return {
+					Name = target.Name,
+					Label = target.DisplayName .. " (@" .. target.Name .. ")",
+					Image = thumbnail,
+					UserId = target.UserId,
+				}
+			end
+
+			local function getOptions()
+				local options = {}
+				for _, target in ipairs(playerService:GetPlayers()) do
+					table.insert(options, playerOption(target))
+				end
+				return options
+			end
+
+			config.Options = getOptions()
+			config.Multi = config.Multi == true or config.MultipleSelection == true
+			config.PlaceHolder = config.PlaceHolder or config.Placeholder or "Select players..."
+			config.Callback = function(value)
+				table.clear(selectedNames)
+				if type(value) == "table" then
+					for _, name in ipairs(value) do selectedNames[name] = true end
+				elseif value and value ~= "" then
+					selectedNames[value] = true
+				end
+				if originalCallback then originalCallback(value) end
+			end
+
+			local control = self:Dropdown(config)
+			local function refreshPlayers()
+				if control and control.Refresh then
+					control:Refresh(getOptions(), false)
+				end
+			end
+
+			Owl:AddConnection(playerService.PlayerAdded, refreshPlayers)
+			Owl:AddConnection(playerService.PlayerRemoving, function(leaving)
+				if selectedNames[leaving.Name] then
+					local thumbnail = ""
+					pcall(function()
+						thumbnail = playerService:GetUserThumbnailAsync(
+							leaving.UserId,
+							Enum.ThumbnailType.HeadShot,
+							Enum.ThumbnailSize.Size48x48
+						)
+					end)
+					Owl:Notify({
+						Title = leaving.DisplayName .. " left the server",
+						Content = "@" .. leaving.Name .. " was selected in " .. tostring(config.Title or config.Name or "Player Dropdown") .. ".",
+						Icon = thumbnail,
+						Duration = 4,
+					})
+				end
+				task.defer(refreshPlayers)
+			end)
+
+			return control
+		end
+		initelement.PlayerMultiDropdown = initelement.PlayerDropdown
 		function initelement:ColorPicker(ColorPicker)
 			local data = {
 				Title = ColorPicker.Title;

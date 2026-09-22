@@ -12,14 +12,6 @@ local function humanoid()
 	return character and character:FindFirstChildOfClass("Humanoid")
 end
 
-local function playerNames()
-	local names = {}
-	for _, otherPlayer in ipairs(Players:GetPlayers()) do
-		table.insert(names, otherPlayer.Name)
-	end
-	return names
-end
-
 Owl:Load({
 	Name = "Owl Complete Demo",
 	Accent = Color3.fromRGB(0, 170, 255),
@@ -151,10 +143,9 @@ inputs:Dropdown({
 	end,
 })
 
-inputs:Dropdown({
+inputs:PlayerDropdown({
 	Title = "Target Player",
 	Description = "Player dropdown example.",
-	Options = playerNames(),
 	PlaceHolder = "Select a player...",
 	Flag = "demo_target_player",
 	CallBack = function(name)
@@ -162,12 +153,11 @@ inputs:Dropdown({
 	end,
 })
 
-inputs:Dropdown({
+inputs:PlayerMultiDropdown({
 	Title = "Player MultiDropdown",
 	Description = "Multi-select player dropdown example.",
-	Options = playerNames(),
 	PlaceHolder = "Select players...",
-	Multi = true,
+	MultipleSelection = true,
 	Flag = "demo_player_multi_dropdown",
 	CallBack = function(selected)
 		print("Selected players:", selected)
