@@ -3277,28 +3277,64 @@ function Owl:Init(library)
 
 	
 
-		local layout = Bento.new(window.pages.home.general.Quick,{
-			Gap = 6,
-			RightPadding = 20,
-			TweenTime = 0.35
-		})
-		local row1 = layout:NewRow()
-		local row2 = layout:NewRow()
-		local row3 = layout:NewRow()
+		presence.Visible = false
+		quick.Position = UDim2.new(0, 0, 0, 0)
+		local quickPlayCard = quick.QuickPlay
+		local playerCard = quick.Player
+		local settingsCard = quick.QuickSettings
+		local latencyCard = quick.Latency
+		for _, card in ipairs({quickPlayCard, playerCard, settingsCard, latencyCard}) do
+			card.BackgroundColor3 = Color3.fromRGB(13, 13, 15)
+			card.BackgroundTransparency = 0.08
+			local corner = card:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 12)
+			corner.Parent = card
+			local stroke = card:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
+			stroke.Color = Owl.theme.Accent
+			stroke.Transparency = 0.9
+			stroke.Thickness = 1
+			stroke.Parent = card
+		end
 
-		layout:AddItem(window.pages.home.general.Quick.QuickPlay,nil,row1)
-		layout:AddItem(window.pages.home.general.Quick.Player,nil,row1)
-		layout:AddItem(window.pages.home.general.Quick.Latency,nil,row3)
-
-		layout:AddItem(
-			window.pages.home.general.Quick.QuickSettings,
-			{Bottom = true},
-			row2
-		)
-
-
-		layout:Bind()
-		layout:Update()
+		local homeLayoutBusy = false
+		local function updateHomeLayout()
+			if homeLayoutBusy then return end
+			homeLayoutBusy = true
+			task.defer(function()
+				local width = math.max(260, quick.AbsoluteSize.X)
+				local gap = 8
+				local contentHeight
+				if width >= 560 then
+					local leftWidth = math.floor((width - gap) * 0.62)
+					quickPlayCard.Position = UDim2.fromOffset(0, 0)
+					quickPlayCard.Size = UDim2.fromOffset(leftWidth, 128)
+					playerCard.Position = UDim2.fromOffset(leftWidth + gap, 0)
+					playerCard.Size = UDim2.fromOffset(width - leftWidth - gap, 128)
+					settingsCard.Position = UDim2.fromOffset(0, 136)
+					settingsCard.Size = UDim2.fromOffset(width, 96)
+					latencyCard.Position = UDim2.fromOffset(0, 240)
+					latencyCard.Size = UDim2.fromOffset(width, 132)
+					contentHeight = 372
+				else
+					quickPlayCard.Position = UDim2.fromOffset(0, 0)
+					quickPlayCard.Size = UDim2.fromOffset(width, 116)
+					playerCard.Position = UDim2.fromOffset(0, 124)
+					playerCard.Size = UDim2.fromOffset(width, 88)
+					settingsCard.Position = UDim2.fromOffset(0, 220)
+					settingsCard.Size = UDim2.fromOffset(width, 96)
+					latencyCard.Position = UDim2.fromOffset(0, 324)
+					latencyCard.Size = UDim2.fromOffset(width, 126)
+					contentHeight = 450
+				end
+				quick.Size = UDim2.new(1, 0, 0, contentHeight)
+				if homePage:IsA("ScrollingFrame") then
+					homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
+				end
+				homeLayoutBusy = false
+			end)
+		end
+		Owl:AddConnection(quick:GetPropertyChangedSignal("AbsoluteSize"), updateHomeLayout)
+		updateHomeLayout()
 
 
 		local Stats = game:GetService("Stats")
@@ -3526,12 +3562,30 @@ function Owl:Init(library)
 		end)
 
 		bh.Rejoin.interact.MouseButton1Click:Connect(function()
-
 			local TeleportService = game:GetService("TeleportService")
 			local rejoinPlayer = Services.Players.LocalPlayer
-
-			TeleportService:Teleport(game.PlaceId, rejoinPlayer)
-
+			task.spawn(function()
+				local failureConnection
+				failureConnection = TeleportService.TeleportInitFailed:Connect(function(player, _, _, failedPlaceId)
+					if player ~= rejoinPlayer or failedPlaceId ~= game.PlaceId then return end
+					failureConnection:Disconnect()
+					pcall(function()
+						TeleportService:Teleport(game.PlaceId, rejoinPlayer)
+					end)
+				end)
+				local success = pcall(function()
+					TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, rejoinPlayer)
+				end)
+				if not success then
+					failureConnection:Disconnect()
+					pcall(function()
+						TeleportService:Teleport(game.PlaceId, rejoinPlayer)
+					end)
+				end
+				task.delay(8, function()
+					if failureConnection.Connected then failureConnection:Disconnect() end
+				end)
+			end)
 		end)
 
 		local HttpService = game:GetService("HttpService")
@@ -3555,53 +3609,38 @@ function Owl:Init(library)
 		end
 
 		local function ServerHop()
-
-			local cursor = ""
-
-			local servers = {}
-
-			repeat
-
-				local url =
-					"https://games.roblox.com/v1/games/"
-					..placeId..
-					"/servers/Public?sortOrder=Asc&limit=100&cursor="
-					..cursor
-
-				local ok, response = pcall(function()
-					return HttpService:JSONDecode(httpGet(url))
-				end)
-
-				if not ok or type(response) ~= "table" or not response.data then
-					break
-				end
-
-				for _,server in pairs(response.data) do
-
-					if server.playing < server.maxPlayers
-						and server.id ~= game.JobId then
-
-						table.insert(servers,server.id)
-
+			task.spawn(function()
+				local urls = {
+					"https://games.roblox.com/v2/games/" .. placeId .. "/servers/Public?cursor=&sortOrder=Desc&excludeFullGames=true&orderBy=BestLatency",
+					"https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100",
+				}
+				local candidates = {}
+				for _, url in ipairs(urls) do
+					local ok, response = pcall(function()
+						return HttpService:JSONDecode(httpGet(url))
+					end)
+					if ok and type(response) == "table" and type(response.data) == "table" then
+						for _, server in ipairs(response.data) do
+							local playing = tonumber(server.playing) or math.huge
+							local maxPlayers = tonumber(server.maxPlayers) or 0
+							if server.id and server.id ~= game.JobId and playing < maxPlayers then
+								table.insert(candidates, server.id)
+							end
+						end
 					end
-
+					if #candidates > 0 then break end
 				end
-
-				cursor = response.nextPageCursor
-
-			until cursor == nil or #servers > 0
-
-
-			if #servers > 0 then
-
-				TeleportService:TeleportToPlaceInstance(
-					placeId,
-					servers[math.random(1,#servers)],
-					Services.Players
-				)
-
-			end
-
+				if #candidates == 0 then
+					Owl:Notify({Title = "Server Hop", Content = "No available server was found.", Duration = 3})
+					return
+				end
+				for index = 1, math.min(#candidates, 10) do
+					local ok = pcall(function()
+						TeleportService:TeleportToPlaceInstance(placeId, candidates[index], localPlayer)
+					end)
+					if ok then return end
+				end
+			end)
 		end
 
 		bh.Fast.interact.MouseButton1Click:Connect(function()

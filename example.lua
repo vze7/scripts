@@ -84,13 +84,25 @@ buttons:Toggle({
 })
 
 buttons:Toggle({
-	Title = "Configurable Toggle",
-	Description = "A saved toggle example.",
-	Value = false,
+	Title = "Configurable Toggle (Session)",
+	Description = "Starts enabled and resets when the script runs again.",
+	Value = true,
 	Config = true,
-	Flag = "demo_configurable_toggle",
+	Save = false,
 	CallBack = function(value)
-		notify("Configurable Toggle", value and "Enabled" or "Disabled", 2)
+		notify("Session Toggle", value and "Enabled" or "Disabled", 2)
+	end,
+})
+
+buttons:Toggle({
+	Title = "Configurable Toggle (Saved)",
+	Description = "Starts enabled and saves the selected value automatically.",
+	Value = true,
+	Config = true,
+	Save = true,
+	Flag = "demo_configurable_toggle_saved",
+	CallBack = function(value)
+		notify("Saved Toggle", value and "Enabled" or "Disabled", 2)
 	end,
 })
 
