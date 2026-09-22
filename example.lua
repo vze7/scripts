@@ -1,4 +1,4 @@
-local Owl = loadstring(game:HttpGet("https://raw.githubusercontent.com/vze7/scripts/main/owl.lua?v=1c12cda", true))()
+local Owl = loadstring(game:HttpGet("https://raw.githubusercontent.com/vze7/scripts/main/owl.lua?v=1352853", true))()
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
