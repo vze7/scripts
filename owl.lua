@@ -1669,6 +1669,42 @@ local function SaveCfg(Name)
 		end	
 	end
 
+	if Owl.SettingsFlags then
+		for i, v in pairs(Owl.SettingsFlags) do
+			if v and v.Save ~= false then
+				if v.Type == "Colorpicker" or v.Type == "ColorPicker" then
+					if v.Pickers and v.Pickers[1] then
+						Data[i] = PackColor(v.Pickers[1].Value)
+					elseif v.Value and typeof(v.Value) == "Color3" then
+						Data[i] = PackColor(v.Value)
+					elseif v.Color and typeof(v.Color) == "Color3" then
+						Data[i] = PackColor(v.Color)
+					end
+				elseif v.Type == "Bind" or v.Type == "Keybind" then
+					if typeof(v.Value) == "EnumItem" then
+						Data[i] = v.Value.Name
+					elseif typeof(v.Key) == "EnumItem" then
+						Data[i] = v.Key.Name
+					elseif typeof(v.Value) == "string" and v.Value ~= "" and v.Value ~= "NONE" then
+						Data[i] = v.Value
+					elseif typeof(v.Key) == "string" and v.Key ~= "" and v.Key ~= "NONE" then
+						Data[i] = v.Key
+					end
+				else
+					if v.Value ~= nil then
+						if typeof(v.Value) == "EnumItem" then
+							Data[i] = v.Value.Name
+						else
+							Data[i] = v.Value
+						end
+					elseif v.V ~= nil then
+						Data[i] = v.V
+					end
+				end
+			end
+		end
+	end
+
 	if writefile then
 		pcall(function()
 			writefile(folder .. "/" .. tostring(Name) .. ".txt", tostring(HttpService:JSONEncode(Data)))
@@ -1685,8 +1721,8 @@ local function LoadCfg(Config)
 	Owl.LoadedConfig = Data
 
 	for a, b in pairs(Data) do
-		if Owl.Flags[a] then
-			local flag = Owl.Flags[a]
+		local flag = Owl.Flags[a] or (Owl.SettingsFlags and Owl.SettingsFlags[a])
+		if flag then
 			pcall(function()
 				if flag.Type == "MultiColorpicker" then
 					if type(b) == "table" and b.R == nil then
