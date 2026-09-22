@@ -1888,8 +1888,20 @@ local function createPerformanceOverlay()
 	frame.Position = UDim2.new(1, -250, 0, 9)
 	frame.Size = UDim2.new(0, 104, 0, 20)
 	frame.Visible = false
-	frame.ZIndex = 25
+	frame.ZIndex = 5
 	frame.Parent = window.top
+	frame.Active = false
+	frame.Selectable = false
+	local function alignPerformanceOverlay()
+		if not frame.Parent or not window.top or not window.top.functions then return end
+		local topWidth = window.top.AbsoluteSize.X
+		local controlsWidth = window.top.functions.AbsoluteSize.X
+		local rightEdge = topWidth - controlsWidth - 12
+		frame.Position = UDim2.fromOffset(math.max(120, rightEdge - frame.AbsoluteSize.X), 9)
+	end
+	window.top:GetPropertyChangedSignal("AbsoluteSize"):Connect(alignPerformanceOverlay)
+	window.top.functions:GetPropertyChangedSignal("AbsoluteSize"):Connect(alignPerformanceOverlay)
+	task.defer(alignPerformanceOverlay)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 7)
 	corner.Parent = frame
@@ -1901,7 +1913,8 @@ local function createPerformanceOverlay()
 	label.Text = "-- FPS  ·  -- ms"
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.TextSize = 10
-	label.ZIndex = 26
+	label.ZIndex = 6
+	label.Active = false
 	label.Parent = frame
 
 	performanceOverlay.frame = frame
@@ -3170,7 +3183,12 @@ function Owl:Init(library)
 	local debounce = false
 	local DEBOUNCE_TIME = 0.1
 
-	top.functions.search.interact.MouseButton1Click:Connect(function()
+	local searchButton = top.functions.search:FindFirstChild("interact", true)
+	if searchButton and (searchButton:IsA("GuiButton") or searchButton:IsA("ImageButton")) then
+		searchButton.Active = true
+		if searchButton:IsA("GuiButton") then searchButton.Interactable = true end
+	end
+	local function toggleSearch()
 		if debounce then return end
 		debounce = true
 
@@ -3183,7 +3201,11 @@ function Owl:Init(library)
 		task.delay(DEBOUNCE_TIME, function()
 			debounce = false
 		end)
-	end)
+	end
+	if searchButton and searchButton:IsA("GuiButton") then
+		searchButton.MouseButton1Click:Connect(toggleSearch)
+		searchButton.Activated:Connect(toggleSearch)
+	end
 
 
 
@@ -6502,7 +6524,9 @@ function Owl:Init(library)
 			Save = true,
 			CallBack = function(enabled)
 				Owl:SetPerformanceOverlay(enabled)
-				SaveCfg(game and game.GameId)
+				task.defer(function()
+					SaveCfg(game and game.GameId)
+				end)
 			end,
 			SFlag = 'PERF'
 		})
