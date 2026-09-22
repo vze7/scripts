@@ -1,4 +1,3 @@
--- Made: By iceboy
 local Services = {
 	Http = game:GetService("HttpService"),
 	Insert = game:GetService("InsertService"),
@@ -12,11 +11,8 @@ local Services = {
 
 local GuiRoot = (gethui and gethui()) or game:GetService("CoreGui")
 local uiAsset = game:GetObjects("rbxassetid://123800669522471")[1]
-local viewportSize = workspace.CurrentCamera.ViewportSize
-local isMobile = Services.UserInput.TouchEnabled or (viewportSize.X < 1024 and viewportSize.Y < 768)
-local activeCamera = workspace.CurrentCamera
-local isResizing = false
 local isLoaded = false
+local isResizing = false
 
 uiAsset.Enabled = false
 for _, descendant in ipairs(uiAsset:GetDescendants()) do
@@ -910,7 +906,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	local userInput = game:GetService("UserInputService")
 
 	local startPosition, startSize = nil, nil
-	local _isResizing = false
+	local activeResizeInput = nil
 	local function getInputPos(input)
 		if input.UserInputType == Enum.UserInputType.Touch then
 			return Vector2.new(input.Position.X, input.Position.Y)
@@ -920,9 +916,9 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	end
 
 	local function onInputBegan(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			_isResizing = true
+		if not isResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 			isResizing = true
+			activeResizeInput = input.UserInputType == Enum.UserInputType.Touch and input or nil
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
 			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
@@ -931,7 +927,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	end
 
 	local function onInputChanged(input)
-		if _isResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		if isResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local mouse = getInputPos(input)
 			if startPosition and mouse then
 				local delta = mouse - startPosition
@@ -954,9 +950,11 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	end
 
 	local function onInputEnded(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			_isResizing = false
+		local isActiveTouch = activeResizeInput ~= nil and input == activeResizeInput
+		local isActiveMouse = activeResizeInput == nil and input.UserInputType == Enum.UserInputType.MouseButton1
+		if isResizing and (isActiveMouse or isActiveTouch) then
 			isResizing = false
+			activeResizeInput = nil
 			startPosition, startSize = nil, nil
 			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
 			Services.Tween:Create(uiAsset.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
@@ -965,7 +963,7 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	Owl:AddConnection(Dragger.InputBegan, onInputBegan)
 	Owl:AddConnection(userInput.InputChanged, onInputChanged)
-	Owl:AddConnection(Dragger.InputEnded, onInputEnded)
+	Owl:AddConnection(userInput.InputEnded, onInputEnded)
 end
 
 
@@ -1255,7 +1253,9 @@ function Owl:Load(config)
 	card.BackgroundTransparency = 1
 	card.BorderSizePixel = 0
 	card.Position = UDim2.fromScale(0.5, 0.5)
-	card.Size = UDim2.fromOffset(280, 92)
+	local camera = workspace.CurrentCamera
+	local cardWidth = camera and math.min(400, math.max(1, camera.ViewportSize.X - 32)) or 400
+	card.Size = UDim2.fromOffset(cardWidth, 186)
 	card.Parent = backdrop
 
 	local cardScale = Instance.new("UIScale")
@@ -1263,10 +1263,11 @@ function Owl:Load(config)
 	cardScale.Parent = card
 
 	local cardCorner = Instance.new("UICorner")
-	cardCorner.CornerRadius = UDim.new(0, 12)
+	cardCorner.CornerRadius = UDim.new(0, 18)
 	cardCorner.Parent = card
 
 	local cardStroke = Instance.new("UIStroke")
+	cardStroke.Color = accent
 	cardStroke.Transparency = 1
 	cardStroke.Thickness = 1
 	cardStroke.Parent = card
@@ -1274,7 +1275,7 @@ function Owl:Load(config)
 	local glow = Instance.new("Frame")
 	glow.AnchorPoint = Vector2.new(0.5, 0.5)
 	glow.BackgroundColor3 = accent
-	glow.BackgroundTransparency = 1
+	glow.BackgroundTransparency = 0.88
 	glow.BorderSizePixel = 0
 	glow.Position = UDim2.fromScale(0.78, 0.2)
 	glow.Size = UDim2.fromOffset(150, 150)
@@ -1291,7 +1292,6 @@ function Owl:Load(config)
 	owlMark.Position = UDim2.fromOffset(49, 57)
 	owlMark.Size = UDim2.fromOffset(48, 42)
 	owlMark.Parent = card
-	owlMark.Visible = false
 
 	local owlCorner = Instance.new("UICorner")
 	owlCorner.CornerRadius = UDim.new(0, 13)
@@ -1365,35 +1365,34 @@ function Owl:Load(config)
 	local titleLabel = Instance.new("TextLabel")
 	titleLabel.BackgroundTransparency = 1
 	titleLabel.Font = Enum.Font.GothamSemibold
-	titleLabel.Position = UDim2.new(0, 0, 0, 18)
-	titleLabel.Size = UDim2.new(1, 0, 0, 24)
+	titleLabel.Position = UDim2.fromOffset(84, 34)
+	titleLabel.Size = UDim2.new(1, -108, 0, 24)
 	titleLabel.Text = title
 	titleLabel.TextColor3 = Color3.fromRGB(247, 247, 250)
-	titleLabel.TextSize = 20
+	titleLabel.TextSize = 18
 	titleLabel.TextTransparency = 1
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	titleLabel.Parent = card
 
 	local statusLabel = Instance.new("TextLabel")
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.Font = Enum.Font.Gotham
-	statusLabel.Position = UDim2.new(0, 0, 0, 45)
-	statusLabel.Size = UDim2.new(1, 0, 0, 18)
-	statusLabel.Text = "Loading"
+	statusLabel.Position = UDim2.fromOffset(84, 62)
+	statusLabel.Size = UDim2.new(1, -108, 0, 18)
+	statusLabel.Text = "Loading interface"
 	statusLabel.TextColor3 = Color3.fromRGB(151, 151, 162)
 	statusLabel.TextSize = 12
 	statusLabel.TextTransparency = 1
-	statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 	statusLabel.Parent = card
 
 	local track = Instance.new("Frame")
 	track.BackgroundColor3 = Color3.fromRGB(44, 44, 52)
 	track.BackgroundTransparency = 1
 	track.BorderSizePixel = 0
-	track.Position = UDim2.fromOffset(28, 72)
+	track.Position = UDim2.fromOffset(28, 132)
 	track.Size = UDim2.new(1, -56, 0, 4)
 	track.Parent = card
-	track.Visible = true
 
 	local trackCorner = Instance.new("UICorner")
 	trackCorner.CornerRadius = UDim.new(1, 0)
@@ -1418,48 +1417,61 @@ function Owl:Load(config)
 	fillGradient.Offset = Vector2.new(-1, 0)
 	fillGradient.Parent = fill
 
-	local dots = {}
-	for index = 1, 3 do
-		local dot = Instance.new("Frame")
-		dot.AnchorPoint = Vector2.new(0.5, 0.5)
-		dot.BackgroundColor3 = accent
-		dot.BackgroundTransparency = 0.68
-		dot.BorderSizePixel = 0
-		dot.Position = UDim2.new(0.5, (index - 2) * 12, 0, 64)
-		dot.Size = UDim2.fromOffset(5, 5)
-		dot.Parent = card
-		local dotCorner = Instance.new("UICorner")
-		dotCorner.CornerRadius = UDim.new(1, 0)
-		dotCorner.Parent = dot
-		dots[index] = dot
-	end
-
 	Services.Tween:Create(backdrop, TweenInfo.new(0.28, Enum.EasingStyle.Quint), {BackgroundTransparency = 0.12}):Play()
-	Services.Tween:Create(card, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+	Services.Tween:Create(card, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.03}):Play()
 	Services.Tween:Create(cardScale, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
+	Services.Tween:Create(cardStroke, TweenInfo.new(0.34, Enum.EasingStyle.Quint), {Transparency = 0.62}):Play()
 	Services.Tween:Create(titleLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {TextTransparency = 0}):Play()
 	Services.Tween:Create(statusLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {TextTransparency = 0}):Play()
-	Services.Tween:Create(cardScale, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
+	Services.Tween:Create(track, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {BackgroundTransparency = 0}):Play()
+	Services.Tween:Create(fill, TweenInfo.new(0.92, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.fromScale(1, 1)}):Play()
+	Services.Tween:Create(fillGradient, TweenInfo.new(0.78, Enum.EasingStyle.Sine), {Offset = Vector2.new(1, 0)}):Play()
+	Services.Tween:Create(owlScale, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
+	local breatheTween = Services.Tween:Create(owlScale, TweenInfo.new(0.78, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Scale = 1.035})
+	local floatTween = Services.Tween:Create(owlMark, TweenInfo.new(0.78, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Position = UDim2.fromOffset(49, 54)})
+	local glowTweens = {}
+	for _, eye in ipairs(eyes) do
+		local glowTween = Services.Tween:Create(eye, TweenInfo.new(0.72, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {BackgroundColor3 = accent:Lerp(Color3.new(1, 1, 1), 0.18)})
+		glowTween:Play()
+		table.insert(glowTweens, glowTween)
+	end
 	local loadingActive = true
-	Services.Tween:Create(fill, TweenInfo.new(0.9, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.fromScale(1, 1)}):Play()
+	task.delay(0.3, function()
+		if loadingActive and loaderGui.Parent then
+			breatheTween:Play()
+			floatTween:Play()
+		end
+	end)
+	for _, pupil in ipairs(pupils) do
+		Services.Tween:Create(pupil, TweenInfo.new(0.38, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 1, true), {Position = UDim2.fromScale(0.68, 0.5)}):Play()
+	end
 	task.spawn(function()
+		task.wait(0.34)
 		while loadingActive and loaderGui.Parent do
-			for _, dot in ipairs(dots) do
-				Services.Tween:Create(dot, TweenInfo.new(0.18, Enum.EasingStyle.Sine), {BackgroundTransparency = 0}):Play()
-				task.wait(0.12)
-				Services.Tween:Create(dot, TweenInfo.new(0.22, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.68}):Play()
+			for _, eye in ipairs(eyes) do
+				Services.Tween:Create(eye, TweenInfo.new(0.065, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.fromOffset(11, 1)}):Play()
 			end
+			task.wait(0.07)
+			for _, eye in ipairs(eyes) do
+				Services.Tween:Create(eye, TweenInfo.new(0.13, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(11, 8)}):Play()
+			end
+			task.wait(0.72)
 		end
 	end)
 
 	task.wait(0.42)
 	Services.Tween:Create(statusLabel, TweenInfo.new(0.1), {TextTransparency = 1}):Play()
 	task.wait(0.1)
-	statusLabel.Text = "Ready"
+	statusLabel.Text = "Finishing details"
 	Services.Tween:Create(statusLabel, TweenInfo.new(0.16), {TextTransparency = 0}):Play()
 	task.wait(0.42)
 	loadingActive = false
+	breatheTween:Cancel()
+	floatTween:Cancel()
+	for _, glowTween in ipairs(glowTweens) do
+		glowTween:Cancel()
+	end
 	Services.Tween:Create(cardScale, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.98}):Play()
 	Services.Tween:Create(card, TweenInfo.new(0.22, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
 	Services.Tween:Create(backdrop, TweenInfo.new(0.25, Enum.EasingStyle.Quint), {BackgroundTransparency = 1}):Play()
@@ -1475,7 +1487,10 @@ if makefolder and isfolder and not isfolder(THEME_FOLDER) then
 	pcall(makefolder, THEME_FOLDER)
 end
 
-	local function Round(Number, Factor)
+local LoadedThemeFile = false
+local ThemeColorsToSave = {}
+
+local function Round(Number, Factor)
 	local Result = math.floor(Number/Factor + (math.sign(Number) * 0.5)) * Factor
 	if Result < 0 then Result = Result + Factor end
 	return Result
@@ -1495,6 +1510,70 @@ local function UnpackColor(Color)
 	return Color3.fromRGB(math.clamp(red, 0, 255), math.clamp(green, 0, 255), math.clamp(blue, 0, 255))
 end
 
+function Owl:SaveThemeCfg()
+	if not LoadedThemeFile then return end
+
+	local Data = {}
+	local themeData = (self.Themes and self.SelectedTheme and self.Themes[self.SelectedTheme]) or self.theme
+
+	if themeData then
+		for typeName, value in pairs(themeData) do
+			if typeof(value) == "Color3" then
+				ThemeColorsToSave[typeName] = PackColor(value)
+			end
+		end
+	end
+
+	if self.theme then
+		if self.theme.Accent then ThemeColorsToSave["Accent"] = PackColor(self.theme.Accent) end
+		if self.theme.HitBox then ThemeColorsToSave["HitBox"] = PackColor(self.theme.HitBox) end
+	end
+
+	if makefolder and isfolder and not isfolder(THEME_FOLDER) then
+		pcall(makefolder, THEME_FOLDER)
+	end
+	if writefile then
+		pcall(function()
+			writefile(FILE_PATH, HttpService:JSONEncode(ThemeColorsToSave))
+		end)
+	end
+end
+
+local function LoadThemeCfg(Config)
+	Config = Config or FILE_PATH
+	if isfile and isfile(Config) then
+		local ok, dataOrErr = pcall(function()
+			return HttpService:JSONDecode(readfile(Config))
+		end)
+
+		if ok and type(dataOrErr) == "table" then
+			local Data = dataOrErr
+			Owl.Themes = Owl.Themes or {}
+			Owl.Themes.Custom = Owl.Themes.Custom or {}
+
+			for TypeName, Value in pairs(Data) do
+				local c = UnpackColor(Value)
+				Owl.Themes.Custom[TypeName] = c
+				if TypeName == "Accent" or TypeName == "HitBox" then
+					if Owl.theme then
+						Owl.theme[TypeName] = c
+					end
+				end
+			end
+
+			Owl.SelectedTheme = "Custom"
+			LoadedThemeFile = true
+
+			task.wait(0.02)
+			Owl:SetTheme()
+		else
+			LoadedThemeFile = true
+		end
+	else
+		LoadedThemeFile = true
+	end
+end
+
 function Owl:SetTheme()
 	local themeData = (self.Themes and self.SelectedTheme and self.Themes[self.SelectedTheme]) or self.theme
 	if not themeData then return end
@@ -1510,6 +1589,8 @@ function Owl:SetTheme()
 		self.theme.HitBox = hitbox
 		self.Comms:Fire("HitBox", hitbox)
 	end
+
+	self:SaveThemeCfg()
 end
 
 function Owl:GenTheme(mainColor)
@@ -1595,42 +1676,6 @@ local function SaveCfg(Name)
 		end	
 	end
 
-	if Owl.SettingsFlags then
-		for i, v in pairs(Owl.SettingsFlags) do
-			if v and v.Save ~= false then
-				if v.Type == "Colorpicker" or v.Type == "ColorPicker" then
-					if v.Pickers and v.Pickers[1] then
-						Data[i] = PackColor(v.Pickers[1].Value)
-					elseif v.Value and typeof(v.Value) == "Color3" then
-						Data[i] = PackColor(v.Value)
-					elseif v.Color and typeof(v.Color) == "Color3" then
-						Data[i] = PackColor(v.Color)
-					end
-				elseif v.Type == "Bind" or v.Type == "Keybind" then
-					if typeof(v.Value) == "EnumItem" then
-						Data[i] = v.Value.Name
-					elseif typeof(v.Key) == "EnumItem" then
-						Data[i] = v.Key.Name
-					elseif typeof(v.Value) == "string" and v.Value ~= "" and v.Value ~= "NONE" then
-						Data[i] = v.Value
-					elseif typeof(v.Key) == "string" and v.Key ~= "" and v.Key ~= "NONE" then
-						Data[i] = v.Key
-					end
-				else
-					if v.Value ~= nil then
-						if typeof(v.Value) == "EnumItem" then
-							Data[i] = v.Value.Name
-						else
-							Data[i] = v.Value
-						end
-					elseif v.V ~= nil then
-						Data[i] = v.V
-					end
-				end
-			end
-		end
-	end
-
 	if writefile then
 		pcall(function()
 			writefile(folder .. "/" .. tostring(Name) .. ".txt", tostring(HttpService:JSONEncode(Data)))
@@ -1646,43 +1691,57 @@ local function LoadCfg(Config)
 
 	Owl.LoadedConfig = Data
 
+	local flagsProcessed = 0
+	local totalFlags = 0
+	for _, _ in pairs(Data) do totalFlags += 1 end
+
 	for a, b in pairs(Data) do
-		local flag = Owl.Flags[a] or (Owl.SettingsFlags and Owl.SettingsFlags[a])
-		if flag then
-			pcall(function()
-				if flag.Type == "MultiColorpicker" then
-					if type(b) == "table" and b.R == nil then
-						for index, colorData in ipairs(b) do
-							flag:Set(index, UnpackColor(colorData))
+		if Owl.Flags[a] then
+			task.spawn(function()
+				local flag = Owl.Flags[a]
+				pcall(function()
+					if flag.Type == "MultiColorpicker" then
+						if type(b) == "table" and b.R == nil then
+							for index, colorData in ipairs(b) do
+								flag:Set(index, UnpackColor(colorData))
+							end
+						else
+							flag:Set(1, UnpackColor(b))
+						end
+					elseif flag.Type == "Colorpicker" or flag.Type == "ColorPicker" then
+						flag:Set(UnpackColor(b))
+					elseif flag.Type == "Bind" or flag.Type == "Keybind" then
+						local success, keyEnum = pcall(function()
+							return Enum.KeyCode[b] or Enum.UserInputType[b]
+						end)
+						if success and keyEnum then
+							flag:Set(keyEnum)
+						else
+							flag:Set(b)
+						end
+					elseif flag.Type == "Pbind" or (type(b) == "table" and b._type == "Pbind") then
+						if flag.Set then
+							flag:Set(b.X, b.Y, b.Z)
 						end
 					else
-						flag:Set(1, UnpackColor(b))
-					end
-				elseif flag.Type == "Colorpicker" or flag.Type == "ColorPicker" then
-					flag:Set(UnpackColor(b))
-				elseif flag.Type == "Bind" or flag.Type == "Keybind" then
-					local success, keyEnum = pcall(function()
-						return Enum.KeyCode[b] or Enum.UserInputType[b]
-					end)
-					if success and keyEnum then
-						flag:Set(keyEnum)
-					else
 						flag:Set(b)
 					end
-				elseif flag.Type == "Pbind" or (type(b) == "table" and b._type == "Pbind") then
-					if flag.Set then
-						flag:Set(b.X, b.Y, b.Z)
-					end
-				else
-					if flag.Set then
-						flag:Set(b)
-					end
+				end)
+
+				flagsProcessed += 1
+				if flagsProcessed >= totalFlags then
+					task.wait(0.05)
+					Owl:SetTheme()
 				end
 			end)
+		else
+			flagsProcessed += 1
+			if flagsProcessed >= totalFlags then
+				task.wait(0.05)
+				Owl:SetTheme()
+			end
 		end
 	end
-	
-	Owl:SetTheme()
 end
 
 local saveDebounce = nil
@@ -1921,8 +1980,17 @@ function Owl:SetPerformanceOverlay()
 	end)
 end
 
-function applyLayout(isMobile)
-	Services.Tween:Create(uiAsset.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
+local layoutTween
+local function applyLayout(isMobile, viewportSize)
+	local targetWidth = isMobile and 543 or 715
+	local targetHeight = 575
+	if viewportSize then
+		targetWidth = math.min(targetWidth, math.max(1, viewportSize.X - 24))
+		targetHeight = math.min(targetHeight, math.max(1, viewportSize.Y - 24))
+	end
+	if layoutTween then layoutTween:Cancel() end
+	layoutTween = Services.Tween:Create(uiAsset.main, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Size = UDim2.fromOffset(targetWidth, targetHeight)})
+	layoutTween:Play()
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then
 		shadow.Visible = not isMobile 
@@ -1935,9 +2003,8 @@ local function updateLayout()
 	if not activeCamera then
 		return
 	end
-	local viewportSize = activeCamera.ViewportSize
 	local mobile = Services.UserInput.TouchEnabled
-	applyLayout(mobile)
+	applyLayout(mobile, activeCamera.ViewportSize)
 end
 
 local function bindLayoutListeners()
@@ -2449,7 +2516,7 @@ function Owl:MakeWindow(WindowConfig)
 		if not isfolder(cfgFolder) then pcall(makefolder, cfgFolder) end
 		if not isfolder(THEME_FOLDER) then pcall(makefolder, THEME_FOLDER) end
 	end
-	
+	LoadThemeCfg(FILE_PATH)
 	local configFilePath = string.format("%s/%s.txt", cfgFolder, tostring(game and game.GameId or "default"))
 	if isfile and isfile(configFilePath) then
 		local ok, rawData = pcall(readfile, configFilePath)
@@ -2655,7 +2722,7 @@ function openui()
 		Owl:UnlockMouse(true)
 	end
 
-	local fastTween = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+	local fastTween = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	if isBlurEnabled then
 		Owl:BindFrame(window, {
@@ -2711,7 +2778,7 @@ function closeui()
 	uiRuntime.transitionId += 1
 	local closeTransitionId = uiRuntime.transitionId
 	uiRuntime.isClosed = true
-	local fastTween = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+	local fastTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	pages.Visible = false
 	window.tabs.Visible = false
@@ -2721,7 +2788,7 @@ function closeui()
 	end
 
 	Services.Tween:Create(window, fastTween, {BackgroundTransparency = 1 }):Play()
-	Services.Tween:Create(window, fastTween, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200) }):Play()
+	Services.Tween:Create(window, fastTween, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 120) }):Play()
 	Services.Tween:Create(window.top.separator, fastTween, {BackgroundTransparency = 1 }):Play()
 	Services.Tween:Create(window.top.title, fastTween, {TextTransparency = 1 }):Play()
 	Services.Tween:Create(window.top.title.sub, fastTween, {TextTransparency = 1 }):Play()
@@ -2755,7 +2822,7 @@ function closeui()
 		Owl:UnlockMouse(false)
 	end
 
-	task.delay(0.4, function()
+	task.delay(0.2, function()
 		if uiRuntime.isClosed and uiRuntime.transitionId == closeTransitionId then
 			window.Visible = false
 		end
@@ -2784,12 +2851,12 @@ function ToggleUI()
 
 	if uiRuntime.isClosed then
 		openui()
-		-- updateLayout() removed to prevent conflicting tweens causing lag
+		updateLayout()
 	else
 		closeui()
 	end
 
-	task.delay(0.4, function()
+	task.delay(0.2, function()
 		uiRuntime.isTransitionLocked = false
 	end)
 end
@@ -2860,6 +2927,7 @@ function Owl:Init(library)
 					if not v:IsA("ScreenGui") then continue end
 					local name = string.lower(v.Name)
 					local isLegacyUi = v:FindFirstChild(MARKER_NAME)
+						or string.find(name, "syde", 1, true)
 						or string.find(name, "owlui", 1, true)
 					for _, child in ipairs(v:GetDescendants()) do
 						if child:IsA("TextLabel") and string.find(string.lower(child.Text or ""), "luffyhub", 1, true) then
@@ -2951,12 +3019,16 @@ function Owl:Init(library)
 	end
 	
 	local Minihome = ui.minihome
+	local savedWatermark = Owl.LoadedConfig and Owl.LoadedConfig.WTRMK
 	Owl.WatermarkEnabled = library.Watermark == true
+	if type(savedWatermark) == "boolean" then
+		Owl.WatermarkEnabled = savedWatermark
+	end
 
 	function Owl:SetWatermarkEnabled(enabled)
 		self.WatermarkEnabled = enabled == true
 		if Minihome then
-			Minihome.Visible = self.WatermarkEnabled or Services.UserInput.TouchEnabled
+			Minihome.Visible = self.WatermarkEnabled
 		end
 	end
 
@@ -3128,7 +3200,7 @@ function Owl:Init(library)
 
 	
 
-	window.search.close.interact.MouseButton1Click:Connect(function()
+	window.search.close.interact.Activated:Connect(function()
 		closesearch()
 	end)
 
@@ -3156,7 +3228,8 @@ function Owl:Init(library)
 		end)
 	end
 	if searchButton and searchButton:IsA("GuiButton") then
-		searchButton.MouseButton1Click:Connect(toggleSearch)
+		-- Activated covers both mouse and touch; wiring MouseButton1Click too
+		-- makes a single click/tap toggle the search twice on supported controls.
 		searchButton.Activated:Connect(toggleSearch)
 	end
 
@@ -3206,52 +3279,11 @@ function Owl:Init(library)
 			window.pages.home.general.presence.wallpaper.Image = ""
 		end
 		
-		local placeIdLabel = window.pages.home.general.presence.PlaceID
-		placeIdLabel.Visible = true
+		local placeId = game.PlaceId
 
-		task.spawn(function()
-			local requestFn = request or http_request or (syn and syn.request) or (http and http.request)
-			local weatherStr = ""
-			if requestFn then
-				local ok, ipRes = pcall(function() return requestFn({Url = "http://ip-api.com/json/", Method = "GET"}) end)
-				if ok and ipRes and ipRes.StatusCode == 200 then
-					local HttpService = game:GetService("HttpService")
-					local ipData = HttpService:JSONDecode(ipRes.Body)
-					if ipData and ipData.lat and ipData.lon then
-						local weatherUrl = string.format("https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true", ipData.lat, ipData.lon)
-						local wok, wRes = pcall(function() return requestFn({Url = weatherUrl, Method = "GET"}) end)
-						if wok and wRes and wRes.StatusCode == 200 then
-							local wData = HttpService:JSONDecode(wRes.Body)
-							if wData.current_weather then
-								local tempC = wData.current_weather.temperature
-								if ipData.countryCode == "US" then
-									weatherStr = " | 🌡️ " .. math.floor((tempC * 9/5) + 32) .. "°F"
-								else
-									weatherStr = " | 🌡️ " .. math.floor(tempC) .. "°C"
-								end
-							end
-						end
-					end
-				end
-			end
-			local RunService = game:GetService("RunService")
-			local frames = 0
-			local lastUpdate = os.clock()
-			local localPlayer = game:GetService("Players").LocalPlayer
-			RunService.RenderStepped:Connect(function()
-				frames += 1
-				local now = os.clock()
-				if now - lastUpdate >= 1 then
-					local fps = frames
-					frames = 0
-					lastUpdate = now
-					local ping = localPlayer:GetNetworkPing() * 1000
-					if ping == 0 and RunService:IsStudio() then ping = 50 + math.noise(os.clock()*0.5)*40 end
-					placeIdLabel.Text = string.format("Ping: %d ms | FPS: %d%s", math.floor(ping), fps, weatherStr)
-				end
-			end)
-		end)
-
+		window.pages.home.general.presence.PlaceID.Text =
+			"Place ID: "..placeId
+		window.pages.home.general.presence.PlaceID.Visible = false
 		local homeGeneral = window.pages.home.general
 		local presence = homeGeneral.presence
 		local quick = homeGeneral.Quick
@@ -3293,36 +3325,45 @@ function Owl:Init(library)
 		local homeLayoutBusy = false
 		local homeLayoutRevision = 0
 		local homeCardTweens = {}
-		local function setHomeCard(card, position, size)
-			if homeCardTweens[card] then 
-				homeCardTweens[card]:Cancel()
-				homeCardTweens[card] = nil 
-			end
-			card.Position = position
-			card.Size = size
+		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		local function animateHomeCard(card, position, size)
+			if homeCardTweens[card] then homeCardTweens[card]:Cancel() end
+			local tween = Services.Tween:Create(card, homeMotion, {Position = position, Size = size})
+			homeCardTweens[card] = tween
+			tween:Play()
+			tween.Completed:Connect(function()
+				if homeCardTweens[card] == tween then homeCardTweens[card] = nil end
+			end)
 		end
 		local function updateHomeLayout()
-			local width = math.max(260, quick.AbsoluteSize.X)
-			local gap = 8
-			local contentHeight
-			if width >= 560 then
-				local leftWidth = math.floor((width - gap) * 0.62)
-				setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
-				setHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
-				setHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
-				setHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
-				contentHeight = 372
-			else
-				setHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
-				setHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
-				setHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
-				setHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
-				contentHeight = 450
-			end
-			quick.Size = UDim2.new(1, 0, 0, contentHeight)
-			if homePage:IsA("ScrollingFrame") then
-				homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
-			end
+			homeLayoutRevision += 1
+			local revision = homeLayoutRevision
+			task.delay(0.12, function()
+				if revision ~= homeLayoutRevision or homeLayoutBusy then return end
+				homeLayoutBusy = true
+				local width = math.max(260, quick.AbsoluteSize.X)
+				local gap = 8
+				local contentHeight
+				if width >= 560 then
+					local leftWidth = math.floor((width - gap) * 0.62)
+					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(leftWidth, 128))
+					animateHomeCard(playerCard, UDim2.fromOffset(leftWidth + gap, 0), UDim2.fromOffset(width - leftWidth - gap, 128))
+					animateHomeCard(settingsCard, UDim2.fromOffset(0, 136), UDim2.fromOffset(width, 96))
+					animateHomeCard(latencyCard, UDim2.fromOffset(0, 240), UDim2.fromOffset(width, 132))
+					contentHeight = 372
+				else
+					animateHomeCard(quickPlayCard, UDim2.fromOffset(0, 0), UDim2.fromOffset(width, 116))
+					animateHomeCard(playerCard, UDim2.fromOffset(0, 124), UDim2.fromOffset(width, 88))
+					animateHomeCard(settingsCard, UDim2.fromOffset(0, 220), UDim2.fromOffset(width, 96))
+					animateHomeCard(latencyCard, UDim2.fromOffset(0, 324), UDim2.fromOffset(width, 126))
+					contentHeight = 450
+				end
+				quick.Size = UDim2.new(1, 0, 0, contentHeight)
+				if homePage:IsA("ScrollingFrame") then
+					homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
+				end
+				homeLayoutBusy = false
+			end)
 		end
 		Owl:AddConnection(quick:GetPropertyChangedSignal("AbsoluteSize"), updateHomeLayout)
 		updateHomeLayout()
@@ -3601,30 +3642,26 @@ function Owl:Init(library)
 
 		local function ServerHop()
 			task.spawn(function()
-				local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+				local urls = {
+					"https://games.roblox.com/v2/games/" .. placeId .. "/servers/Public?cursor=&sortOrder=Desc&excludeFullGames=true&orderBy=BestLatency",
+					"https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100",
+				}
 				local candidates = {}
-				
-				local ok, response = pcall(function()
-					return HttpService:JSONDecode(httpGet(url))
-				end)
-				
-				if ok and type(response) == "table" and type(response.data) == "table" then
-					local servers = response.data
-					table.sort(servers, function(a, b)
-						local pingA = type(a.ping) == "number" and a.ping or math.huge
-						local pingB = type(b.ping) == "number" and b.ping or math.huge
-						return pingA < pingB
+				for _, url in ipairs(urls) do
+					local ok, response = pcall(function()
+						return HttpService:JSONDecode(httpGet(url))
 					end)
-					
-					for _, server in ipairs(servers) do
-						local playing = tonumber(server.playing) or math.huge
-						local maxPlayers = tonumber(server.maxPlayers) or 0
-						if server.id and server.id ~= game.JobId and playing < maxPlayers then
-							table.insert(candidates, server.id)
+					if ok and type(response) == "table" and type(response.data) == "table" then
+						for _, server in ipairs(response.data) do
+							local playing = tonumber(server.playing) or math.huge
+							local maxPlayers = tonumber(server.maxPlayers) or 0
+							if server.id and server.id ~= game.JobId and playing < maxPlayers then
+								table.insert(candidates, server.id)
+							end
 						end
 					end
+					if #candidates > 0 then break end
 				end
-				
 				if #candidates == 0 then
 					Owl:Notify({Title = "Server Hop", Content = "No available server was found.", Duration = 3})
 					return
@@ -4087,10 +4124,15 @@ function Owl:Init(library)
 			end
 
 			function telement:Toggle(Toggle)
+				local flagKey = Toggle.Flag or Toggle.SFlag or Toggle.Title
+				local initialValue = Toggle.Value == true
+				if Owl.LoadedConfig and Owl.LoadedConfig[flagKey] ~= nil then
+					initialValue = Owl.LoadedConfig[flagKey] == true
+				end
 				local data = {
 					Title = Toggle.Title or "Temp Toggle";
 					Desc = Toggle.Description or "";
-					V = Toggle.Value or false;
+					V = initialValue;
 					Config = Toggle.Config or false;
 					CallBack = Toggle.CallBack;
 					SFlag = Toggle.SFlag;
@@ -4144,8 +4186,9 @@ function Owl:Init(library)
 
 				UpdateToggleUI(data.V)
 
-				toggle.interact.MouseButton1Click:Connect(function()
+				toggle.interact.Activated:Connect(function()
 					data.V = not data.V
+					data.Value = data.V
 					UpdateToggleUI(data.V)
 
 					local success, errorMsg = pcall(function()
@@ -4156,6 +4199,9 @@ function Owl:Init(library)
 
 					if not success then
 						Owl:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
+					end
+					if data.Save and data.Flag then
+						SaveConfig(game and game.GameId)
 					end
 				end)
 				local descLabel = toggle:FindFirstChild("desc")
@@ -4311,6 +4357,7 @@ function Owl:Init(library)
 					Services.UserInput.InputBegan:Connect(function(input, processed)
 						if not Services.UserInput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
 							data.V = not data.V
+							data.Value = data.V
 							UpdateToggleUI(data.V)
 
 							if data.CallBack then
@@ -4321,6 +4368,7 @@ function Owl:Init(library)
 									Owl:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 								end
 							end
+							if data.Save and data.Flag then SaveConfig(game and game.GameId) end
 						end
 					end)
 
@@ -4381,18 +4429,23 @@ function Owl:Init(library)
 					if not success then
 						Owl:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 					end
+					if data.Save and data.Flag then
+						SaveConfig(game and game.GameId)
+					end
 				end
 
 				data.Type = "Toggle"
 				data.Save = Toggle.Save ~= false
 				data.Value = data.V
-				local flagKey = Toggle.Flag or Toggle.SFlag or Toggle.Title
 				data.Flag = flagKey
 				if flagKey then
 					Owl.Flags[flagKey] = data
 				end
 				if data.SFlag then
 					Owl.SettingsFlags[data.SFlag] = data
+				end
+				if Owl.LoadedConfig and Owl.LoadedConfig[flagKey] ~= nil then
+					data:Set(Owl.LoadedConfig[flagKey] == true)
 				end
 
 				return data
@@ -4555,7 +4608,7 @@ function Owl:Init(library)
 					SFlag = ColorPicker.SFlag;
 				}
 
-				ColorPicker.Linkable = ColorPicker.Linkable or true
+				if ColorPicker.Linkable == nil then ColorPicker.Linkable = true end
 
 				local colorpicker = window.settings.pages.page.ColorPicker:Clone()
 				colorpicker.Visible = true
@@ -5189,11 +5242,11 @@ function Owl:Init(library)
 				local SV, HUE = nil, nil
 
 				Owl:AddConnection(SVPicker.InputBegan, function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						SV = Services.Run.RenderStepped:Connect(function()
-							local mouse = game.Players.LocalPlayer:GetMouse()
-							local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
-							local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, SVPicker.AbsoluteSize.Y) / SVPicker.AbsoluteSize.Y
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					SV = Services.Run.RenderStepped:Connect(function()
+							local pointer = input.UserInputType == Enum.UserInputType.Touch and input.Position or Services.UserInput:GetMouseLocation()
+							local ColorX = math.clamp(pointer.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
+							local ColorY = math.clamp(pointer.Y - SVPicker.AbsolutePosition.Y, 0, SVPicker.AbsoluteSize.Y) / SVPicker.AbsoluteSize.Y
 
 							HSV[2] = ColorX
 							HSV[3] = 1 - ColorY
@@ -5204,7 +5257,7 @@ function Owl:Init(library)
 				end)
 
 				Owl:AddConnection(SVPicker.InputEnded, function(i)
-					if i.UserInputType == Enum.UserInputType.MouseButton1 and SV then
+					if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and SV then
 						SV:Disconnect()
 						SV = nil
 						AddRecentColor(data.Color)
@@ -5212,10 +5265,10 @@ function Owl:Init(library)
 				end)
 
 				Owl:AddConnection(HUESlider.InputBegan, function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						HUE = Services.Run.RenderStepped:Connect(function()
-							local mouse = game.Players.LocalPlayer:GetMouse()
-							local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
+							local pointerX = input.UserInputType == Enum.UserInputType.Touch and input.Position.X or Services.UserInput:GetMouseLocation().X
+							local ColorX = math.clamp(pointerX - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
 
 							HSV[1] = 1 - ColorX
 
@@ -5225,7 +5278,7 @@ function Owl:Init(library)
 				end)
 
 				Owl:AddConnection(HUESlider.InputEnded, function(i)
-					if i.UserInputType == Enum.UserInputType.MouseButton1 and HUE then
+					if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and HUE then
 						HUE:Disconnect()
 						HUE = nil
 						AddRecentColor(data.Color)
@@ -5429,11 +5482,20 @@ function Owl:Init(library)
 				if flagKey then
 					Owl.Flags[flagKey] = data
 				end
+				local colorCallback = data.CallBack
+				data.CallBack = function(color)
+					if colorCallback then colorCallback(color) end
+					if data.Save and data.Flag then SaveConfig(game and game.GameId) end
+				end
+				if Owl.LoadedConfig and flagKey and Owl.LoadedConfig[flagKey] ~= nil then
+					local restoredColor = UnpackColor(Owl.LoadedConfig[flagKey])
+					if typeof(restoredColor) == "Color3" then
+						data:Set(restoredColor)
+					end
+				end
 				if data.SFlag then
 					Owl.SettingsFlags[data.SFlag] = data
 				end
-
-				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(ToggleRainbowEffect)
 
 				return data
 
@@ -5515,7 +5577,7 @@ function Owl:Init(library)
 
 				end
 
-				dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
+				dropdown.dropholder.drop.down.Activated:Connect(function()
 					if DeBounce then return end
 					DeBounce = true
 
@@ -5694,7 +5756,7 @@ function Owl:Init(library)
 							Services.Tween:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 						end
 
-						option.Interact.MouseButton1Click:Connect(function()
+						option.Interact.Activated:Connect(function()
 							if data.Multi then
 								if SelectedOptions[OptionText] then
 									RemoveFromSelected(OptionText)
@@ -5791,9 +5853,13 @@ function Owl:Init(library)
 						Range = Options.Range or {0, 100};
 						StarterValue = Options.StarterValue or 16;
 						CallBack = Options.CallBack;
+						Flag = Options.Flag or Options.SFlag or Options.Title;
+						Save = Options.Save ~= false;
 						SFlag = Options.SFlag;
 						SettingsConfig = true;
+						Type = "Slider";
 					}
+					Options.Value = Options.StarterValue
 
 					Slider.Name = Options.Title
 					Slider.title.Text = Options.Title
@@ -5933,11 +5999,16 @@ function Owl:Init(library)
 							end
 
 							Options.StarterValue = newValue
+							Options.Value = newValue
+							if Options.Save and Options.Flag then SaveConfig(game and game.GameId) end
 						end
 					end
 
-					Slider.slide.Interact.MouseButton1Down:Connect(function()
-						dragging = true
+					Slider.slide.Interact.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+							dragging = true
+							UpdateSlider(input.Position.X)
+						end
 					end)
 
 					Slider.slide.Interact.MouseButton1Up:Connect(function()
@@ -5952,7 +6023,7 @@ function Owl:Init(library)
 					end)
 
 					Owl:AddConnection(Services.UserInput.InputChanged, function(input)
-						if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or input.UserInputType == Enum.UserInputType.Touch  then
+						if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 							UpdateSlider(input.Position.X)
 						end
 					end)
@@ -6012,12 +6083,20 @@ function Owl:Init(library)
 						end
 
 						Options.StarterValue = NewVal
+						Options.Value = NewVal
+						if not skipSave and Options.Save and Options.Flag then SaveConfig(game and game.GameId) end
 					end
 					Owl:AttachSliderInput(Slider, Options)
 
 					if Options.SFlag then
 						if Options.SFlag then
 							Owl.SettingsFlags[Options.SFlag] = Options
+						end
+					end
+					if Options.Flag then
+						Owl.Flags[Options.Flag] = Options
+						if Owl.LoadedConfig and Owl.LoadedConfig[Options.Flag] ~= nil then
+							Options:Set(Owl.LoadedConfig[Options.Flag], true)
 						end
 					end
 
@@ -6551,6 +6630,7 @@ function Owl:Init(library)
 			Value = Owl.WatermarkEnabled,
 			CallBack = function (v)
 				Owl:SetWatermarkEnabled(v)
+				SaveConfig(game and game.GameId)
 			end,
 			SFlag = 'WTRMK'
 		})
@@ -6686,7 +6766,7 @@ function Owl:Init(library)
 		end
 
 		function Owl:LoadSettingsConfig()
-			
+			LoadThemeCfg(FILE_PATH)
 			local folder = Owl.Folder or Owl.ConfigFolder or "OwlHub"
 			local filePath = folder .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
 			if isfile and isfile(filePath) then
@@ -7241,7 +7321,7 @@ function Owl:Init(library)
 			corner.CornerRadius = UDim.new(0, 8)
 			corner.Parent = result
 
-			result.MouseButton1Click:Connect(function()
+			result.Activated:Connect(function()
 				closesearch()
 				SwitchToTab(page.Name)
 				if page:IsA("ScrollingFrame") then
@@ -8006,9 +8086,11 @@ function Owl:Init(library)
 				end
 				UpdateSlider()
 
-				Slider.slide.Interact.MouseButton1Down:Connect(function()
-					dragging = true
-					UpdateSlider(Services.UserInput:GetMouseLocation().X)
+				Slider.slide.Interact.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+						dragging = true
+						UpdateSlider(input.Position.X)
+					end
 				end)
 
 				Slider.slide.Interact.MouseButton1Up:Connect(function()
@@ -8688,7 +8770,7 @@ function Owl:Init(library)
 
 			if Viewdata.UserRotate == true then
 				Viewport.InputBegan:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = true
 						lastPos = input.Position
 						dragStartPos = input.Position -- store where drag started
@@ -8700,7 +8782,7 @@ function Owl:Init(library)
 				end)
 
 				Viewport.InputEnded:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = false
 						Services.Tween:Create(icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
 							ImageColor3 = Color3.fromRGB(30, 30, 30)
@@ -8709,7 +8791,7 @@ function Owl:Init(library)
 				end)
 
 				Viewport.InputChanged:Connect(function(input)
-					if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  then
+					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 						local delta = input.Position - lastPos
 						targetRotationY = targetRotationY + delta.X * 0.005
 						targetRotationX = math.clamp(targetRotationX - delta.Y * 0.005, -math.pi/2, math.pi/2)
@@ -9475,7 +9557,7 @@ function Owl:Init(library)
 				Flag = ColorPicker.Flag;
 			}
 
-			ColorPicker.Linkable = ColorPicker.Linkable or true
+				if ColorPicker.Linkable == nil then ColorPicker.Linkable = true end
 
 
 			local colorpicker = pages.page.ColorPicker:Clone()
@@ -10099,7 +10181,7 @@ function Owl:Init(library)
 				recentFrame.Parent = colorpicker.color.Values.Recent
 				recentFrame.BackgroundColor3 = newColor
 
-				recentFrame.interact.MouseButton1Click:Connect(function()
+					recentFrame.interact.Activated:Connect(function()
 				
 
 					local h, s, v = newColor:ToHSV()
@@ -10137,11 +10219,11 @@ function Owl:Init(library)
 			local SV, HUE = nil, nil
 
 			Owl:AddConnection(SVPicker.InputBegan, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
-					SV = Services.Run.RenderStepped:Connect(function()
-						local mouse = game.Players.LocalPlayer:GetMouse()
-						local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
-						local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, SVPicker.AbsoluteSize.Y) / SVPicker.AbsoluteSize.Y
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+						SV = Services.Run.RenderStepped:Connect(function()
+						local pointer = input.UserInputType == Enum.UserInputType.Touch and input.Position or Services.UserInput:GetMouseLocation()
+						local ColorX = math.clamp(pointer.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
+						local ColorY = math.clamp(pointer.Y - SVPicker.AbsolutePosition.Y, 0, SVPicker.AbsoluteSize.Y) / SVPicker.AbsoluteSize.Y
 
 						HSV[2] = ColorX
 						HSV[3] = 1 - ColorY
@@ -10152,7 +10234,7 @@ function Owl:Init(library)
 			end)
 
 			Owl:AddConnection(SVPicker.InputEnded, function(i)
-				if i.UserInputType == Enum.UserInputType.MouseButton1 and SV then
+					if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and SV then
 					SV:Disconnect()
 					SV = nil
 					AddRecentColor(data.Color)
@@ -10160,10 +10242,10 @@ function Owl:Init(library)
 			end)
 
 			Owl:AddConnection(HUESlider.InputBegan, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					HUE = Services.Run.RenderStepped:Connect(function()
-						local mouse = game.Players.LocalPlayer:GetMouse()
-						local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
+							local pointerX = input.UserInputType == Enum.UserInputType.Touch and input.Position.X or Services.UserInput:GetMouseLocation().X
+							local ColorX = math.clamp(pointerX - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
 
 						HSV[1] = 1 - ColorX
 
@@ -10173,7 +10255,7 @@ function Owl:Init(library)
 			end)
 
 			Owl:AddConnection(HUESlider.InputEnded, function(i)
-				if i.UserInputType == Enum.UserInputType.MouseButton1 and HUE then
+					if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and HUE then
 					HUE:Disconnect()
 					HUE = nil
 					AddRecentColor(data.Color)
@@ -10398,68 +10480,85 @@ function Owl:Init(library)
 			return Owl:Modal(ModalConfig)
 		end
 
-		local function WrapConfig(config, defaultName, valKey)
-			config = config or {}
-			local flagName = config.Flag or config.Name or config.Title or config.ValueName or defaultName
-			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
-				local savedVal = Owl.LoadedConfig[flagName]
-				if config.Type == "Colorpicker" then
-					config[valKey] = UnpackColor(savedVal)
-				elseif config.Type == "Bind" then
-					local success, keyEnum = pcall(function() return Enum.KeyCode[savedVal] or Enum.UserInputType[savedVal] end)
-					if success and keyEnum then config[valKey] = keyEnum elseif typeof(savedVal) == "string" and Enum.KeyCode[savedVal] then config[valKey] = Enum.KeyCode[savedVal] end
-				else
-					config[valKey] = savedVal
-				end
-			end
-			config.Flag = flagName
-			config.Save = config.Save ~= false
-			local origCb = config.Callback or config.CallBack
-			config.Callback = function(...)
-				if origCb then origCb(...) end
-				SaveCfg(game and game.GameId)
-			end
-			config.CallBack = config.Callback
-			return config, flagName
-		end
-
 		function initelement:AddToggle(ToggleConfig)
-			ToggleConfig.Type = "Toggle"
-			local cfg, flag = WrapConfig(ToggleConfig, "Toggle", "Value")
-			cfg.Title = cfg.Name or cfg.Title or "Toggle"
-			cfg.Description = cfg.Description or cfg.Desc or ""
-			cfg.Value = cfg.Value ~= nil and cfg.Value or (cfg.Default ~= nil and cfg.Default or false)
-			local data = self:Toggle(cfg)
+			ToggleConfig = ToggleConfig or {}
+			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
+			local defVal = ToggleConfig.Default ~= nil and ToggleConfig.Default or (ToggleConfig.Value ~= nil and ToggleConfig.Value or false)
+
+			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
+				defVal = Owl.LoadedConfig[flagName]
+			end
+
+			local userCb = ToggleConfig.Callback or ToggleConfig.CallBack
+			local data = self:Toggle({
+				Title = ToggleConfig.Name or ToggleConfig.Title or "Toggle",
+				Description = ToggleConfig.Description or ToggleConfig.Desc or "",
+				Value = defVal,
+				Flag = flagName,
+				Save = ToggleConfig.Save ~= false,
+				CallBack = function(v)
+					if userCb then userCb(v) end
+					SaveCfg(game and game.GameId)
+				end
+			})
+
 			data.Type = "Toggle"
-			data.Save = cfg.Save
-			data.Flag = flag
-			data.Value = cfg.Value
-			Owl.Flags[flag] = data
+			data.Save = ToggleConfig.Save ~= false
+			data.Flag = flagName
+			data.Value = defVal
+			Owl.Flags[flagName] = data
 			return data
 		end
 
 		function initelement:AddSlider(SliderConfig)
-			SliderConfig.Type = "Slider"
-			local cfg, flag = WrapConfig(SliderConfig, "Slider", "Default")
-			local data = self:Slider(cfg)
-			data.Type = "Slider"
-			data.Save = cfg.Save
-			data.Flag = flag
-			data.Value = cfg.Default or cfg.Min or 0
-			Owl.Flags[flag] = data
-			return data
+			SliderConfig = SliderConfig or {}
+			local flagName = SliderConfig.Flag or SliderConfig.Name or SliderConfig.Title or SliderConfig.ValueName or "Slider"
+			local userCb = SliderConfig.Callback or SliderConfig.CallBack
+
+			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
+				SliderConfig.Default = Owl.LoadedConfig[flagName]
+			end
+
+			SliderConfig.Flag = flagName
+			SliderConfig.Save = SliderConfig.Save ~= false
+			local origCb = SliderConfig.Callback or SliderConfig.CallBack
+			SliderConfig.Callback = function(val)
+				if origCb then origCb(val) end
+				SaveCfg(game and game.GameId)
+			end
+
+			local sliderObj = self:Slider(SliderConfig)
+			sliderObj.Type = "Slider"
+			sliderObj.Save = SliderConfig.Save ~= false
+			sliderObj.Flag = flagName
+			sliderObj.Value = SliderConfig.Default or SliderConfig.Min or 0
+			Owl.Flags[flagName] = sliderObj
+			return sliderObj
 		end
 
 		function initelement:AddDropdown(DropdownConfig)
-			DropdownConfig.Type = "Dropdown"
-			local cfg, flag = WrapConfig(DropdownConfig, "Dropdown", "Default")
-			local data = self:Dropdown(cfg)
-			data.Type = "Dropdown"
-			data.Save = cfg.Save
-			data.Flag = flag
-			data.Value = cfg.Default
-			Owl.Flags[flag] = data
-			return data
+			DropdownConfig = DropdownConfig or {}
+			local flagName = DropdownConfig.Flag or DropdownConfig.Name or DropdownConfig.Title or "Dropdown"
+			local userCb = DropdownConfig.Callback or DropdownConfig.CallBack
+
+			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
+				DropdownConfig.Default = Owl.LoadedConfig[flagName]
+			end
+
+			DropdownConfig.Flag = flagName
+			DropdownConfig.Save = DropdownConfig.Save ~= false
+			DropdownConfig.Callback = function(val)
+				if userCb then userCb(val) end
+				SaveCfg(game and game.GameId)
+			end
+
+			local dropObj = self:Dropdown(DropdownConfig)
+			dropObj.Type = "Dropdown"
+			dropObj.Save = DropdownConfig.Save ~= false
+			dropObj.Flag = flagName
+			dropObj.Value = DropdownConfig.Default
+			Owl.Flags[flagName] = dropObj
+			return dropObj
 		end
 
 		function initelement:AddButton(ButtonConfig)
@@ -10489,7 +10588,6 @@ function Owl:Init(library)
 		end
 
 		function initelement:AddPbind(PBindConfig)
-			-- PBind left as is because it's too custom for WrapConfig
 			PBindConfig = PBindConfig or {}
 			local name = PBindConfig.Name or "Position"
 			local flagName = PBindConfig.Flag or name
@@ -10625,80 +10723,166 @@ function Owl:Init(library)
 		end
 
 		function initelement:AddBind(BindConfig)
-			BindConfig.Type = "Bind"
-			local cfg, flag = WrapConfig(BindConfig, "Bind", "Key")
-			cfg.Title = cfg.Name or cfg.Title or "Bind"
-			cfg.Key = cfg.Key or cfg.Default or Enum.KeyCode.Unknown
-			cfg.OnKeyChanged = function(newKey)
-				if cfg._obj then
-					cfg._obj.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
-					cfg._obj.Key = newKey
+			BindConfig = BindConfig or {}
+			local flagName = BindConfig.Flag or BindConfig.Name or BindConfig.Title or "Bind"
+			local key = BindConfig.Default or BindConfig.Key or Enum.KeyCode.Unknown
+
+			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
+				local saved = Owl.LoadedConfig[flagName]
+				local success, keyEnum = pcall(function()
+					return Enum.KeyCode[saved] or Enum.UserInputType[saved]
+				end)
+				if success and keyEnum then
+					key = keyEnum
+				elseif typeof(saved) == "string" and Enum.KeyCode[saved] then
+					key = Enum.KeyCode[saved]
 				end
-				cfg.Callback(newKey)
 			end
-			local bindData = self:Keybind(cfg)
+
+			local cb = BindConfig.Callback or BindConfig.CallBack or function() end
+			local name = BindConfig.Name or BindConfig.Title or "Bind"
+
+			local bindData = self:Keybind({
+				Title = name,
+				Key = key,
+				Flag = flagName,
+				Description = BindConfig.Description or "",
+				Save = BindConfig.Save ~= false,
+				OnKeyChanged = function(newKey)
+					if bindObj then
+						bindObj.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
+						bindObj.Key = newKey
+					end
+					SaveCfg(game and game.GameId)
+				end,
+				CallBack = cb
+			})
+
 			local bindObj = {
 				Type = "Bind",
-				Save = cfg.Save,
-				Flag = flag,
-				Value = typeof(cfg.Key) == "EnumItem" and cfg.Key.Name or tostring(cfg.Key or "NONE"),
-				Key = cfg.Key,
+				Save = BindConfig.Save ~= false,
+				Flag = flagName,
+				Value = typeof(key) == "EnumItem" and key.Name or tostring(key or "NONE"),
+				Key = key,
 				_frame = bindData and bindData._frame or nil,
 				Set = function(self, newKey)
 					if typeof(newKey) == "string" then
-						local success, keyEnum = pcall(function() return Enum.KeyCode[newKey] or Enum.UserInputType[newKey] end)
-						if success and keyEnum then newKey = keyEnum end
+						local success, keyEnum = pcall(function()
+							return Enum.KeyCode[newKey] or Enum.UserInputType[newKey]
+						end)
+						if success and keyEnum then
+							newKey = keyEnum
+						end
 					end
-					if bindData and bindData.Set then bindData:Set(newKey) end
+					if bindData and bindData.Set then
+						bindData:Set(newKey)
+					end
 					self.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
 					self.Key = newKey
 					SaveCfg(game and game.GameId)
 				end,
-				toggle = function(self) if bindData and bindData._frame then bindData._frame.Visible = not bindData._frame.Visible end end,
-				remove = function(self) if bindData and bindData._frame then bindData._frame:Destroy() end end
+				toggle = function(self)
+					if bindData and bindData._frame then
+						bindData._frame.Visible = not bindData._frame.Visible
+					end
+				end,
+				remove = function(self)
+					if bindData and bindData._frame then
+						bindData._frame:Destroy()
+					end
+				end
 			}
-			cfg._obj = bindObj
-			Owl.Flags[flag] = bindObj
+
+			Owl.Flags[flagName] = bindObj
 			return bindObj
 		end
 
 		function initelement:AddTextbox(TextboxConfig)
-			TextboxConfig.Type = "Textbox"
-			local cfg, flag = WrapConfig(TextboxConfig, "Textbox", "Default")
-			cfg.Title = cfg.Name or cfg.Title or "Textbox"
-			cfg.PlaceHolder = cfg.BackGrountText or cfg.PlaceHolder or cfg.Placeholder or "Enter..."
-			cfg.ClearOnLost = cfg.TextDisappear ~= false
-			cfg.Default = cfg.Default ~= nil and tostring(cfg.Default) or ""
-			local inputData = self:TextInput(cfg)
+			TextboxConfig = TextboxConfig or {}
+			local name = TextboxConfig.Name or TextboxConfig.Title or "Textbox"
+			local flagName = TextboxConfig.Flag or name
+			local def = TextboxConfig.Default ~= nil and tostring(TextboxConfig.Default) or ""
+
+			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
+				def = tostring(Owl.LoadedConfig[flagName])
+			end
+
+			local placeholder = TextboxConfig.BackGrountText or TextboxConfig.PlaceHolder or TextboxConfig.Placeholder or "Enter..."
+			local clearOnLost = TextboxConfig.TextDisappear ~= false
+			local cb = TextboxConfig.Callback or TextboxConfig.CallBack or function() end
+
+			local inputData = self:TextInput({
+				Title = name,
+				PlaceHolder = placeholder,
+				ClearOnLost = clearOnLost,
+				Default = def,
+				Flag = flagName,
+				Save = TextboxConfig.Save ~= false,
+				CallBack = function(txt)
+					cb(txt)
+					SaveCfg(game and game.GameId)
+				end
+			})
+
 			local tbObj = {
 				Type = "Textbox",
-				Save = cfg.Save,
-				Flag = flag,
-				Value = cfg.Default,
+				Save = TextboxConfig.Save ~= false,
+				Flag = flagName,
+				Value = def,
 				_frame = inputData and inputData._frame or nil,
 				Set = function(self, val)
 					self.Value = tostring(val)
-					if inputData and inputData.Set then inputData:Set(val) else cfg.Callback(tostring(val)) end
+					if inputData and inputData.Set then
+						inputData:Set(val)
+					else
+						cb(tostring(val))
+					end
 					SaveCfg(game and game.GameId)
 				end,
-				toggle = function(self) if inputData and inputData._frame then inputData._frame.Visible = not inputData._frame.Visible end end,
-				remove = function(self) if inputData and inputData._frame then inputData._frame:Destroy() end end
+				toggle = function(self)
+					if inputData and inputData._frame then
+						inputData._frame.Visible = not inputData._frame.Visible
+					end
+				end,
+				remove = function(self)
+					if inputData and inputData._frame then
+						inputData._frame:Destroy()
+					end
+				end
 			}
-			Owl.Flags[flag] = tbObj
+
+			Owl.Flags[flagName] = tbObj
 			return tbObj
 		end
 
 		function initelement:AddColorpicker(ColorpickerConfig)
-			ColorpickerConfig.Type = "Colorpicker"
-			local cfg, flag = WrapConfig(ColorpickerConfig, "Color Picker", "Color")
-			cfg.Title = cfg.Name or cfg.Title or "Color Picker"
-			cfg.Color = cfg.Color or cfg.Default or Color3.fromRGB(255, 255, 255)
-			local pickerData = self:ColorPicker(cfg)
+			ColorpickerConfig = ColorpickerConfig or {}
+			local name = ColorpickerConfig.Name or ColorpickerConfig.Title or "Color Picker"
+			local flagName = ColorpickerConfig.Flag or name
+			local defColor = ColorpickerConfig.Default or ColorpickerConfig.Color or Color3.fromRGB(255, 255, 255)
+
+			if Owl.LoadedConfig and Owl.LoadedConfig[flagName] ~= nil then
+				local saved = Owl.LoadedConfig[flagName]
+				defColor = UnpackColor(saved)
+			end
+
+			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
+
+			local pickerData = self:ColorPicker({
+				Title = name,
+				Color = defColor,
+				Flag = flagName,
+				Save = ColorpickerConfig.Save ~= false,
+				CallBack = function(col)
+					if cb then cb(col) end
+					SaveCfg(game and game.GameId)
+				end
+			})
 			pickerData.Type = "Colorpicker"
-			pickerData.Save = cfg.Save
-			pickerData.Flag = flag
-			pickerData.Value = cfg.Color
-			Owl.Flags[flag] = pickerData
+			pickerData.Save = ColorpickerConfig.Save ~= false
+			pickerData.Flag = flagName
+			pickerData.Value = defColor
+			Owl.Flags[flagName] = pickerData
 			return pickerData
 		end
 
@@ -10873,7 +11057,6 @@ function Owl:Init(library)
 		function initelement:AddSmartTheme()
 			self:AddColorpicker({
 				Name = "Base Accent Color",
-				SFlag = "BaseAccentColor",
 				Default = Owl.theme.Accent or Color3.fromRGB(255, 151, 227),
 				Callback = function(Value)
 					Owl:UpdateTheme({
