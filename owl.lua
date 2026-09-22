@@ -8229,8 +8229,6 @@ function Owl:Init(library)
 
 			local dragging = false
 			local data = {Value = value, Flag = config.Flag, Save = config.Save ~= false, Type = "Slider"}
-			local fillTween
-			local knobTween
 			local function setValue(nextValue, skipCallback)
 				nextValue = math.clamp(tonumber(nextValue) or minimum, minimum, maximum)
 				nextValue = math.floor((nextValue - minimum) / increment + 0.5) * increment + minimum
@@ -8238,13 +8236,9 @@ function Owl:Init(library)
 				value = math.clamp(nextValue, minimum, maximum)
 				data.Value = value
 				local alpha = (value - minimum) / (maximum - minimum)
-				if fillTween then fillTween:Cancel() end
-				if knobTween then knobTween:Cancel() end
-				local motion = TweenInfo.new(dragging and 0.06 or 0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-				fillTween = Services.Tween:Create(fill, motion, {Size = UDim2.new(alpha, 0, 1, 0)})
-				knobTween = Services.Tween:Create(knob, motion, {Position = UDim2.new(alpha, 0, 0.5, 0)})
-				fillTween:Play()
-				knobTween:Play()
+				local motion = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				Services.Tween:Create(fill, motion, {Size = UDim2.new(alpha, 0, 1, 0)}):Play()
+				Services.Tween:Create(knob, motion, {Position = UDim2.new(alpha, 0, 0.5, 0)}):Play()
 				valueLabel.Text = string.format("%g / %g", value, maximum)
 				if not skipCallback then
 					local ok, err = pcall(callback, value)
@@ -8942,6 +8936,10 @@ function Owl:Init(library)
 						yOffset = yOffset + option.Size.Y.Offset + 7
 					end
 				end
+				if dropdown.dropholder.drop.Container:IsA("ScrollingFrame") then
+					dropdown.dropholder.drop.Container.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+				end
+				return yOffset
 			end
 
 			local function OpenDrop()
@@ -8949,12 +8947,16 @@ function Owl:Init(library)
 				dropdown.dropholder.drop.Container.Visible = true
 				dropdown.dropholder.drop.search.Visible = true
 				local optionCount = 0
+				local contentHeight = 0
 				for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if child:IsA("Frame") and child ~= OptionButton and child.Visible then
 						optionCount += 1
+						if optionCount <= 4 then
+							contentHeight += child.Size.Y.Offset + 7
+						end
 					end
 				end
-				local openHeight = 142 + math.min(math.max(optionCount, 1), 4) * 42
+				local openHeight = 142 + math.max(contentHeight, 42)
 
 				Services.Tween:Create(dropdown, TweenInfo.new(0.45, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, openHeight) }):Play()
 				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
@@ -9109,6 +9111,10 @@ function Owl:Init(library)
 					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option:FindFirstChild("Title") then
 							local optionText = option.Title.Text:lower()
+							local subtitle = option:FindFirstChild("OptionSubtitle")
+							if subtitle and subtitle:IsA("TextLabel") then
+								optionText ..= " " .. subtitle.Text:lower()
+							end
 							local isTemplate = option.Name == "Option"
 							local showldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Name])
 
@@ -9179,6 +9185,7 @@ function Owl:Init(library)
 					displayLabel.Size = UDim2.new(1, -50, 1, 0)
 					displayLabel.ZIndex = math.max(option.ZIndex + 3, 4)
 					displayLabel.Parent = option
+					local isPlayerOption = optionData.Player == true or optionData.UserId ~= nil
 					local image = tostring(optionData.Image or optionData.Icon or optionData.ImageId or optionData.Decal or "")
 					if image ~= "" then
 						if not string.find(image, "://", 1, true) then
@@ -9198,6 +9205,33 @@ function Owl:Init(library)
 						displayLabel.Position = UDim2.new(0, 40, 0, 0)
 						displayLabel.Size = UDim2.new(1, -78, 1, 0)
 						displayLabel.ZIndex = thumbnail.ZIndex
+					end
+					if isPlayerOption then
+						local username = tostring(optionData.Username or OptionText)
+						local playerDisplayName = tostring(optionData.DisplayName or optionData.Label or OptionText)
+						option.Size = UDim2.new(option.Size.X.Scale, option.Size.X.Offset, 0, 52)
+						displayLabel.Text = playerDisplayName
+						displayLabel.Font = Enum.Font.GothamMedium
+						displayLabel.TextSize = 14
+						displayLabel.Position = UDim2.new(0, 54, 0, 7)
+						displayLabel.Size = UDim2.new(1, -92, 0, 20)
+						local subtitle = Instance.new("TextLabel")
+						subtitle.Name = "OptionSubtitle"
+						subtitle.BackgroundTransparency = 1
+						subtitle.Font = Enum.Font.Gotham
+						subtitle.Text = "@" .. username
+						subtitle.TextColor3 = Color3.fromRGB(170, 170, 176)
+						subtitle.TextSize = 11
+						subtitle.TextXAlignment = Enum.TextXAlignment.Left
+						subtitle.Position = UDim2.new(0, 54, 0, 27)
+						subtitle.Size = UDim2.new(1, -92, 0, 17)
+						subtitle.ZIndex = displayLabel.ZIndex
+						subtitle.Parent = option
+						local thumbnail = option:FindFirstChild("OptionImage")
+						if thumbnail and thumbnail:IsA("ImageLabel") then
+							thumbnail.Position = UDim2.new(0, 10, 0.5, -18)
+							thumbnail.Size = UDim2.fromOffset(36, 36)
+						end
 					end
 
 					if OptionText == data.StarterOption and not starterSet then
@@ -9332,9 +9366,12 @@ function Owl:Init(library)
 					"rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48",
 					target.UserId
 				)
-				return {
-					Name = target.Name,
-					Label = target.DisplayName .. " (@" .. target.Name .. ")",
+					return {
+						Name = target.Name,
+						Label = target.DisplayName .. " (@" .. target.Name .. ")",
+						DisplayName = target.DisplayName,
+						Username = target.Name,
+						Player = true,
 					Image = thumbnail,
 					UserId = target.UserId,
 				}
