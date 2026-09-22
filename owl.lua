@@ -1885,7 +1885,7 @@ local function createPerformanceOverlay()
 	frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 	frame.BackgroundTransparency = 0
 	frame.BorderSizePixel = 0
-	frame.Position = UDim2.new(1, -250, 0, 9)
+	frame.Position = UDim2.new(1, -250, 0, 16)
 	frame.Size = UDim2.new(0, 104, 0, 20)
 	frame.Visible = false
 	frame.ZIndex = 5
@@ -1897,7 +1897,7 @@ local function createPerformanceOverlay()
 		local topWidth = window.top.AbsoluteSize.X
 		local controlsWidth = window.top.functions.AbsoluteSize.X
 		local rightEdge = topWidth - controlsWidth + 32
-		frame.Position = UDim2.fromOffset(math.max(120, rightEdge - frame.AbsoluteSize.X), 9)
+		frame.Position = UDim2.fromOffset(math.max(120, rightEdge - frame.AbsoluteSize.X), 16)
 	end
 	window.top:GetPropertyChangedSignal("AbsoluteSize"):Connect(alignPerformanceOverlay)
 	window.top.functions:GetPropertyChangedSignal("AbsoluteSize"):Connect(alignPerformanceOverlay)
@@ -7144,6 +7144,12 @@ function Owl:Init(library)
 		local Pages = ui.main.pages
 		local Results = window.search.Container
 		local Template = Results.option
+		if not Results:FindFirstChildOfClass("UIListLayout") then
+			local listLayout = Instance.new("UIListLayout")
+			listLayout.Padding = UDim.new(0, 6)
+			listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			listLayout.Parent = Results
+		end
 
 		local activeResults = {}
 		local searchDebounce = 0
@@ -7158,7 +7164,7 @@ function Owl:Init(library)
 
 		local function clearResults()
 			for _, v in ipairs(Results:GetChildren()) do
-				if v:IsA("Frame") and v ~= Template then
+				if v:IsA("GuiObject") and v ~= Template then
 					v:Destroy()
 				end
 			end
@@ -7169,6 +7175,42 @@ function Owl:Init(library)
 			local key = func:GetFullName() -- unique string key
 			if activeResults[key] then return end
 			activeResults[key] = true
+
+			local result = Instance.new("TextButton")
+			result.Name = "SearchResult"
+			result.AutoButtonColor = false
+			result.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+			result.BackgroundTransparency = 0
+			result.BorderSizePixel = 0
+			result.Size = UDim2.new(1, -16, 0, 34)
+			result.Font = Enum.Font.Gotham
+			result.Text = func.Name .. "   ·   " .. getFunctionType(func)
+			result.TextColor3 = Color3.fromRGB(235, 235, 238)
+			result.TextSize = 12
+			result.TextXAlignment = Enum.TextXAlignment.Left
+			result.LayoutOrder = #activeResults
+			result.Parent = Results
+			local padding = Instance.new("UIPadding")
+			padding.PaddingLeft = UDim.new(0, 12)
+			padding.Parent = result
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 8)
+			corner.Parent = result
+			result.MouseButton1Click:Connect(function()
+				closesearch()
+				SwitchToTab(page.Name)
+				if page:IsA("ScrollingFrame") then
+					local y = func.AbsolutePosition.Y - page.AbsolutePosition.Y + page.CanvasPosition.Y
+					page.CanvasPosition = Vector2.new(0, math.max(0, y - 20))
+				end
+			end)
+			result.MouseEnter:Connect(function()
+				Services.Tween:Create(result, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 30, 34)}):Play()
+			end)
+			result.MouseLeave:Connect(function()
+				Services.Tween:Create(result, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(20, 20, 22)}):Play()
+			end)
+			return
 
 			local result = Template:Clone()
 			result.Visible = true
