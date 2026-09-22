@@ -1913,6 +1913,10 @@ function Owl:SetPerformanceOverlay(enabled)
 	performanceOverlay.enabled = enabled == true
 	createPerformanceOverlay()
 	performanceOverlay.frame.Visible = performanceOverlay.enabled
+	local miniInfo = ui and ui:FindFirstChild("minihome") and ui.minihome:FindFirstChild("info")
+	if miniInfo and miniInfo:FindFirstChild("fps") then
+		miniInfo.fps.Visible = not performanceOverlay.enabled
+	end
 
 	if performanceOverlay.connection then
 		performanceOverlay.connection:Disconnect()
@@ -2537,7 +2541,7 @@ function Owl:MakeWindow(WindowConfig)
 	end
 
 	local windowObj = Owl:Init(libConfig)
-	if WindowConfig.PerformanceOverlay == true or (Owl.LoadedConfig and Owl.LoadedConfig.PerformanceOverlay == true) then
+	if WindowConfig.PerformanceOverlay == true or (Owl.LoadedConfig and Owl.LoadedConfig.owl_performance_overlay == true) then
 		Owl:SetPerformanceOverlay(true)
 	end
 
@@ -2788,8 +2792,14 @@ function closeui()
 		closesearch()
 	end)
 
+	local currentToggle = uitoggle
+	local toggleFlag = Owl.Flags and Owl.Flags.ToggleUI
+	if toggleFlag then
+		currentToggle = toggleFlag.Value or toggleFlag.Key or currentToggle
+	end
+	local toggleName = typeof(currentToggle) == "EnumItem" and currentToggle.Name or tostring(currentToggle)
 	Owl:Toast({
-		Content = 'UI Hidden, Use '.. uitoggle.Name ..' To Open Back.',
+		Content = 'UI Hidden, Use '.. toggleName ..' To Open Back.',
 		Duration = 2,
 	})
 end
@@ -6472,7 +6482,7 @@ function Owl:Init(library)
 		a:Toggle({
 			Title = 'Performance Overlay',
 			Description = 'Shows FPS and Data Ping in the top bar.',
-			Value = Owl.LoadedConfig and Owl.LoadedConfig["owl_performance_overlay"] or false,
+			Value = (Owl.LoadedConfig and Owl.LoadedConfig["owl_performance_overlay"] == true) or performanceOverlay.enabled,
 			Flag = "owl_performance_overlay",
 			Save = true,
 			CallBack = function(enabled)
