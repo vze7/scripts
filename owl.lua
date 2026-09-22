@@ -291,10 +291,10 @@ do
 	local function IsNotNaN(x)
 		return x == x
 	end
-	local continue = IsNotNaN(activeCamera:ScreenPointToRay(0,0).Origin.x)
-	while not continue do
+	local isCameraReady = IsNotNaN(activeCamera:ScreenPointToRay(0,0).Origin.x)
+	while not isCameraReady do
 		RunService.RenderStepped:wait()
-		continue = IsNotNaN(activeCamera:ScreenPointToRay(0,0).Origin.x)
+		isCameraReady = IsNotNaN(activeCamera:ScreenPointToRay(0,0).Origin.x)
 	end
 end
 
