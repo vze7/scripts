@@ -3303,16 +3303,9 @@ function Owl:Init(library)
 		end
 
 		local homeLayoutBusy = false
-		local homeCardTweens = {}
-		local homeMotion = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 		local function animateHomeCard(card, position, size)
-			if homeCardTweens[card] then homeCardTweens[card]:Cancel() end
-			local tween = Services.Tween:Create(card, homeMotion, {Position = position, Size = size})
-			homeCardTweens[card] = tween
-			tween:Play()
-			tween.Completed:Connect(function()
-				if homeCardTweens[card] == tween then homeCardTweens[card] = nil end
-			end)
+			card.Position = position
+			card.Size = size
 		end
 		local function updateHomeLayout()
 			if homeLayoutBusy then return end
