@@ -931,16 +931,29 @@ function Owl:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			local mouse = getInputPos(input)
 			if startPosition and mouse then
 				local delta = mouse - startPosition
-
-				local newWidth = math.max(MinSize.X, startSize.X + delta.X)
-				local newHeight = math.max(MinSize.Y, startSize.Y + delta.Y)
+				local camera = workspace.CurrentCamera
+				local viewport = camera and camera.ViewportSize
+				local maxWidth = viewport and math.max(1, viewport.X - 16) or math.huge
+				local maxHeight = viewport and math.max(1, viewport.Y - 16) or math.huge
+				local minWidth = math.min(MinSize.X, maxWidth)
+				local minHeight = math.min(MinSize.Y, maxHeight)
+				local newWidth = math.clamp(startSize.X + delta.X, minWidth, maxWidth)
+				local newHeight = math.clamp(startSize.Y + delta.Y, minHeight, maxHeight)
 
 				if LockAspectRatio then
 					local aspectRatio = startSize.X / startSize.Y
-					newHeight = newWidth / aspectRatio
+					local widthFromHeight = newHeight * aspectRatio
+					if math.abs(delta.X) >= math.abs(delta.Y) then
+						newHeight = math.clamp(newWidth / aspectRatio, minHeight, maxHeight)
+						newWidth = newHeight * aspectRatio
+					else
+						newWidth = math.clamp(widthFromHeight, minWidth, maxWidth)
+						newHeight = newWidth / aspectRatio
+					end
 				end
 
 				Object.Size = UDim2.fromOffset(newWidth, newHeight)
+				Owl._windowSize = Vector2.new(newWidth, newHeight)
 
 				if Callback then
 					Callback(Vector2.new(newWidth, newHeight))
@@ -1888,11 +1901,8 @@ local function createPerformanceOverlay()
 
 	local frame = Instance.new("Frame")
 	frame.Name = "PerformanceOverlay"
-	frame.AnchorPoint = Vector2.new(0.5, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-	frame.BackgroundTransparency = 0
+	frame.BackgroundTransparency = 1
 	frame.BorderSizePixel = 0
-	frame.Position = UDim2.new(1, -250, 0, 16)
 	frame.Size = UDim2.new(0, 104, 0, 20)
 	frame.Visible = false
 	frame.ZIndex = 5
@@ -1901,17 +1911,16 @@ local function createPerformanceOverlay()
 	frame.Selectable = false
 	local function alignPerformanceOverlay()
 		if not frame.Parent or not window.top or not window.top.functions then return end
-		local topWidth = window.top.AbsoluteSize.X
-		local controlsWidth = window.top.functions.AbsoluteSize.X
-		local rightEdge = topWidth - controlsWidth + 32
-		frame.Position = UDim2.fromOffset(math.max(120, rightEdge - frame.AbsoluteSize.X), 16)
+		local controlsLeft = window.top.functions.AbsolutePosition.X - window.top.AbsolutePosition.X
+		local controlsTop = window.top.functions.AbsolutePosition.Y - window.top.AbsolutePosition.Y
+		local x = math.max(112, controlsLeft - frame.AbsoluteSize.X - 8)
+		local y = math.max(0, controlsTop + (window.top.functions.AbsoluteSize.Y - frame.AbsoluteSize.Y) / 2)
+		frame.Position = UDim2.fromOffset(x, y)
 	end
-	window.top:GetPropertyChangedSignal("AbsoluteSize"):Connect(alignPerformanceOverlay)
-	window.top.functions:GetPropertyChangedSignal("AbsoluteSize"):Connect(alignPerformanceOverlay)
+	Owl:AddConnection(window.top:GetPropertyChangedSignal("AbsoluteSize"), alignPerformanceOverlay)
+	Owl:AddConnection(window.top.functions:GetPropertyChangedSignal("AbsoluteSize"), alignPerformanceOverlay)
+	Owl:AddConnection(window.top.functions:GetPropertyChangedSignal("AbsolutePosition"), alignPerformanceOverlay)
 	task.defer(alignPerformanceOverlay)
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 7)
-	corner.Parent = frame
 
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
@@ -1929,8 +1938,11 @@ local function createPerformanceOverlay()
 
 end
 
-function Owl:SetPerformanceOverlay()
-	performanceOverlay.enabled = true
+function Owl:SetPerformanceOverlay(enabled)
+	if enabled == nil then
+		enabled = true
+	end
+	performanceOverlay.enabled = enabled == true
 	createPerformanceOverlay()
 	performanceOverlay.frame.Visible = performanceOverlay.enabled
 	local miniInfo = ui and ui:FindFirstChild("minihome") and ui.minihome:FindFirstChild("info")
@@ -1941,6 +1953,9 @@ function Owl:SetPerformanceOverlay()
 	if performanceOverlay.connection then
 		performanceOverlay.connection:Disconnect()
 		performanceOverlay.connection = nil
+	end
+	if not performanceOverlay.enabled then
+		return
 	end
 
 	performanceOverlay.frameCount = 0
@@ -1981,16 +1996,25 @@ function Owl:SetPerformanceOverlay()
 end
 
 local layoutTween
+local initialLayoutApplied = false
 local function applyLayout(isMobile, viewportSize)
-	local targetWidth = isMobile and 543 or 715
-	local targetHeight = 575
-	if viewportSize then
-		targetWidth = math.min(targetWidth, math.max(1, viewportSize.X - 24))
-		targetHeight = math.min(targetHeight, math.max(1, viewportSize.Y - 24))
+	local targetWidth = Owl._windowSize and Owl._windowSize.X or (isMobile and 543 or 715)
+	local targetHeight = Owl._windowSize and Owl._windowSize.Y or 575
+	if viewportSize and viewportSize.X > 0 and viewportSize.Y > 0 then
+		local maxWidth = math.max(1, viewportSize.X - 16)
+		local maxHeight = math.max(1, viewportSize.Y - 16)
+		targetWidth = math.clamp(targetWidth, math.min(454, maxWidth), maxWidth)
+		targetHeight = math.clamp(targetHeight, math.min(228, maxHeight), maxHeight)
 	end
+	Owl._windowSize = Vector2.new(targetWidth, targetHeight)
 	if layoutTween then layoutTween:Cancel() end
-	layoutTween = Services.Tween:Create(uiAsset.main, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Size = UDim2.fromOffset(targetWidth, targetHeight)})
-	layoutTween:Play()
+	if initialLayoutApplied then
+		window.Size = UDim2.fromOffset(targetWidth, targetHeight)
+	else
+		initialLayoutApplied = true
+		layoutTween = Services.Tween:Create(window, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Size = UDim2.fromOffset(targetWidth, targetHeight)})
+		layoutTween:Play()
+	end
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then
 		shadow.Visible = not isMobile 
@@ -2733,7 +2757,8 @@ function openui()
 	else
 		Services.Tween:Create(window, fastTween, {BackgroundTransparency = 0 }):Play()
 	end
-	Services.Tween:Create(window, fastTween, {Size = UDim2.new(0, 700, 0, 560) }):Play()
+	local restoreSize = Owl._windowSize or window.AbsoluteSize
+	Services.Tween:Create(window, fastTween, {Size = UDim2.fromOffset(restoreSize.X, restoreSize.Y)}):Play()
 
 	Services.Tween:Create(window.top.separator, fastTween, {BackgroundTransparency = 0 }):Play()
 	Services.Tween:Create(window.top.title, fastTween, {TextTransparency = 0 }):Play()
@@ -2851,7 +2876,6 @@ function ToggleUI()
 
 	if uiRuntime.isClosed then
 		openui()
-		updateLayout()
 	else
 		closeui()
 	end
@@ -3303,6 +3327,21 @@ function Owl:Init(library)
 		local playerCard = quick.Player
 		local settingsCard = quick.QuickSettings
 		local latencyCard = quick.Latency
+		local latencyValue = latencyCard:FindFirstChild("LatencyValue")
+		if not latencyValue then
+			latencyValue = Instance.new("TextLabel")
+			latencyValue.Name = "LatencyValue"
+			latencyValue.BackgroundTransparency = 1
+			latencyValue.Font = Enum.Font.GothamSemibold
+			latencyValue.Position = UDim2.new(1, -88, 0, 7)
+			latencyValue.Size = UDim2.fromOffset(76, 18)
+			latencyValue.Text = "-- ms"
+			latencyValue.TextColor3 = Color3.fromRGB(190, 190, 198)
+			latencyValue.TextSize = 11
+			latencyValue.TextXAlignment = Enum.TextXAlignment.Right
+			latencyValue.ZIndex = latencyCard.ZIndex + 2
+			latencyValue.Parent = latencyCard
+		end
 		for _, card in ipairs({quickPlayCard, playerCard, settingsCard, latencyCard}) do
 			card.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
 			card.BackgroundTransparency = 0.04
@@ -3325,9 +3364,15 @@ function Owl:Init(library)
 		local homeLayoutBusy = false
 		local homeLayoutRevision = 0
 		local homeCardTweens = {}
+		local homeLayoutInitialized = false
 		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 		local function animateHomeCard(card, position, size)
 			if homeCardTweens[card] then homeCardTweens[card]:Cancel() end
+			if homeLayoutInitialized then
+				card.Position = position
+				card.Size = size
+				return
+			end
 			local tween = Services.Tween:Create(card, homeMotion, {Position = position, Size = size})
 			homeCardTweens[card] = tween
 			tween:Play()
@@ -3341,7 +3386,7 @@ function Owl:Init(library)
 			task.delay(0.12, function()
 				if revision ~= homeLayoutRevision or homeLayoutBusy then return end
 				homeLayoutBusy = true
-				local width = math.max(260, quick.AbsoluteSize.X)
+				local width = math.max(1, quick.AbsoluteSize.X)
 				local gap = 8
 				local contentHeight
 				if width >= 560 then
@@ -3362,6 +3407,7 @@ function Owl:Init(library)
 				if homePage:IsA("ScrollingFrame") then
 					homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
 				end
+				homeLayoutInitialized = true
 				homeLayoutBusy = false
 			end)
 		end
@@ -3369,207 +3415,162 @@ function Owl:Init(library)
 		updateHomeLayout()
 
 
-		local Stats = game:GetService("Stats")
-		local TweenService = game:GetService("TweenService")
-
 		local graph = window.pages.home.general.Quick.Latency.Frame:WaitForChild("graph")
-
-		local pointTemplate = graph:WaitForChild("point")
-		local lineTemplate = graph:WaitForChild("line")
-
-		pointTemplate.Visible = false
-		lineTemplate.Visible = false
+		local lineTemplate = graph:FindFirstChild("line")
+		if not lineTemplate then
+			lineTemplate = Instance.new("Frame")
+			lineTemplate.Name = "line"
+			lineTemplate.BackgroundColor3 = Color3.fromRGB(235, 235, 240)
+			lineTemplate.BorderSizePixel = 0
+			lineTemplate.Visible = false
+			lineTemplate.Parent = graph
+		else
+			lineTemplate.Visible = false
+		end
 
 		local UPDATE_INTERVAL = 0.3
 		local MAX_POINTS = 15
 		local MAX_PING = 300
 
 		local SMOOTH_SPEED = 0.25
+		local PLOT_LEFT = 42
+		local PLOT_VERTICAL_PADDING = 6
 
 		local history = {}
 		local smoothHistory = {}
-
-		local points = {}
-		local lines = {}
+		local linePool = {}
+		local gridItems = {}
 		local gridBuilt = false
+		local gridWidth = 0
+		local gridHeight = 0
 
 		repeat task.wait() until graph.AbsoluteSize.X > 0
 
 
 		local Players = game:GetService("Players")
 		local RunService = game:GetService("RunService")
+		local Stats = game:GetService("Stats")
 
 		local function getPing()
-
-			local ping =
-				Players.LocalPlayer:GetNetworkPing() * 1000
-
+			local statsOk, statsPing = pcall(function()
+				return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+			end)
+			if statsOk and type(statsPing) == "number" and statsPing > 0 then
+				return math.floor(statsPing + 0.5)
+			end
+			local localPlayer = Players.LocalPlayer
+			if not localPlayer then return 0 end
+			local ok, pingSeconds = pcall(function()
+				return localPlayer:GetNetworkPing()
+			end)
+			if not ok or type(pingSeconds) ~= "number" then return 0 end
+			local ping = math.max(0, math.floor(pingSeconds * 1000 + 0.5))
 			if ping == 0 and RunService:IsStudio() then
-
-				return 50 + math.noise(os.clock()*0.5)*40
-
+				return math.floor(50 + math.noise(os.clock() * 0.5) * 40 + 0.5)
 			end
-
-			return math.floor(ping)
-
+			return ping
 		end
-
-
-
-		local function clear()
-
-			for _,obj in ipairs(graph:GetChildren()) do
-
-				if obj ~= pointTemplate
-					and obj ~= lineTemplate then
-
-					obj:Destroy()
-
-				end
-
-			end
-
-		end
-
 
 		local function createGrid()
-
 			local w = graph.AbsoluteSize.X
 			local h = graph.AbsoluteSize.Y
+			if gridBuilt and w == gridWidth and h == gridHeight then return end
+			for _, item in ipairs(gridItems) do item:Destroy() end
+			table.clear(gridItems)
+			gridBuilt = true
+			gridWidth = w
+			gridHeight = h
 
 			local steps = 4
+			local plotWidth = math.max(1, w - PLOT_LEFT - 2)
+			local plotHeight = math.max(1, h - PLOT_VERTICAL_PADDING * 2)
 
-			for i=0,steps do
-
+			for i = 0, steps do
 				local percent = i/steps
-				local y = h - (percent*h)
+				local y = PLOT_VERTICAL_PADDING + (1 - percent) * plotHeight
 
 				local gridLine = Instance.new("Frame")
-				gridLine.Size = UDim2.fromOffset(w,1)
-				gridLine.Position = UDim2.fromOffset(34,y)
-				gridLine.BackgroundTransparency = 0.85
+				gridLine.Name = "LatencyGridLine"
+				gridLine.Size = UDim2.fromOffset(plotWidth, 1)
+				gridLine.Position = UDim2.fromOffset(PLOT_LEFT, y)
+				gridLine.BackgroundColor3 = Color3.fromRGB(95, 95, 102)
+				gridLine.BackgroundTransparency = 0.78
 				gridLine.BorderSizePixel = 0
+				gridLine.ZIndex = graph.ZIndex + 1
 				gridLine.Parent = graph
-
+				table.insert(gridItems, gridLine)
 
 				local label = Instance.new("TextLabel")
-				label.Size = UDim2.fromOffset(40,14)
-				label.Position = UDim2.fromOffset(2,y-7)
-
+				label.Name = "LatencyAxisLabel"
+				label.Size = UDim2.fromOffset(PLOT_LEFT - 5, 14)
+				label.Position = UDim2.fromOffset(1, y - 7)
 				label.BackgroundTransparency = 1
-				label.TextSize = 6
+				label.Font = Enum.Font.Gotham
+				label.TextSize = 9
 				label.TextXAlignment = Enum.TextXAlignment.Left
-				label.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-				label.Text =
-					math.floor(percent*MAX_PING)
-					.." ms"
-
+				label.TextColor3 = Color3.fromRGB(170, 170, 178)
+				label.Text = tostring(math.floor(percent * MAX_PING + 0.5)) .. " ms"
 				label.TextTransparency = 0
-
+				label.ZIndex = graph.ZIndex + 2
 				label.Parent = graph
-
+				table.insert(gridItems, label)
 			end
-
 		end
-
-
 
 		local function draw()
-
-			clear()
 			createGrid()
-
 			local w = graph.AbsoluteSize.X
 			local h = graph.AbsoluteSize.Y
+			local plotWidth = math.max(1, w - PLOT_LEFT - 2)
+			local plotHeight = math.max(1, h - PLOT_VERTICAL_PADDING * 2)
+			local step = plotWidth / math.max(1, MAX_POINTS - 1)
+			local lastX, lastY
+			local lineCount = 0
 
-			local step = w/(MAX_POINTS-1)
-
-			local lastX,lastY
-
-			for i,value in ipairs(smoothHistory) do
-
-				local percent =
-					math.clamp(value/MAX_PING,0,1)
-
-				local x = (i-1)*step
-				local y = h - (percent*h)
-
-
-				local point = pointTemplate:Clone()
-				point.Visible = false
-				point.Position = UDim2.fromOffset(x,y)
-				point.AnchorPoint = Vector2.new(0.5,0.5)
-
-				point.Parent = graph
-
-
+			for i, value in ipairs(smoothHistory) do
+				local percent = math.clamp(value / MAX_PING, 0, 1)
+				local x = PLOT_LEFT + (i - 1) * step
+				local y = PLOT_VERTICAL_PADDING + (1 - percent) * plotHeight
 				if lastX then
-
-					local dx = x-lastX
-					local dy = y-lastY
-
-					local length =
-						math.sqrt(dx*dx + dy*dy)
-
-					local angle =
-						math.deg(math.atan2(dy,dx))
-
-					local midX = (lastX + x)/2
-					local midY = (lastY + y)/2
-
-					local line = lineTemplate:Clone()
-
+					lineCount += 1
+					local dx, dy = x - lastX, y - lastY
+					local line = linePool[lineCount]
+					if not line then
+						line = lineTemplate:Clone()
+						line.Name = "LatencySegment"
+						line.AnchorPoint = Vector2.new(0.5, 0.5)
+						line.ZIndex = graph.ZIndex + 3
+						line.Parent = graph
+						linePool[lineCount] = line
+					end
 					line.Visible = true
-					line.AnchorPoint = Vector2.new(0.5,0.5)
-
-					line.Position =
-						UDim2.fromOffset(midX,midY)
-
-					line.Size =
-						UDim2.fromOffset(length,1)
-
-					line.Rotation = angle
-
-					line.Parent = graph
-
+					line.Position = UDim2.fromOffset((lastX + x) / 2, (lastY + y) / 2)
+					line.Size = UDim2.fromOffset(math.sqrt(dx * dx + dy * dy), 2)
+					line.Rotation = math.deg(math.atan2(dy, dx))
 				end
-
-
-				lastX = x
-				lastY = y
-
+				lastX, lastY = x, y
 			end
-
+			for i = lineCount + 1, #linePool do
+				linePool[i].Visible = false
+			end
 		end
 
-
-
 		task.spawn(function()
-			while true do
-
+			while graph.Parent and graph:IsDescendantOf(ui) do
 				local ping = getPing()
-
+				if latencyValue.Parent then
+					latencyValue.Text = tostring(ping) .. " ms"
+				end
+				if #history >= MAX_POINTS then
+					table.remove(history, 1)
+					table.remove(smoothHistory, 1)
+				end
 				table.insert(history,ping)
-
-				if #history > MAX_POINTS then
-					table.remove(history,1)
-				end
-				for i,v in ipairs(history) do
-
-					local current =
-						smoothHistory[i] or v
-
-					smoothHistory[i] =
-						current + (v-current)*SMOOTH_SPEED
-
-				end
-
-
+				local sampleIndex = #history
+				local previous = smoothHistory[sampleIndex] or ping
+				smoothHistory[sampleIndex] = previous + (ping - previous) * SMOOTH_SPEED
 				draw()
-
 				task.wait(UPDATE_INTERVAL)
-
 			end
 		end)
 
@@ -3878,11 +3879,21 @@ function Owl:Init(library)
 		end
 	end)
 
-	window.top.functions.mini.interact.MouseButton1Click:Connect(function()
-		if not uiRuntime.isClosed then
-			ToggleUI()
-		end
-	end)
+	local minimizeButton = window.top.functions.mini.interact
+	if minimizeButton:IsA("GuiButton") then
+		minimizeButton.Active = true
+		minimizeButton.Interactable = true
+		minimizeButton.Activated:Connect(function()
+			if not uiRuntime.isClosed then ToggleUI() end
+		end)
+	else
+		minimizeButton.Active = true
+		minimizeButton.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				if not uiRuntime.isClosed then ToggleUI() end
+			end
+		end)
+	end
 
 	
 
@@ -6315,10 +6326,10 @@ function Owl:Init(library)
 			end
 			function telement:AddPerformanceOverlay(Options)
 				Options = Options or {}
-				return self:Toggle({
+				local performanceToggle = self:Toggle({
 					Title = Options.Name or Options.Title or "Performance Overlay",
 					Description = Options.Description or "Show FPS and ping in the top bar",
-					Value = Options.Default == true,
+					Value = Options.Default ~= false,
 					Flag = Options.Flag or "owl_performance_overlay",
 					Save = Options.Save ~= false,
 					CallBack = function(enabled)
@@ -6326,6 +6337,8 @@ function Owl:Init(library)
 						if Options.Callback then Options.Callback(enabled) end
 					end,
 				})
+				Owl:SetPerformanceOverlay(performanceToggle.Value)
+				return performanceToggle
 			end
 
 			function telement:AddUiBind()
@@ -7585,13 +7598,20 @@ function Owl:Init(library)
 
 		end
 		function initelement:Toggle(Toggle)
+			local defaultValue = Toggle.Value
+			if defaultValue == nil then defaultValue = Toggle.Default end
+			if defaultValue == nil then defaultValue = false end
+			if Owl.LoadedConfig and Toggle.Flag and Owl.LoadedConfig[Toggle.Flag] ~= nil then
+				defaultValue = Owl.LoadedConfig[Toggle.Flag] == true
+			end
 			local data = {
 				Title = Toggle.Title or Toggle.Name or "Temp Toggle";
 				Desc = Toggle.Description or Toggle.Desc or "";
-				V = Toggle.Value ~= nil and Toggle.Value or (Toggle.Default ~= nil and Toggle.Default or false);
+				V = defaultValue == true;
 				Config = Toggle.Config or false;
 				CallBack = Toggle.Callback or Toggle.CallBack;
 				Flag = Toggle.Flag;
+				Save = Toggle.Save ~= false;
 			}
 
 			local toggle = pages.page.Toggle:Clone()
@@ -7642,8 +7662,11 @@ function Owl:Init(library)
 
 			UpdateToggleUI(data.V)
 
-			toggle.interact.MouseButton1Click:Connect(function()
+			toggle.interact.Active = true
+			toggle.interact.Interactable = true
+			toggle.interact.Activated:Connect(function()
 				data.V = not data.V
+				data.Value = data.V
 				UpdateToggleUI(data.V)
 
 				local success, errorMsg = pcall(function()
@@ -7654,6 +7677,9 @@ function Owl:Init(library)
 
 				if not success then
 					Owl:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
+				end
+				if data.Save and data.Flag then
+					SaveConfig(game and game.GameId)
 				end
 			end)
 			local descLabel = toggle:FindFirstChild("desc")
@@ -7876,9 +7902,12 @@ function Owl:Init(library)
 						data.CallBack(data.V)
 					end)
 					if not success then
-						Owl:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
+					Owl:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 					end
 			end
+				if not skipSave and data.Save and data.Flag then
+					SaveConfig(game and game.GameId)
+				end
 			end
 
 			data.Value = data.V
@@ -11039,11 +11068,11 @@ function Owl:Init(library)
 
 		function initelement:AddPerformanceOverlay(Options)
 			Options = Options or {}
-			return self:AddToggle({
+			local performanceToggle = self:AddToggle({
 				Name = Options.Name or "Performance Overlay",
 				Description = Options.Description or "Show FPS and ping in the top bar",
 				Flag = Options.Flag or "owl_performance_overlay",
-				Default = Options.Default == true,
+				Default = Options.Default ~= false,
 				Save = Options.Save ~= false,
 				Callback = function(enabled)
 					Owl:SetPerformanceOverlay(enabled)
@@ -11052,6 +11081,8 @@ function Owl:Init(library)
 					end
 				end,
 			})
+			Owl:SetPerformanceOverlay(performanceToggle.Value)
+			return performanceToggle
 		end
 
 		function initelement:AddSmartTheme()
