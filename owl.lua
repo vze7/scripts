@@ -7153,6 +7153,7 @@ function Owl:Init(library)
 
 		local activeResults = {}
 		local searchDebounce = 0
+		local resultOrder = 0
 
 		local function getFunctionType(frame)
 			local attr = frame:GetAttribute("FunctionType")
@@ -7169,18 +7170,19 @@ function Owl:Init(library)
 				end
 			end
 			table.clear(activeResults)
+			resultOrder = 0
 		end
 
 		local function createResult(page, func)
-			local key = func:GetFullName() -- unique string key
+			local key = func:GetFullName()
 			if activeResults[key] then return end
 			activeResults[key] = true
+			resultOrder += 1
 
 			local result = Instance.new("TextButton")
 			result.Name = "SearchResult"
 			result.AutoButtonColor = false
 			result.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
-			result.BackgroundTransparency = 0
 			result.BorderSizePixel = 0
 			result.Size = UDim2.new(1, -16, 0, 34)
 			result.Font = Enum.Font.Gotham
@@ -7188,7 +7190,7 @@ function Owl:Init(library)
 			result.TextColor3 = Color3.fromRGB(235, 235, 238)
 			result.TextSize = 12
 			result.TextXAlignment = Enum.TextXAlignment.Left
-			result.LayoutOrder = #activeResults
+			result.LayoutOrder = resultOrder
 			result.Parent = Results
 			local padding = Instance.new("UIPadding")
 			padding.PaddingLeft = UDim.new(0, 12)
@@ -7196,6 +7198,7 @@ function Owl:Init(library)
 			local corner = Instance.new("UICorner")
 			corner.CornerRadius = UDim.new(0, 8)
 			corner.Parent = result
+
 			result.MouseButton1Click:Connect(function()
 				closesearch()
 				SwitchToTab(page.Name)
@@ -7210,58 +7213,6 @@ function Owl:Init(library)
 			result.MouseLeave:Connect(function()
 				Services.Tween:Create(result, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(20, 20, 22)}):Play()
 			end)
-			return
-
-			local result = Template:Clone()
-			result.Visible = true
-			result.Parent = Results
-
-			result.info.title.Text = func.Name
-			result.info.badge["function"].Text = getFunctionType(func)
-			result.info.badge.Size = UDim2.new(0, result.info.badge["function"].TextBounds.X + 20,0, 20)
-			result.interact.MouseButton1Click:Connect(function()
-
-				closesearch()
-
-				local openedPage = ui.main.pages:FindFirstChild(page.Name)
-				if not openedPage or not openedPage:IsA("GuiObject") then return end
-				SwitchToTab(page.Name)
-
-				task.wait(0.05) -- small delay to allow UI to update
-				if openedPage:IsA("ScrollingFrame") then
-					local y = func.AbsolutePosition.Y - openedPage.AbsolutePosition.Y + openedPage.CanvasPosition.Y
-					Services.Tween:Create(
-						openedPage,
-						TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-						{ CanvasPosition = Vector2.new(0, math.max(0, y - 20)) }
-					):Play()
-				end
-				local original = func.BackgroundColor3
-				Services.Tween:Create(func, TweenInfo.new(0.2), {
-					BackgroundColor3 = Owl:GetLighter(original, 0.03)
-				}):Play()
-
-				task.delay(0.35, function()
-					Services.Tween:Create(func, TweenInfo.new(0.35), {
-						BackgroundColor3 = original
-					}):Play()
-				end)
-			end)
-
-			result.MouseEnter:Connect(function()
-				Services.Tween:Create(result.ImageLabel, TweenInfo.new(0.2), {
-					ImageColor3 = Color3.fromRGB(255, 255, 255)
-				}):Play()
-			end)
-
-			result.MouseLeave:Connect(function()
-				Services.Tween:Create(result.ImageLabel, TweenInfo.new(0.2), {
-					ImageColor3 = Color3.fromRGB(130, 130, 130)
-				}):Play()
-			end)
-			Services.Tween:Create(result.info.badge, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-			Services.Tween:Create(result.info.title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			Services.Tween:Create(result.info.badge["function"], TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 		end
 
 		local function searchFunctions(query)
