@@ -8956,7 +8956,7 @@ function Owl:Init(library)
 						end
 					end
 				end
-				local openHeight = 142 + math.max(contentHeight, 42)
+				local openHeight = 122 + math.max(contentHeight, 38)
 
 				Services.Tween:Create(dropdown, TweenInfo.new(0.45, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, openHeight) }):Play()
 				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
@@ -9209,28 +9209,28 @@ function Owl:Init(library)
 					if isPlayerOption then
 						local username = tostring(optionData.Username or OptionText)
 						local playerDisplayName = tostring(optionData.DisplayName or optionData.Label or OptionText)
-						option.Size = UDim2.new(option.Size.X.Scale, option.Size.X.Offset, 0, 52)
+						option.Size = UDim2.new(option.Size.X.Scale, option.Size.X.Offset, 0, 42)
 						displayLabel.Text = playerDisplayName
 						displayLabel.Font = Enum.Font.GothamMedium
-						displayLabel.TextSize = 14
-						displayLabel.Position = UDim2.new(0, 54, 0, 7)
-						displayLabel.Size = UDim2.new(1, -92, 0, 20)
+						displayLabel.TextSize = 13
+						displayLabel.Position = UDim2.new(0, 46, 0, 4)
+						displayLabel.Size = UDim2.new(1, -82, 0, 18)
 						local subtitle = Instance.new("TextLabel")
 						subtitle.Name = "OptionSubtitle"
 						subtitle.BackgroundTransparency = 1
 						subtitle.Font = Enum.Font.Gotham
 						subtitle.Text = "@" .. username
 						subtitle.TextColor3 = Color3.fromRGB(170, 170, 176)
-						subtitle.TextSize = 11
+						subtitle.TextSize = 10
 						subtitle.TextXAlignment = Enum.TextXAlignment.Left
-						subtitle.Position = UDim2.new(0, 54, 0, 27)
-						subtitle.Size = UDim2.new(1, -92, 0, 17)
+						subtitle.Position = UDim2.new(0, 46, 0, 21)
+						subtitle.Size = UDim2.new(1, -82, 0, 15)
 						subtitle.ZIndex = displayLabel.ZIndex
 						subtitle.Parent = option
 						local thumbnail = option:FindFirstChild("OptionImage")
 						if thumbnail and thumbnail:IsA("ImageLabel") then
-							thumbnail.Position = UDim2.new(0, 10, 0.5, -18)
-							thumbnail.Size = UDim2.fromOffset(36, 36)
+							thumbnail.Position = UDim2.new(0, 9, 0.5, -15)
+							thumbnail.Size = UDim2.fromOffset(30, 30)
 						end
 					end
 
