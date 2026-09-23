@@ -2143,6 +2143,9 @@ local function SaveCfg(Name)
 				elseif v._textBox and v._textBox.Text then
 					Data[i] = v._textBox.Text
 				end
+				if v.Type == "Toggle" and v.Config and typeof(v.Keybind) == "EnumItem" then
+					Data[i .. "_Keybind"] = v.Keybind.Name
+				end
 			end
 		end	
 	end
@@ -2204,6 +2207,13 @@ local function LoadCfg(Config)
 					syde:SetTheme()
 				end
 			end)
+		elseif type(a) == "string" and a:sub(-8) == "_Keybind" then
+			local toggle = syde.Flags[a:sub(1, -9)]
+			if toggle and toggle.Type == "Toggle" and toggle.SetKeybind and type(b) == "string" then
+				local key = Enum.KeyCode[b]
+				if key then toggle:SetKeybind(key, true) end
+			end
+			flagsProcessed += 1
 		else
 			flagsProcessed += 1
 			if flagsProcessed >= totalFlags then
@@ -8505,6 +8515,7 @@ function syde:Init(library)
 
 			toggle.interact.MouseButton1Click:Connect(function()
 				data.V = not data.V
+				data.Value = data.V
 				UpdateToggleUI(data.V)
 
 				local success, errorMsg = pcall(function()
@@ -8651,7 +8662,7 @@ function syde:Init(library)
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) }):Play()
 				end
 
-				local function setKeybind(key)
+				local function setKeybind(key, skipSave)
 					if not key then
 						toggleConfiguration.Container.KeyBind.Bind.v.Text = 'None'
 						ResizeBindFrame()
@@ -8669,7 +8680,9 @@ function syde:Init(library)
 							data.KeybindReady = true
 						end)
 					end
+					if not skipSave and data.Flag and data.Save ~= false then SaveConfig(game and game.GameId) end
 				end
+				data.SetKeybind = function(_, key, skipSave) setKeybind(key, skipSave) end
 
 				toggleConfiguration.Container.KeyBind.Interact.MouseButton1Click:Connect(function()
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
@@ -8691,6 +8704,7 @@ function syde:Init(library)
 				userinput.InputBegan:Connect(function(input, processed)
 					if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
 						data.V = not data.V
+						data.Value = data.V
 						UpdateToggleUI(data.V)
 
 						if data.CallBack then
@@ -11298,6 +11312,11 @@ function syde:Init(library)
 					SaveCfg(game and game.GameId)
 				end
 			})
+			local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[flagName .. "_Keybind"]
+			if type(savedKeybind) == "string" and data.SetKeybind then
+				local key = Enum.KeyCode[savedKeybind]
+				if key then data:SetKeybind(key, true) end
+			end
 
 			data.Type = "Toggle"
 			data.Save = ToggleConfig.Save ~= false
