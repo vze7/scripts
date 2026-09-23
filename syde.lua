@@ -1075,8 +1075,19 @@ end
 function Bento:Bind()
 
 	local busy = false
+	local pendingAfterResize = false
 
 	self.Container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		if resizing then
+			if pendingAfterResize then return end
+			pendingAfterResize = true
+			task.spawn(function()
+				repeat task.wait(0.1) until not resizing or not self.Container.Parent
+				pendingAfterResize = false
+				if self.Container.Parent then self:Update() end
+			end)
+			return
+		end
 
 		if busy then return end
 		busy = true
@@ -1103,6 +1114,15 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	local startPosition, startSize = nil, nil
 	local isResizing = false
+	local pendingSize
+	local renderConnection
+	local lastAppliedSize
+	local function applyPendingSize()
+		if not pendingSize or pendingSize == lastAppliedSize then return end
+		Object.Size = pendingSize
+		lastAppliedSize = pendingSize
+		if Callback then Callback(Vector2.new(pendingSize.X.Offset, pendingSize.Y.Offset)) end
+	end
 
 	-- helper for both mouse and touch
 	local function getInputPos(input)
@@ -1114,13 +1134,14 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	end
 
 	local function onInputBegan(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if not isResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 			isResizing = true
 			resizing = true
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+			local arrow = Dragger:FindFirstChild("ResizeArrow")
+			if arrow then arrow.TextTransparency = 0.1 end
+			renderConnection = runservice.RenderStepped:Connect(applyPendingSize)
 		end
 	end
 
@@ -1141,29 +1162,37 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 					newHeight = math.clamp(newWidth / aspectRatio, math.min(MinSize.Y, maxHeight), maxHeight)
 				end
 
-				-- One direct size update per input event; no accumulating resize tweens.
-				Object.Size = UDim2.fromOffset(newWidth, newHeight)
-
-				if Callback then
-					Callback(Vector2.new(newWidth, newHeight))
-				end
+				-- Input events can outnumber rendered frames; apply latest size once per frame.
+				pendingSize = UDim2.fromOffset(math.floor(newWidth), math.floor(newHeight))
 			end
 		end
 	end
 
 	local function onInputEnded(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if isResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			applyPendingSize()
+			if renderConnection then renderConnection:Disconnect() renderConnection = nil end
 			isResizing = false
 			resizing = false
-			startPosition, startSize = nil, nil
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
+			startPosition, startSize, pendingSize, lastAppliedSize = nil, nil, nil, nil
+			local arrow = Dragger:FindFirstChild("ResizeArrow")
+			if arrow then arrow.TextTransparency = 0.45 end
+			task.defer(function()
+				for _, page in ipairs(Library.main.pages:GetChildren()) do
+					if page:IsA("ScrollingFrame") and page.Visible then
+						syde:updateLayout(page, 7)
+					end
+				end
+			end)
 		end
 	end
 
 	syde:AddConnection(Dragger.InputBegan, onInputBegan)
 	syde:AddConnection(userInput.InputChanged, onInputChanged)
-	syde:AddConnection(Dragger.InputEnded, onInputEnded)
+	syde:AddConnection(userInput.InputEnded, onInputEnded)
+	Dragger.Destroying:Connect(function()
+		if renderConnection then renderConnection:Disconnect() end
+	end)
 end
 
 
@@ -1299,7 +1328,7 @@ end
 
 local activeLayouts = setmetatable({}, {__mode = "k"})
 function syde:updateLayout(container, spacing)
-	if activeLayouts[container] or not container.Parent then return end
+	if resizing or activeLayouts[container] or not container.Parent then return end
 	activeLayouts[container] = true
 	spacing = spacing or 8
 	local yOffset = 8
@@ -2254,6 +2283,22 @@ local bluron = false
 local glow = false
 
 local uitoggle = Enum.KeyCode.RightShift
+local sydeBlurEffect
+local function setBackgroundBlur(enabled)
+	bluron = enabled == true
+	if not bluron then
+		if sydeBlurEffect then sydeBlurEffect:Destroy() end
+		sydeBlurEffect = nil
+		return
+	end
+	if not sydeBlurEffect then
+		sydeBlurEffect = Instance.new("BlurEffect")
+		sydeBlurEffect.Name = "SydeBackgroundBlur"
+		sydeBlurEffect.Size = 12
+		sydeBlurEffect.Parent = game:GetService("Lighting")
+	end
+	sydeBlurEffect.Enabled = not uiclosed
+end
 --
 
 local performanceOverlay = {
@@ -2356,6 +2401,30 @@ function syde:SetPerformanceOverlay(enabled)
 		performanceOverlay.frameCount = 0
 		performanceOverlay.elapsed = 0
 	end)
+	return true
+end
+
+function syde:SetCornerImage(assetId)
+	local id = tostring(assetId or ""):match("^%s*(.-)%s*$")
+	id = id:gsub("^rbxassetid://", "")
+	if id ~= "" and not id:match("^%d+$") then return false end
+	local image = window:FindFirstChild("CornerDecal")
+	if not image then
+		image = Instance.new("ImageLabel")
+		image.Name = "CornerDecal"
+		image.BackgroundTransparency = 1
+		image.BorderSizePixel = 0
+		image.AnchorPoint = Vector2.new(1, 1)
+		image.Position = UDim2.new(1, -34, 1, -8)
+		image.Size = UDim2.fromOffset(22, 22)
+		image.ScaleType = Enum.ScaleType.Fit
+		image.ZIndex = window.resize.ZIndex + 1
+		image.Parent = window
+	end
+	image.Image = id ~= "" and ("rbxassetid://" .. id) or ""
+	image.Visible = id ~= ""
+	self.CornerImageId = id
+	if self.Flags.CornerImageId then self.Flags.CornerImageId.Value = id end
 	return true
 end
 
@@ -2848,6 +2917,7 @@ function syde:MakeWindow(WindowConfig)
 	WindowConfig.Name = WindowConfig.Name or "Fire Hub"
 	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name or "FireHub"
 	WindowConfig.SaveConfig = true
+	syde.CornerImageDefault = WindowConfig.CornerImageId or ""
 
 	local cfgFolder = WindowConfig.ConfigFolder
 	syde.ConfigFolder = cfgFolder
@@ -2911,7 +2981,7 @@ function syde:MakeWindow(WindowConfig)
 	syde:SetWatermarkEnabled(watermarkEnabled)
 	syde:SetPerformanceOverlay(WindowConfig.PerformanceOverlay ~= false)
 
-	if WindowConfig.KeyToOpenWindow or WindowConfig.Openkey then
+	if not (syde.LoadedConfig and syde.LoadedConfig.ToggleUI) and (WindowConfig.KeyToOpenWindow or WindowConfig.Openkey) then
 		local key = WindowConfig.KeyToOpenWindow or WindowConfig.Openkey
 		if type(key) == "string" and Enum.KeyCode[key] then
 			uitoggle = Enum.KeyCode[key]
@@ -2995,6 +3065,7 @@ function syde:Rejoin()
 end
 
 function syde:Destroy()
+	setBackgroundBlur(false)
 	if rs and rs.Connected then rs:Disconnect() end
 	if ss and ss.Connected then ss:Disconnect() end
 	if performanceOverlay.connection then
@@ -3103,6 +3174,7 @@ function openui()
 	window.user.Visible = true
 	window.Visible = true
 	uiclosed = false
+	if sydeBlurEffect then sydeBlurEffect.Enabled = true end
 	if performanceOverlay.frame then
 		performanceOverlay.frame.Visible = performanceOverlay.enabled and performanceOverlay.frame.Size.X.Offset >= 105
 	end
@@ -3118,15 +3190,7 @@ function openui()
 
 	local fastTween = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-	if bluron then
-		syde:BindFrame(window, {
-			Transparency = 0.98;
-			BrickColor = BrickColor.new('Institutional white');
-		})
-		tweenservice:Create(window, fastTween, {BackgroundTransparency = 0.45 }):Play()
-	else
-		tweenservice:Create(window, fastTween, {BackgroundTransparency = 0 }):Play()
-	end
+	tweenservice:Create(window, fastTween, {BackgroundTransparency = 0 }):Play()
 	tweenservice:Create(window, fastTween, {Size = sizeBeforeMinimize or UDim2.fromOffset(700, 560) }):Play()
 
 	tweenservice:Create(window.top.separator, fastTween, {BackgroundTransparency = 0 }):Play()
@@ -3155,7 +3219,7 @@ function openui()
 	end
 
 	tweenservice:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 0.5 }):Play()
-	tweenservice:Create(window.resize, fastTween, {ImageTransparency = 0.3}):Play()
+	window.resize.ImageTransparency = 1
 
 	if glow == true then
 		for i, g in pairs(window.clipframe:GetChildren()) do
@@ -3176,13 +3240,13 @@ function closeui()
 	window.tabs.Visible = false
 	window.user.Visible = false
 	window.Visible = false
+	if sydeBlurEffect then sydeBlurEffect.Enabled = false end
 	if performanceOverlay.frame then performanceOverlay.frame.Visible = false end
 	window.shadow.glow.Visible = false
 	window.shadow.glow1.Visible = false
 	for _, effect in ipairs(window.clipframe:GetChildren()) do
 		if effect:IsA("ImageLabel") then effect.Visible = false end
 	end
-	if syde:HasBinding(window) then syde:UnbindFrame(window) end
 
 	-- These helpers wait for their closing animations. Hiding these transient
 	-- panels directly avoids blocking the minimize notification and next reopen.
@@ -3403,6 +3467,19 @@ function syde:Init(library)
 	if Minihome then
 		syde:AddDrag(Minihome, Minihome) -- make the watermark draggable
 	end
+	window.resize.ImageTransparency = 1
+	window.resize.Size = UDim2.fromOffset(24, 24)
+	local resizeArrow = window.resize:FindFirstChild("ResizeArrow") or Instance.new("TextLabel")
+	resizeArrow.Name = "ResizeArrow"
+	resizeArrow.BackgroundTransparency = 1
+	resizeArrow.Size = UDim2.fromScale(1, 1)
+	resizeArrow.Font = Enum.Font.GothamSemibold
+	resizeArrow.Text = "↘"
+	resizeArrow.TextSize = 18
+	resizeArrow.TextColor3 = Color3.fromRGB(210, 210, 214)
+	resizeArrow.TextTransparency = 0.45
+	resizeArrow.ZIndex = window.resize.ZIndex + 1
+	resizeArrow.Parent = window.resize
 	syde:MakeResizable(window.resize, window, Vector2.new(454, 228))
 
 	--initial transparency setup
@@ -6316,7 +6393,18 @@ function syde:Init(library)
 					-- Connect AbsoluteSize change **only once**
 					if Options.Increment > 4 then
 						if not Slider.slide.Ticks:FindFirstChild("_ResizeConnection") then
+							local pendingTickRefresh = false
 							local conn = Slider.slide.Ticks:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+								if resizing then
+									if pendingTickRefresh then return end
+									pendingTickRefresh = true
+									task.spawn(function()
+										repeat task.wait(0.1) until not resizing or not Slider.slide.Ticks.Parent
+										pendingTickRefresh = false
+										if Slider.slide.Ticks.Parent then BuildTicks(Slider.slide, Options) end
+									end)
+									return
+								end
 								BuildTicks(Slider.slide, Options)
 							end)
 							-- Tag the connection so we don't connect again
@@ -6573,6 +6661,7 @@ function syde:Init(library)
 				textinput.TextFrame.TextBox.PlaceholderText = data.PlaceHolder
 
 				local textBox = textinput.TextFrame.TextBox
+				textBox.Text = tostring(TextInput.Default or "")
 				local defaultHeight = 32
 				--	local maxHeight = data.MaxSize
 				local ignoreNextClear = false
@@ -6876,47 +6965,10 @@ function syde:Init(library)
 
 		a:Toggle({
 			Title = 'Blur',
-			Description = 'Make sure your graphics are above 8.',
+			Description = 'Blur the 3D world behind the UI.',
 			CallBack = function (v)
-				if v then
-					window.shadow.ImageLabel.Visible = false
-					window.BackgroundTransparency = 0.45
-
-					window.pages.v1.Visible = false
-					window.pages.v0.Visible = false
-
-					window.pages.clipframe.v1.Visible = false
-					window.pages.clipframe.v0.Visible = false
-
-					syde:BindFrame(window, {
-						Transparency = 0.98;
-						BrickColor = BrickColor.new('Institutional white');
-					})
-
-					local dof = Instance.new('DepthOfFieldEffect')
-					dof.Parent = game.Lighting
-					dof.Enabled = true
-					dof.FocusDistance = 51.6
-					dof.InFocusRadius = 50
-					dof.NearIntensity = 1
-					dof.FarIntensity = 0
-
-					bluron = true
-
-				else
-					window.shadow.ImageLabel.Visible = true
-					window.BackgroundTransparency = 0
-
-					window.pages.v1.Visible = true
-					window.pages.v0.Visible = true
-
-					window.pages.clipframe.v1.Visible = true
-					window.pages.clipframe.v0.Visible = true
-
-					syde:UnbindFrame(window)
-
-					bluron = false
-				end
+				setBackgroundBlur(v)
+				window.BackgroundTransparency = 0
 			end,
 			SFlag = 'BLUR',
 		})
@@ -6997,6 +7049,28 @@ function syde:Init(library)
 					})
 				end
 			end
+		})
+		local cornerImageId = syde.LoadedConfig and syde.LoadedConfig.CornerImageId or syde.CornerImageDefault or ""
+		syde.Flags.CornerImageId = {
+			Type = "Input",
+			Value = tostring(cornerImageId),
+			Save = true,
+			Set = function(self, value)
+				if syde:SetCornerImage(value) then self.Value = syde.CornerImageId end
+			end,
+		}
+		syde:SetCornerImage(cornerImageId)
+		a:TextInput({
+			Title = 'Corner Image ID',
+			PlaceHolder = 'Decal ID beside resize arrow',
+			Default = cornerImageId,
+			NumberOnly = true,
+			ClearOnLost = false,
+			CallBack = function(value)
+				if syde:SetCornerImage(value) then
+					SaveCfg(game and game.GameId)
+				end
+			end,
 		})
 
 
@@ -8558,7 +8632,18 @@ function syde:Init(library)
 				-- Connect AbsoluteSize change **only once**
 				if Options.Increment > 4 then
 					if not Slider.slide.Ticks:FindFirstChild("_ResizeConnection") then
+						local pendingTickRefresh = false
 						local conn = Slider.slide.Ticks:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+							if resizing then
+								if pendingTickRefresh then return end
+								pendingTickRefresh = true
+								task.spawn(function()
+									repeat task.wait(0.1) until not resizing or not Slider.slide.Ticks.Parent
+									pendingTickRefresh = false
+									if Slider.slide.Ticks.Parent then BuildTicks(Slider.slide, Options) end
+								end)
+								return
+							end
 							BuildTicks(Slider.slide, Options)
 						end)
 						-- Tag the connection so we don't connect again
