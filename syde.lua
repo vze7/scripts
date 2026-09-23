@@ -1114,14 +1114,31 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	local startPosition, startSize = nil, nil
 	local isResizing = false
+	local activeTouch
 	local pendingSize
 	local renderConnection
 	local lastAppliedSize
+	local previewGeneration = 0
+	local preview = Instance.new("Frame")
+	preview.Name = "ResizePreview"
+	preview.BackgroundTransparency = 1
+	preview.BorderSizePixel = 0
+	preview.Active = false
+	preview.Visible = false
+	preview.ZIndex = Object.ZIndex + 5
+	preview.Parent = Object.Parent
+	local previewCorner = Instance.new("UICorner")
+	previewCorner.CornerRadius = UDim.new(0, 18)
+	previewCorner.Parent = preview
+	local previewStroke = Instance.new("UIStroke")
+	previewStroke.Color = Color3.fromRGB(94, 130, 255)
+	previewStroke.Thickness = 2
+	previewStroke.Transparency = 1
+	previewStroke.Parent = preview
 	local function applyPendingSize()
 		if not pendingSize or pendingSize == lastAppliedSize then return end
-		Object.Size = pendingSize
+		preview.Size = pendingSize
 		lastAppliedSize = pendingSize
-		if Callback then Callback(Vector2.new(pendingSize.X.Offset, pendingSize.Y.Offset)) end
 	end
 
 	-- helper for both mouse and touch
@@ -1139,6 +1156,14 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			resizing = true
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
+			activeTouch = input.UserInputType == Enum.UserInputType.Touch and input or nil
+			previewGeneration += 1
+			preview.AnchorPoint = Object.AnchorPoint
+			preview.Position = Object.Position
+			preview.Size = Object.Size
+			preview.Visible = true
+			previewStroke.Transparency = 1
+			tweenservice:Create(previewStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 0.2}):Play()
 			local arrow = Dragger:FindFirstChild("ResizeArrow")
 			if arrow then arrow.TextTransparency = 0.1 end
 			renderConnection = runservice.RenderStepped:Connect(applyPendingSize)
@@ -1147,6 +1172,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	local function onInputChanged(input)
 		if isResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			if activeTouch and input ~= activeTouch then return end
+			if not activeTouch and input.UserInputType == Enum.UserInputType.Touch then return end
 			local mouse = getInputPos(input)
 			if startPosition and mouse then
 				local delta = mouse - startPosition
@@ -1162,7 +1189,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 					newHeight = math.clamp(newWidth / aspectRatio, math.min(MinSize.Y, maxHeight), maxHeight)
 				end
 
-				-- Input events can outnumber rendered frames; apply latest size once per frame.
+				-- Update only the outline while dragging; relayout the window once on release.
 				pendingSize = UDim2.fromOffset(math.floor(newWidth), math.floor(newHeight))
 			end
 		end
@@ -1170,11 +1197,23 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 
 	local function onInputEnded(input)
 		if isResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			if activeTouch and input ~= activeTouch then return end
+			if not activeTouch and input.UserInputType == Enum.UserInputType.Touch then return end
 			applyPendingSize()
 			if renderConnection then renderConnection:Disconnect() renderConnection = nil end
+			if pendingSize and Object.Size ~= pendingSize then
+				Object.Size = pendingSize
+				if Callback then Callback(Vector2.new(pendingSize.X.Offset, pendingSize.Y.Offset)) end
+			end
 			isResizing = false
 			resizing = false
+			activeTouch = nil
 			startPosition, startSize, pendingSize, lastAppliedSize = nil, nil, nil, nil
+			local generation = previewGeneration
+			tweenservice:Create(previewStroke, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+			task.delay(0.12, function()
+				if preview.Parent and previewGeneration == generation and not isResizing then preview.Visible = false end
+			end)
 			local arrow = Dragger:FindFirstChild("ResizeArrow")
 			if arrow then arrow.TextTransparency = 0.45 end
 			task.defer(function()
@@ -1192,6 +1231,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	syde:AddConnection(userInput.InputEnded, onInputEnded)
 	Dragger.Destroying:Connect(function()
 		if renderConnection then renderConnection:Disconnect() end
+		preview:Destroy()
 	end)
 end
 
@@ -3468,14 +3508,14 @@ function syde:Init(library)
 		syde:AddDrag(Minihome, Minihome) -- make the watermark draggable
 	end
 	window.resize.ImageTransparency = 1
-	window.resize.Size = UDim2.fromOffset(24, 24)
+	window.resize.Size = UDim2.fromOffset(38, 38)
 	local resizeArrow = window.resize:FindFirstChild("ResizeArrow") or Instance.new("TextLabel")
 	resizeArrow.Name = "ResizeArrow"
 	resizeArrow.BackgroundTransparency = 1
 	resizeArrow.Size = UDim2.fromScale(1, 1)
 	resizeArrow.Font = Enum.Font.GothamSemibold
 	resizeArrow.Text = "↘"
-	resizeArrow.TextSize = 18
+	resizeArrow.TextSize = 21
 	resizeArrow.TextColor3 = Color3.fromRGB(210, 210, 214)
 	resizeArrow.TextTransparency = 0.45
 	resizeArrow.ZIndex = window.resize.ZIndex + 1
@@ -5991,7 +6031,15 @@ function syde:Init(library)
 
 				end
 
-				dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
+				local headerHitbox = Instance.new("TextButton")
+				headerHitbox.Name = "HeaderHitbox"
+				headerHitbox.Text = ""
+				headerHitbox.BackgroundTransparency = 1
+				headerHitbox.AutoButtonColor = false
+				headerHitbox.Size = UDim2.new(1, 0, 0, 42)
+				headerHitbox.ZIndex = dropdown.dropholder.drop.down.ZIndex + 2
+				headerHitbox.Parent = dropdown.dropholder.drop
+				headerHitbox.Activated:Connect(function()
 					if DeBounce then return end
 					DeBounce = true
 
@@ -6173,6 +6221,9 @@ function syde:Init(library)
 						option.Parent = dropdown.dropholder.drop.Container
 						option.Visible = true
 						option.Name = OptionText
+						option.Interact.Size = UDim2.fromScale(1, 1)
+						option.Interact.Position = UDim2.fromOffset(0, 0)
+						option.Interact.ZIndex = option.ZIndex + 2
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
@@ -6291,8 +6342,13 @@ function syde:Init(library)
 					Slider.Name = Options.Title
 					Slider.Title.Text = Options.Title
 					Options.Value = Options.StarterValue
-
+					local slideSize = Slider.slide.Size
+					Slider.slide.Size = UDim2.new(slideSize.X.Scale, slideSize.X.Offset, slideSize.Y.Scale, slideSize.Y.Offset + 4)
+					Slider.slide.Interact.Size = UDim2.new(1, 0, 1, 16)
+					Slider.slide.Interact.Position = UDim2.new(0, 0, 0, -8)
+					Slider.Size = UDim2.new(Slider.Size.X.Scale, Slider.Size.X.Offset, Slider.Size.Y.Scale, Slider.Size.Y.Offset + 6)
 					local dragging = false
+					local activeTouch = nil
 					Slider.Visible = true
 					Slider.Parent = slider.slideholder
 
@@ -6460,20 +6516,29 @@ function syde:Init(library)
 					Slider.slide.Interact.MouseButton1Down:Connect(function()
 						dragging = true
 					end)
+					Slider.slide.Interact.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.Touch and not activeTouch then
+							activeTouch = input
+							dragging = true
+							UpdateSlider(input.Position.X)
+						end
+					end)
 
 					Slider.slide.Interact.MouseButton1Up:Connect(function()
 						dragging = false
 					end)
 
 					syde:AddConnection(userinput.InputEnded, function(input, processed)
-						if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
+						if input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeTouch then
 							dragging = false
+							activeTouch = nil
 							tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 						end
 					end)
 
 					syde:AddConnection(userinput.InputChanged, function(input)
-						if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or input.UserInputType == Enum.UserInputType.Touch  then
+						if dragging and ((activeTouch and input == activeTouch)
+							or (not activeTouch and input.UserInputType == Enum.UserInputType.MouseMovement)) then
 							UpdateSlider(input.Position.X)
 						end
 					end)
@@ -8530,8 +8595,13 @@ function syde:Init(library)
 				Slider.Name = Options.Title
 				Slider.Title.Text = Options.Title
 				Options.Value = Options.StarterValue
-
+				local slideSize = Slider.slide.Size
+				Slider.slide.Size = UDim2.new(slideSize.X.Scale, slideSize.X.Offset, slideSize.Y.Scale, slideSize.Y.Offset + 4)
+				Slider.slide.Interact.Size = UDim2.new(1, 0, 1, 16)
+				Slider.slide.Interact.Position = UDim2.new(0, 0, 0, -8)
+				Slider.Size = UDim2.new(Slider.Size.X.Scale, Slider.Size.X.Offset, Slider.Size.Y.Scale, Slider.Size.Y.Offset + 6)
 				local dragging = false
+				local activeTouch = nil
 				Slider.Visible = true
 				Slider.Parent = slider.slideholder
 
@@ -8708,20 +8778,29 @@ function syde:Init(library)
 				Slider.slide.Interact.MouseButton1Down:Connect(function()
 					dragging = true
 				end)
+				Slider.slide.Interact.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.Touch and not activeTouch then
+						activeTouch = input
+						dragging = true
+						UpdateSlider(input.Position.X)
+					end
+				end)
 
 				Slider.slide.Interact.MouseButton1Up:Connect(function()
 					dragging = false
 				end)
 
 				syde:AddConnection(userinput.InputEnded, function(input, processed)
-					if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeTouch then
 						dragging = false
+						activeTouch = nil
 						tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 					end
 				end)
 
 				syde:AddConnection(userinput.InputChanged, function(input)
-					if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or input.UserInputType == Enum.UserInputType.Touch  then
+					if dragging and ((activeTouch and input == activeTouch)
+						or (not activeTouch and input.UserInputType == Enum.UserInputType.MouseMovement)) then
 						UpdateSlider(input.Position.X)
 					end
 				end)
@@ -9624,7 +9703,15 @@ function syde:Init(library)
 
 			end
 
-			dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
+			local headerHitbox = Instance.new("TextButton")
+			headerHitbox.Name = "HeaderHitbox"
+			headerHitbox.Text = ""
+			headerHitbox.BackgroundTransparency = 1
+			headerHitbox.AutoButtonColor = false
+			headerHitbox.Size = UDim2.new(1, 0, 0, 42)
+			headerHitbox.ZIndex = dropdown.dropholder.drop.down.ZIndex + 2
+			headerHitbox.Parent = dropdown.dropholder.drop
+			headerHitbox.Activated:Connect(function()
 				if DropOpen then
 					CloseDrop()
 				else
@@ -9674,6 +9761,12 @@ function syde:Init(library)
 			local function UpdateSelectedText()
 				local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 				local placeholderText = dropdown.dropholder.drop.selected
+				for _, optionFrame in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+					if optionFrame:IsA("Frame") and optionFrame ~= OptionButton then
+						local checkmark = optionFrame:FindFirstChild("ImageLabel")
+						if checkmark then checkmark.Visible = not data.Multi or SelectedOptions[optionFrame.Name] == true end
+					end
+				end
 				selectedContainer.Visible = data.Multi
 				dropdown.dropholder.drop.selected.Visible = false
 
@@ -9817,6 +9910,9 @@ function syde:Init(library)
 					option.Parent = dropdown.dropholder.drop.Container
 					option.Visible = true
 					option.Name = OptionText
+					option.Interact.Size = UDim2.fromScale(1, 1)
+					option.Interact.Position = UDim2.fromOffset(0, 0)
+					option.Interact.ZIndex = option.ZIndex + 2
 
 					local image = tostring(optionData.Image or optionData.Icon or optionData.ImageId or optionData.Decal or "")
 					if image ~= "" then
