@@ -9950,6 +9950,18 @@ function syde:Init(library)
 			local SelectedOrder = {}
 			local OptionLabels = {}
 			local OptionDataByName = {}
+			local playerPreview
+			if data.PlayerSelection and data.Multi then
+				playerPreview = Instance.new("Frame")
+				playerPreview.Name = "PlayerSelectionPreview"
+				playerPreview.BackgroundTransparency = 1
+				playerPreview.ClipsDescendants = true
+				playerPreview.Position = UDim2.fromOffset(6, 0)
+				playerPreview.Size = UDim2.new(1, -46, 0, 30)
+				playerPreview.ZIndex = dropdown.dropholder.drop.selected.ZIndex + 1
+				playerPreview.Visible = false
+				playerPreview.Parent = dropdown.dropholder.drop
+			end
 
 			local function normalizeOption(option)
 				if type(option) == "table" then
@@ -10022,6 +10034,7 @@ function syde:Init(library)
 			end
 
 			local removeChipCallbacks = {}
+			local playerPreviewRemoveButtons = {}
 			local headerHitbox = Instance.new("TextButton")
 			headerHitbox.Name = "HeaderHitbox"
 			headerHitbox.Text = ""
@@ -10030,7 +10043,21 @@ function syde:Init(library)
 			headerHitbox.Size = UDim2.new(1, 0, 0, 42)
 			headerHitbox.ZIndex = dropdown.dropholder.drop.down.ZIndex + 2
 			headerHitbox.Parent = dropdown.dropholder.drop
+			if playerPreview then playerPreview.ZIndex = headerHitbox.ZIndex - 1 end
 			headerHitbox.Activated:Connect(function(input)
+				if playerPreview and input then
+					local pointer = input.Position
+					for button, removeSelected in pairs(playerPreviewRemoveButtons) do
+						if button.Parent then
+							local origin, size = button.AbsolutePosition, button.AbsoluteSize
+							if pointer.X >= origin.X and pointer.X <= origin.X + size.X
+								and pointer.Y >= origin.Y and pointer.Y <= origin.Y + size.Y then
+								removeSelected()
+								return
+							end
+						end
+					end
+				end
 				local chip = selectedChipAtPosition(dropdown.dropholder.drop.selectContainer.ScrollingFrame, input)
 				if chip and removeChipCallbacks[chip] then
 					removeChipCallbacks[chip]()
@@ -10085,11 +10112,6 @@ function syde:Init(library)
 			local function UpdateSelectedText()
 				local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 				local placeholderText = dropdown.dropholder.drop.selected
-				if data.PlayerSelection then
-					dropdown.dropholder.drop.selectContainer.Size = UDim2.new(1, -42, 0, 36)
-					selectedContainer.Size = UDim2.new(1, 0, 0, 36)
-					selectedContainer.ScrollBarThickness = 0
-				end
 				for _, optionFrame in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if optionFrame:IsA("Frame") and optionFrame ~= OptionButton then
 						local checkmark = optionFrame:FindFirstChild("ImageLabel")
@@ -10098,6 +10120,83 @@ function syde:Init(library)
 				end
 				selectedContainer.Visible = data.Multi
 				dropdown.dropholder.drop.selected.Visible = false
+				if playerPreview then
+					selectedContainer.Visible = false
+					playerPreview.Visible = #SelectedOrder > 0
+					placeholderText.Visible = #SelectedOrder == 0
+					table.clear(playerPreviewRemoveButtons)
+					for _, child in ipairs(playerPreview:GetChildren()) do child:Destroy() end
+					local width = playerPreview.AbsoluteSize.X > 0 and playerPreview.AbsoluteSize.X or 260
+					local slots = math.max(1, math.floor(width / 76))
+					local hasOverflow = #SelectedOrder > slots
+					local visibleCount = math.min(#SelectedOrder, hasOverflow and math.max(0, slots - 1) or slots)
+					for index = 1, visibleCount do
+						local name = SelectedOrder[index]
+						local playerData = OptionDataByName[name]
+						local card = Instance.new("Frame")
+						card.Name = name
+						card.BackgroundTransparency = 1
+						card.Size = UDim2.fromOffset(72, 30)
+						card.Position = UDim2.fromOffset((index - 1) * 76, 0)
+						card.ZIndex = playerPreview.ZIndex + 1
+						card.Parent = playerPreview
+						local avatar = Instance.new("ImageLabel")
+						avatar.Name = "Avatar"
+						avatar.BackgroundTransparency = 1
+						avatar.Image = playerData and playerData.Image or ""
+						avatar.Size = UDim2.fromOffset(20, 20)
+						avatar.Position = UDim2.fromOffset(25, 0)
+						avatar.ZIndex = card.ZIndex + 1
+						avatar.Parent = card
+						local corner = Instance.new("UICorner")
+						corner.CornerRadius = UDim.new(1, 0)
+						corner.Parent = avatar
+						local nameLabel = Instance.new("TextLabel")
+						nameLabel.Name = "PlayerName"
+						nameLabel.BackgroundTransparency = 1
+						nameLabel.Text = OptionLabels[name] or name
+						nameLabel.TextColor3 = Color3.fromRGB(235, 235, 238)
+						nameLabel.Font = Enum.Font.Gotham
+						nameLabel.TextSize = 9
+						nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+						nameLabel.Size = UDim2.fromOffset(72, 10)
+						nameLabel.Position = UDim2.fromOffset(0, 20)
+						nameLabel.ZIndex = card.ZIndex + 1
+						nameLabel.Parent = card
+						local remove = Instance.new("TextButton")
+						remove.Name = "Remove"
+						remove.BackgroundTransparency = 1
+						remove.Text = "×"
+						remove.TextColor3 = Color3.fromRGB(205, 205, 210)
+						remove.TextSize = 16
+						remove.Size = UDim2.fromOffset(20, 20)
+						remove.Position = UDim2.fromOffset(52, 0)
+						remove.ZIndex = card.ZIndex + 2
+						remove.Parent = card
+						local function removeSelected()
+							RemoveFromSelected(name)
+							UpdateSelectedText()
+							data.Value = table.clone(SelectedOrder)
+							if data.CallBack then data.CallBack(SelectedOrder) end
+						end
+						playerPreviewRemoveButtons[remove] = removeSelected
+						remove.Activated:Connect(removeSelected)
+					end
+					if hasOverflow then
+						local more = Instance.new("TextLabel")
+						more.Name = "MorePlayers"
+						more.BackgroundTransparency = 1
+						more.Text = "+" .. tostring(#SelectedOrder - visibleCount)
+						more.TextColor3 = Color3.fromRGB(195, 195, 202)
+						more.Font = Enum.Font.GothamMedium
+						more.TextSize = 12
+						more.Size = UDim2.fromOffset(72, 30)
+						more.Position = UDim2.fromOffset(visibleCount * 76, 0)
+						more.ZIndex = playerPreview.ZIndex + 1
+						more.Parent = playerPreview
+					end
+					return
+				end
 
 
 				if data.Multi then
@@ -10117,28 +10216,6 @@ function syde:Init(library)
 							optionGroup.Visible = true
 							optionGroup.Name = option
 							optionGroup.TextLabel.Text = OptionLabels[option] or option
-							if data.PlayerSelection then
-								optionGroup.Size = UDim2.fromOffset(78, 34)
-								optionGroup.TextLabel.Position = UDim2.fromOffset(3, 23)
-								optionGroup.TextLabel.Size = UDim2.new(1, -6, 0, 10)
-								optionGroup.TextLabel.TextSize = 9
-								optionGroup.TextLabel.TextXAlignment = Enum.TextXAlignment.Center
-								optionGroup.X.Position = UDim2.new(1, -20, 0, 0)
-								optionGroup.X.Size = UDim2.fromOffset(20, 20)
-								local playerData = OptionDataByName[option]
-								if playerData and playerData.Image and playerData.Image ~= "" then
-									local avatar = Instance.new("ImageLabel")
-									avatar.Name = "SelectedAvatar"
-									avatar.BackgroundTransparency = 1
-									avatar.Image = playerData.Image
-									avatar.Size = UDim2.fromOffset(22, 22)
-									avatar.Position = UDim2.new(0.5, -11, 0, 1)
-									avatar.Parent = optionGroup
-									local corner = Instance.new("UICorner")
-									corner.CornerRadius = UDim.new(1, 0)
-									corner.Parent = avatar
-								end
-							end
 
 							-- Set up remove button
 							removeChipCallbacks[option] = function()
@@ -10167,17 +10244,15 @@ function syde:Init(library)
 							optionGroup.Parent = selectedContainer
 
 							-- Optional: auto-size width
-							if not data.PlayerSelection then
-								task.defer(function()
-									local padding = 40
-									local textWidth = optionGroup.TextLabel.TextBounds.X
-									local totalWidth = textWidth + padding
+							task.defer(function()
+								local padding = 40
+								local textWidth = optionGroup.TextLabel.TextBounds.X
+								local totalWidth = textWidth + padding
 
-									optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
+								optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
 
-									tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
-								end)
-							end
+								tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
+							end)
 						end
 					end
 
@@ -10190,6 +10265,9 @@ function syde:Init(library)
 						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 					end
 				end
+			end
+			if playerPreview then
+				playerPreview:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateSelectedText)
 			end
 
 			--[SEARCH]
