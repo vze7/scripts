@@ -1222,7 +1222,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			applyPendingSize()
 			if renderConnection then renderConnection:Disconnect() renderConnection = nil end
 			if pendingSize and Object.Size ~= pendingSize then
-				tweenservice:Create(Object, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = pendingSize}):Play()
+				Object.Size = pendingSize
 				if Callback then Callback(Vector2.new(pendingSize.X.Offset, pendingSize.Y.Offset)) end
 			end
 			isResizing = false
@@ -2337,6 +2337,9 @@ local Connected = false
 local settingsOpen = false
 local pluginsOpen = false
 local uiclosed = false
+function syde:IsWindowOpen()
+	return not uiclosed
+end
 local userinfodisabled = false
 local intro = false
 local bluron = false
@@ -2955,6 +2958,7 @@ local function getFreeMouseBtn()
 end
 
 function syde:UnlockMouse(Value)
+	Value = Value == true or syde.ForceFreeMouse == true
 	local btn = getFreeMouseBtn()
 	if btn then
 		btn.Modal = Value and true or false
@@ -8595,7 +8599,7 @@ function syde:Init(library)
 					--	tweenservice:Create(toggleConfiguration.shadow.ImageLabel, enterTween, { ImageTransparency = 1 }):Play()
 					task.wait(0.5)
 
-					toggleConfiguration.Visible = false
+					if not State then toggleConfiguration.Visible = false end
 
 				end
 
@@ -8627,6 +8631,20 @@ function syde:Init(library)
 
 				toggle.configure.MouseButton1Click:Connect(function()
 					ToggleConfig()
+				end)
+
+				syde:AddConnection(userinput.InputBegan, function(input)
+					if not State or (input.UserInputType ~= Enum.UserInputType.MouseButton1
+						and input.UserInputType ~= Enum.UserInputType.Touch) then return end
+					local position = Vector2.new(input.Position.X, input.Position.Y)
+					local function inside(gui)
+						local origin, size = gui.AbsolutePosition, gui.AbsoluteSize
+						return position.X >= origin.X and position.X <= origin.X + size.X
+							and position.Y >= origin.Y and position.Y <= origin.Y + size.Y
+					end
+					if inside(toggleConfiguration) or inside(toggle.configure) then return end
+					if TogService then TogService:Disconnect() TogService = nil end
+					task.spawn(ToggleConfigClose)
 				end)
 
 				local function ResizeBindFrame()
