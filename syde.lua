@@ -9927,6 +9927,7 @@ function syde:Init(library)
 				StarterOption = Dropdown.Default ~= nil and Dropdown.Default or Dropdown.StarterOption;
 				PlaceHolder = Dropdown.PlaceHolder or Dropdown.Placeholder or "Select Option...";
 				Multi = Dropdown.Multi or false;
+				PlayerSelection = Dropdown.PlayerSelection == true;
 				CallBack = Dropdown.Callback or Dropdown.CallBack;
 				Flag = Dropdown.Flag;
 				Save = Dropdown.Save ~= false;
@@ -10084,6 +10085,11 @@ function syde:Init(library)
 			local function UpdateSelectedText()
 				local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 				local placeholderText = dropdown.dropholder.drop.selected
+				if data.PlayerSelection then
+					dropdown.dropholder.drop.selectContainer.Size = UDim2.new(1, -42, 0, 36)
+					selectedContainer.Size = UDim2.new(1, 0, 0, 36)
+					selectedContainer.ScrollBarThickness = 0
+				end
 				for _, optionFrame in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if optionFrame:IsA("Frame") and optionFrame ~= OptionButton then
 						local checkmark = optionFrame:FindFirstChild("ImageLabel")
@@ -10111,6 +10117,28 @@ function syde:Init(library)
 							optionGroup.Visible = true
 							optionGroup.Name = option
 							optionGroup.TextLabel.Text = OptionLabels[option] or option
+							if data.PlayerSelection then
+								optionGroup.Size = UDim2.fromOffset(78, 34)
+								optionGroup.TextLabel.Position = UDim2.fromOffset(3, 23)
+								optionGroup.TextLabel.Size = UDim2.new(1, -6, 0, 10)
+								optionGroup.TextLabel.TextSize = 9
+								optionGroup.TextLabel.TextXAlignment = Enum.TextXAlignment.Center
+								optionGroup.X.Position = UDim2.new(1, -20, 0, 0)
+								optionGroup.X.Size = UDim2.fromOffset(20, 20)
+								local playerData = OptionDataByName[option]
+								if playerData and playerData.Image and playerData.Image ~= "" then
+									local avatar = Instance.new("ImageLabel")
+									avatar.Name = "SelectedAvatar"
+									avatar.BackgroundTransparency = 1
+									avatar.Image = playerData.Image
+									avatar.Size = UDim2.fromOffset(22, 22)
+									avatar.Position = UDim2.new(0.5, -11, 0, 1)
+									avatar.Parent = optionGroup
+									local corner = Instance.new("UICorner")
+									corner.CornerRadius = UDim.new(1, 0)
+									corner.Parent = avatar
+								end
+							end
 
 							-- Set up remove button
 							removeChipCallbacks[option] = function()
@@ -10139,15 +10167,17 @@ function syde:Init(library)
 							optionGroup.Parent = selectedContainer
 
 							-- Optional: auto-size width
-							task.defer(function()
-								local padding = 40
-								local textWidth = optionGroup.TextLabel.TextBounds.X
-								local totalWidth = textWidth + padding
+							if not data.PlayerSelection then
+								task.defer(function()
+									local padding = 40
+									local textWidth = optionGroup.TextLabel.TextBounds.X
+									local totalWidth = textWidth + padding
 
-								optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
+									optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
 
-								tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
-							end)
+									tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
+								end)
+							end
 						end
 					end
 
@@ -11541,6 +11571,7 @@ function syde:Init(library)
 			config.Flag = flagName
 			config.Options = getOptions()
 			config.Multi = config.Multi == true or config.MultipleSelection == true
+			config.PlayerSelection = true
 			config.Placeholder = config.Placeholder or config.PlaceHolder or "Select players..."
 			config.Callback = function(value)
 				table.clear(selectedNames)
