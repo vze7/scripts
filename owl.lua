@@ -296,6 +296,37 @@ function Owl:SetSliderGradient(fill, accent)
 	})
 end
 
+local sliderFillAnimations = setmetatable({}, {__mode = "k"})
+function Owl:AnimateSliderFill(fill, targetPosition)
+	if typeof(fill) ~= "Instance" or not fill:IsA("GuiObject") or not fill.Parent then return end
+	targetPosition = math.clamp(tonumber(targetPosition) or 0, 0, 1)
+	local state = sliderFillAnimations[fill]
+	if not state then
+		state = {target = targetPosition}
+		sliderFillAnimations[fill] = state
+	end
+	state.target = targetPosition
+	if state.connection then return end
+	state.connection = Services.Run.RenderStepped:Connect(function(deltaTime)
+		if not fill.Parent then
+			state.connection:Disconnect()
+			sliderFillAnimations[fill] = nil
+			return
+		end
+		local current = fill.Size.X.Scale
+		local alpha = 1 - math.exp(-18 * deltaTime)
+		local nextPosition = current + (state.target - current) * alpha
+		if math.abs(state.target - nextPosition) < 0.001 then
+			fill.Size = UDim2.new(state.target, 0, fill.Size.Y.Scale, fill.Size.Y.Offset)
+			state.connection:Disconnect()
+			state.connection = nil
+			sliderFillAnimations[fill] = nil
+		else
+			fill.Size = UDim2.new(nextPosition, 0, fill.Size.Y.Scale, fill.Size.Y.Offset)
+		end
+	end)
+end
+
 local function normalizeSliderOptions(options)
 	local range = type(options.Range) == "table" and options.Range or {0, 100}
 	local minimum = tonumber(range[1]) or 0
@@ -1705,8 +1736,15 @@ function Owl:GenTheme(mainColor)
 	return t
 end
 
+local function normalizeConfigName(name)
+	name = tostring(name or "default")
+	name = name:gsub("[^%w_%-]", "_"):gsub("_+", "_")
+	name = name:sub(1, 64)
+	return name ~= "" and name or "default"
+end
+
 local function SaveCfg(Name)
-	Name = Name or (game and game.GameId) or "default"
+	Name = normalizeConfigName(Name or (game and game.GameId) or "default")
 	local folder = Owl.Folder or Owl.ConfigFolder or "OwlHub"
 	if makefolder and isfolder and not isfolder(folder) then
 		pcall(makefolder, folder)
@@ -1761,18 +1799,18 @@ local function SaveCfg(Name)
 		end	
 	end
 
-	if writefile then
-		pcall(function()
-			writefile(folder .. "/" .. tostring(Name) .. ".txt", tostring(HttpService:JSONEncode(Data)))
-		end)
-	end
+	if not writefile then return false end
+	local ok, encoded = pcall(HttpService.JSONEncode, HttpService, Data)
+	if not ok then return false end
+	local wrote = pcall(writefile, folder .. "/" .. Name .. ".txt", encoded)
+	return wrote
 end
 
 local function LoadCfg(Config)
 	local ok, Data = pcall(function()
 		return HttpService:JSONDecode(Config)
 	end)
-	if not ok or type(Data) ~= "table" then return end
+	if not ok or type(Data) ~= "table" then return false end
 
 	Owl.LoadedConfig = Data
 
@@ -1827,6 +1865,7 @@ local function LoadCfg(Config)
 			end
 		end
 	end
+	return true
 end
 
 local saveDebounce = nil
@@ -1841,17 +1880,16 @@ function SaveConfig(Name)
 end
 
 function LoadConfig(Configuration)
-	LoadCfg(Configuration)
-	return true
+	return LoadCfg(Configuration) == true
 end
 
 function Owl:AutoSave()
-	SaveCfg(game and game.GameId)
+	return SaveCfg(game and game.GameId)
 end
 
 function Owl:LoadSaveConfig(targetFile)
 	local folder = Owl.Folder or Owl.ConfigFolder or "OwlHub"
-	local fileName = targetFile or (game and game.GameId) or "default"
+	local fileName = normalizeConfigName(targetFile or (game and game.GameId) or "default")
 	local filePath = string.format("%s/%s.txt", folder, fileName)
 
 	if not isfile or not isfile(filePath) then
@@ -1863,11 +1901,11 @@ function Owl:LoadSaveConfig(targetFile)
 
 	local ok, content = pcall(readfile, filePath)
 	if ok and content then
-		LoadCfg(content)
-		if Owl.Toast then
+		local loaded = LoadCfg(content)
+		if loaded and Owl.Toast then
 			Owl:Toast({ Content = 'Loaded config ' .. fileName, Duration = 3 })
 		end
-		return true
+		return loaded == true
 	end
 	return false
 end
@@ -1892,9 +1930,10 @@ end
 
 function Owl:SaveConfigAs(name)
 	if type(name) ~= "string" or name == "" then return false end
-	SaveCfg(name)
+	local saved = SaveCfg(name)
+	if not saved then return false end
 	if Owl.Toast then
-		Owl:Toast({ Content = 'Saved config as ' .. name, Duration = 3 })
+		Owl:Toast({ Content = 'Saved config as ' .. normalizeConfigName(name), Duration = 3 })
 	end
 	return true
 end
@@ -1902,7 +1941,7 @@ end
 function Owl:DeleteConfig(name)
 	if type(name) ~= "string" or name == "" then return false end
 	local folder = Owl.Folder or Owl.ConfigFolder or "OwlHub"
-	local filePath = string.format("%s/%s.txt", folder, name)
+	local filePath = string.format("%s/%s.txt", folder, normalizeConfigName(name))
 	if isfile and isfile(filePath) and delfile then
 		return pcall(delfile, filePath)
 	end
@@ -2651,7 +2690,7 @@ function Owl:MakeWindow(WindowConfig)
 	if previousLibrary and previousLibrary ~= Owl and type(previousLibrary.Destroy) == "function" then
 		pcall(previousLibrary.Destroy, previousLibrary)
 	end
-	WindowConfig.Name = WindowConfig.Name or "Fire Hub"
+	WindowConfig.Name = WindowConfig.Name or "Owl Hub"
 	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name or "OwlHub"
 	WindowConfig.SaveConfig = true
 	if WindowConfig.PreserveCameraMode ~= nil then
@@ -3503,21 +3542,45 @@ function Owl:Init(library)
 		end
 
 		local homeLayoutBusy = false
-		local homeCardTweens = {}
-		local homeLayoutInitialized = false
-		local homeMotion = TweenInfo.new(0.65, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		local homeCardTargets = {}
+		local homeLayoutConnection
+		local function lerpUDim2(current, target, alpha)
+			return UDim2.new(
+				current.X.Scale + (target.X.Scale - current.X.Scale) * alpha,
+				current.X.Offset + (target.X.Offset - current.X.Offset) * alpha,
+				current.Y.Scale + (target.Y.Scale - current.Y.Scale) * alpha,
+				current.Y.Offset + (target.Y.Offset - current.Y.Offset) * alpha
+			)
+		end
 		local function animateHomeCard(card, position, size)
-			if homeCardTweens[card] then homeCardTweens[card]:Cancel() end
-			if homeLayoutInitialized then
-				card.Position = position
-				card.Size = size
-				return
-			end
-			local tween = Services.Tween:Create(card, homeMotion, {Position = position, Size = size})
-			homeCardTweens[card] = tween
-			tween:Play()
-			tween.Completed:Connect(function()
-				if homeCardTweens[card] == tween then homeCardTweens[card] = nil end
+			homeCardTargets[card] = {Position = position, Size = size}
+			if homeLayoutConnection then return end
+			homeLayoutConnection = Services.Run.RenderStepped:Connect(function(deltaTime)
+				local alpha = 1 - math.exp(-12 * deltaTime)
+				for targetCard, target in pairs(homeCardTargets) do
+					if not targetCard.Parent then
+						homeCardTargets[targetCard] = nil
+					else
+						local nextPosition = lerpUDim2(targetCard.Position, target.Position, alpha)
+						local nextSize = lerpUDim2(targetCard.Size, target.Size, alpha)
+						local positionDone = math.abs(target.Position.X.Offset - nextPosition.X.Offset) < 0.5
+							and math.abs(target.Position.Y.Offset - nextPosition.Y.Offset) < 0.5
+						local sizeDone = math.abs(target.Size.X.Offset - nextSize.X.Offset) < 0.5
+							and math.abs(target.Size.Y.Offset - nextSize.Y.Offset) < 0.5
+						if positionDone and sizeDone then
+							targetCard.Position = target.Position
+							targetCard.Size = target.Size
+							homeCardTargets[targetCard] = nil
+						else
+							targetCard.Position = nextPosition
+							targetCard.Size = nextSize
+						end
+					end
+				end
+				if next(homeCardTargets) == nil then
+					homeLayoutConnection:Disconnect()
+					homeLayoutConnection = nil
+				end
 			end)
 		end
 		local function updateHomeLayout()
@@ -3544,7 +3607,6 @@ function Owl:Init(library)
 			if homePage:IsA("ScrollingFrame") then
 				homePage.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 16)
 			end
-			homeLayoutInitialized = true
 			homeLayoutBusy = false
 		end
 		Owl:AddConnection(quick:GetPropertyChangedSignal("AbsoluteSize"), updateHomeLayout)
@@ -5663,11 +5725,16 @@ function Owl:Init(library)
 				local SelectedOptions = {}
 				local SelectedOrder = {}
 
-				local function UpdateCustomLayout()
+				local function UpdateCustomLayout(animate)
 					local yOffset = 0
 					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option.Visible then
-							option.Position = UDim2.new(0, 0, 0, yOffset)
+							local targetPosition = UDim2.new(0, 0, 0, yOffset)
+							if animate and (option.Position - targetPosition).Magnitude > 1 then
+								Services.Tween:Create(option, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = targetPosition}):Play()
+							else
+								option.Position = targetPosition
+							end
 							yOffset = yOffset + option.Size.Y.Offset + 7
 						end
 					end
@@ -5678,35 +5745,35 @@ function Owl:Init(library)
 					dropdown.dropholder.drop.Container.Visible = true
 					dropdown.dropholder.drop.search.Visible = true
 
-					Services.Tween:Create(dropdown, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+					Services.Tween:Create(dropdown, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(1, -35, 0, 300) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { CornerRadius = UDim.new(0, 20) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Rotation = 180 }):Play()
 
-					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 0.65 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { Transparency = 0.4 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { TextTransparency = 0 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 0.9 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 0.85 }):Play()
 
 				end
 
 				local function CloseDrop()
 					DropOpen = false
-					Services.Tween:Create(dropdown, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+					Services.Tween:Create(dropdown, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { CornerRadius = UDim.new(1,0) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Rotation = 0 }):Play()
 
-					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { Transparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { TextTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 1 }):Play()
+					Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 1 }):Play()
 
-					task.wait(0.18)
+					task.wait(0.27)
 					dropdown.dropholder.drop.Container.Visible = false
 					dropdown.dropholder.drop.search.Visible = false
 
@@ -5722,7 +5789,7 @@ function Owl:Init(library)
 						OpenDrop()
 					end
 
-					task.delay(0.25, function()
+					task.delay(0.38, function()
 						DeBounce = false
 					end)
 				end)
@@ -5850,7 +5917,7 @@ function Owl:Init(library)
 						end
 					end
 
-					UpdateCustomLayout()
+					UpdateCustomLayout(true)
 				end)
 
 
@@ -6088,7 +6155,7 @@ function Owl:Init(library)
 							newValue = math.floor((newValue - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
 							newValue = Owl:RoundTo(newValue, Owl:DecimalPlaces(Options.Increment))
 							local snapPosition = (newValue - Options.Range[1]) / range
-							Slider.slide.slideframe.Size = UDim2.new(snapPosition, 0, 1, 0)
+							Owl:AnimateSliderFill(Slider.slide.slideframe, snapPosition)
 							local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 							Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
@@ -8088,7 +8155,7 @@ function Owl:Init(library)
 						newValue = math.floor((newValue - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
 						newValue = Owl:RoundTo(newValue, Owl:DecimalPlaces(Options.Increment))
 						local snapPosition = (newValue - Options.Range[1]) / range
-						Slider.slide.slideframe.Size = UDim2.new(snapPosition, 0, 1, 0)
+						Owl:AnimateSliderFill(Slider.slide.slideframe, snapPosition)
 						local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 						Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
@@ -8161,7 +8228,7 @@ function Owl:Init(library)
 					NewVal = Owl:RoundTo(NewVal, Owl:DecimalPlaces(Options.Increment))
 					local sliderPosition = (NewVal - Options.Range[1]) / range
 
-				Slider.slide.slideframe.Size = UDim2.new(sliderPosition, 0, 1, 0)
+				Owl:AnimateSliderFill(Slider.slide.slideframe, sliderPosition)
 					local decimalPlaces = Owl:DecimalPlaces(Options.Increment)
 					Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", NewVal, Options.Range[2])
 					local success, result = pcall(function()
@@ -9051,7 +9118,12 @@ function Owl:Init(library)
 				Multi = Dropdown.Multi or false;
 				CallBack = Dropdown.Callback or Dropdown.CallBack;
 				Flag = Dropdown.Flag;
+				Save = Dropdown.Save ~= false;
 			}
+			local loadedSelection = data.Flag and Owl.LoadedConfig and Owl.LoadedConfig[data.Flag]
+			if loadedSelection ~= nil then
+				data.StarterOption = loadedSelection
+			end
 
 			local dropdown = pages.page.Dropdown:Clone()
 			dropdown.Visible = true
@@ -9060,7 +9132,7 @@ function Owl:Init(library)
 			dropdown.Name = data.Title
 			dropdown.dropholder.drop.Container.Option.Visible = false
 			dropdown.dropholder.drop.Container.Visible = false
-			Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+			Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
 			dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
 			dropdown:SetAttribute("Searchable", true)
 
@@ -9070,6 +9142,7 @@ function Owl:Init(library)
 			local SelectedOptions = {}
 			local SelectedOrder = {}
 			local OptionLabels = {}
+			local optionsInitialized = false
 			local function normalizeOption(option)
 				if type(option) == "table" then
 					local name = tostring(option.Name or option.Value or option.Label or "Option")
@@ -9085,11 +9158,16 @@ function Owl:Init(library)
 				return math.huge
 			end
 
-			local function UpdateCustomLayout()
+			local function UpdateCustomLayout(animate)
 				local yOffset = 0
 				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option.Visible then
-						option.Position = UDim2.new(0, 0, 0, yOffset)
+						local targetPosition = UDim2.new(0, 0, 0, yOffset)
+						if animate and (option.Position - targetPosition).Magnitude > 1 then
+							Services.Tween:Create(option, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = targetPosition}):Play()
+						else
+							option.Position = targetPosition
+						end
 						yOffset = yOffset + option.Size.Y.Offset + 7
 					end
 				end
@@ -9115,33 +9193,33 @@ function Owl:Init(library)
 				end
 				local openHeight = 122 + math.max(contentHeight, 38)
 
-				Services.Tween:Create(dropdown, TweenInfo.new(0.45, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, openHeight) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+				Services.Tween:Create(dropdown, TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(1, -35, 0, openHeight) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Rotation = 180 }):Play()
 
-				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.18, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 0.65 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { Transparency = 0.4 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { TextTransparency = 0 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 0.9 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 0.85 }):Play()
 
 			end
 
 			local function CloseDrop()
 				DropOpen = false
-				Services.Tween:Create(dropdown, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.18, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+				Services.Tween:Create(dropdown, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Rotation = 0 }):Play()
 
-				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.16, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { Transparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { TextTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 1 }):Play()
+				Services.Tween:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.24, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { ImageTransparency = 1 }):Play()
 
-				task.wait(0.18)
+				task.wait(0.27)
 				dropdown.dropholder.drop.Container.Visible = false
 				dropdown.dropholder.drop.search.Visible = false
 
@@ -9157,7 +9235,7 @@ function Owl:Init(library)
 					OpenDrop()
 				end
 
-				task.delay(0.25, function()
+				task.delay(0.38, function()
 					DeBounce = false
 				end)
 			end)
@@ -9238,6 +9316,8 @@ function Owl:Init(library)
 								if data.CallBack then
 									data.CallBack(SelectedOrder)
 								end
+								data.Value = table.clone(SelectedOrder)
+								if data.Save and data.Flag then SaveConfig(game and game.GameId) end
 							end)
 
 							optionGroup.Parent = selectedContainer
@@ -9250,6 +9330,10 @@ function Owl:Init(library)
 
 								Services.Tween:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
 							end)
+						else
+							local optionGroup = selectedContainer:FindFirstChild(option)
+							local label = optionGroup and optionGroup:FindFirstChild("TextLabel")
+							if label then label.Text = OptionLabels[option] or option end
 						end
 					end
 
@@ -9284,7 +9368,7 @@ function Owl:Init(library)
 					end
 				end
 
-				UpdateCustomLayout()
+				UpdateCustomLayout(true)
 			end)
 
 
@@ -9303,6 +9387,7 @@ function Owl:Init(library)
 				for _, optionEntry in ipairs(data.Options) do
 					local OptionText, optionData = normalizeOption(optionEntry)
 					local displayText = tostring(optionData.Label or optionData.DisplayName or OptionText)
+					if optionData.Offline then displayText ..= " ×" end
 					OptionLabels[OptionText] = displayText
 					local option = OptionButton:Clone()
 					option.Title.Text = displayText
@@ -9359,8 +9444,8 @@ function Owl:Init(library)
 						subtitle.Name = "OptionSubtitle"
 						subtitle.BackgroundTransparency = 1
 						subtitle.Font = Enum.Font.Gotham
-						subtitle.Text = "@" .. username
-						subtitle.TextColor3 = Color3.fromRGB(170, 170, 176)
+						subtitle.Text = optionData.Offline and ("× Left · @" .. username) or ("@" .. username)
+						subtitle.TextColor3 = optionData.Offline and Color3.fromRGB(235, 115, 115) or Color3.fromRGB(170, 170, 176)
 						subtitle.TextSize = 10
 						subtitle.TextXAlignment = Enum.TextXAlignment.Left
 						subtitle.Position = UDim2.new(0, 46, 0, 21)
@@ -9374,7 +9459,7 @@ function Owl:Init(library)
 						end
 					end
 
-					if OptionText == data.StarterOption and not starterSet then
+					if not optionsInitialized and OptionText == data.StarterOption and not starterSet then
 						starterSet = true
 						dropdown.dropholder.drop.selected.Text = displayText
 						SelectedOptions = {[OptionText] = true}
@@ -9382,6 +9467,10 @@ function Owl:Init(library)
 
 						Services.Tween:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
 						Services.Tween:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+					end
+					if SelectedOptions[OptionText] then
+						Services.Tween:Create(option, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+						Services.Tween:Create(option.ImageLabel, TweenInfo.new(0.15), {ImageTransparency = 0}):Play()
 					end
 
 					option.Interact.MouseButton1Click:Connect(function()
@@ -9425,17 +9514,28 @@ function Owl:Init(library)
 						end
 
 						UpdateSelectedText()
+						data.Value = data.Multi and table.clone(SelectedOrder) or SelectedOrder[1]
+						if data.Save and data.Flag then SaveConfig(game and game.GameId) end
 
 					end)
 				end
 
 				if not starterSet then
-					dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+					if not data.Multi then
+						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+					end
 				end
 
 				UpdateCustomLayout()
+				UpdateSelectedText()
+				optionsInitialized = true
 			end
 
+			if data.Multi and type(data.StarterOption) == "table" then
+				for _, value in ipairs(data.StarterOption) do
+					AddToSelected(tostring(value))
+				end
+			end
 			SetDropdownOptions()
 
 			function data:Refresh(newOptions, clearCurrent)
@@ -9453,24 +9553,45 @@ function Owl:Init(library)
 						end
 					end
 				end
+				data.Value = data.Multi and table.clone(SelectedOrder) or SelectedOrder[1]
 				SetDropdownOptions()
+				if clearCurrent and data.Save and data.Flag then SaveConfig(game and game.GameId) end
+				return data
+			end
+			function data:SetOptions(newOptions, starter)
+				data.StarterOption = starter
+				data:Refresh(newOptions, false)
+				if starter ~= nil then data:Set(starter) end
+				return data
+			end
+			function data:GetSelected()
+				return data.Multi and table.clone(SelectedOrder) or SelectedOrder[1]
 			end
 
 			function data:Set(value, state)
 				if data.Multi then
-					if state == nil or state == true then
-						AddToSelected(value)
+					if type(value) == "table" then
+						SelectedOptions = {}
+						SelectedOrder = {}
+						for _, option in ipairs(value) do
+							AddToSelected(tostring(option))
+						end
+					elseif state == nil or state == true then
+						AddToSelected(tostring(value))
 					else
-						RemoveFromSelected(value)
+						RemoveFromSelected(tostring(value))
 					end
 					UpdateSelectedText()
+					data.Value = table.clone(SelectedOrder)
 					if data.CallBack then
 						data.CallBack(SelectedOrder)
 					end
 				else
+					value = tostring(value)
 					SelectedOptions = {[value] = true}
 					SelectedOrder = {value}
 					dropdown.dropholder.drop.selected.Text = OptionLabels[value] or tostring(value)
+					data.Value = value
 					for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if opt:IsA("Frame") and opt:FindFirstChild("Title") then
 							local isMatch = (opt.Name == value)
@@ -9484,13 +9605,17 @@ function Owl:Init(library)
 						data.CallBack(value)
 					end
 				end
+				if data.Save and data.Flag then SaveConfig(game and game.GameId) end
 			end
 
 			data._frame = dropdown
 			data.toggle = function(self) dropdown.Visible = not dropdown.Visible end
 			data.remove = function(self) dropdown:Destroy() end
 			data.tg = nil
-			data.Value = data.Multi and SelectedOrder or data.StarterOption
+			data.Value = data.Multi and table.clone(SelectedOrder) or SelectedOrder[1] or data.StarterOption
+			if data.Flag and data.Save then
+				Owl.Flags[data.Flag] = data
+			end
 
 			return data
 
@@ -9499,30 +9624,58 @@ function Owl:Init(library)
 			config = config or {}
 			local playerService = Services.Players
 			local selectedNames = {}
+			local departedPlayers = {}
 			local originalCallback = config.Callback or config.CallBack
+			local control
 
-			local function playerOption(target)
-				local thumbnail = string.format(
+			local function playerOption(target, offline)
+				local thumbnail = target.UserId and target.UserId > 0 and string.format(
 					"rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48",
 					target.UserId
-				)
+				) or ""
 					return {
 						Name = target.Name,
-						Label = target.DisplayName .. " (@" .. target.Name .. ")",
-						DisplayName = target.DisplayName,
+						Label = (target.DisplayName or target.Name) .. " (@" .. target.Name .. ")",
+						DisplayName = target.DisplayName or target.Name,
 						Username = target.Name,
 						Player = true,
-					Image = thumbnail,
-					UserId = target.UserId,
+						Image = thumbnail,
+						UserId = target.UserId,
+						Offline = offline == true,
 				}
 			end
 
 			local function getOptions()
 				local options = {}
+				local onlineNames = {}
 				for _, target in ipairs(playerService:GetPlayers()) do
-					table.insert(options, playerOption(target))
+					if not departedPlayers[target.Name] then
+						onlineNames[target.Name] = true
+						table.insert(options, playerOption(target, false))
+					end
+				end
+				for name, target in pairs(departedPlayers) do
+					if selectedNames[name] and not onlineNames[name] then
+						table.insert(options, playerOption(target, true))
+					end
 				end
 				return options
+			end
+
+			local savedSelection = config.Flag and Owl.LoadedConfig and Owl.LoadedConfig[config.Flag]
+			if type(savedSelection) == "table" then
+				for _, name in ipairs(savedSelection) do selectedNames[tostring(name)] = true end
+			elseif type(savedSelection) == "string" then
+				selectedNames[savedSelection] = true
+			end
+			local onlineByName = {}
+			for _, target in ipairs(playerService:GetPlayers()) do
+				onlineByName[target.Name] = true
+			end
+			for name in pairs(selectedNames) do
+				if not onlineByName[name] then
+					departedPlayers[name] = {Name = name, DisplayName = name, UserId = 0}
+				end
 			end
 
 			config.Options = getOptions()
@@ -9535,19 +9688,47 @@ function Owl:Init(library)
 				elseif value and value ~= "" then
 					selectedNames[value] = true
 				end
+				local activeNames = {}
+				for _, activePlayer in ipairs(playerService:GetPlayers()) do
+					activeNames[activePlayer.Name] = true
+				end
+				local changedDeparted = false
+				for name in pairs(selectedNames) do
+					if not activeNames[name] and not departedPlayers[name] then
+						departedPlayers[name] = {Name = name, DisplayName = name, UserId = 0}
+						changedDeparted = true
+					end
+				end
+				for name in pairs(departedPlayers) do
+					if not selectedNames[name] then
+						departedPlayers[name] = nil
+						changedDeparted = true
+					end
+				end
+				if changedDeparted and control then
+					task.defer(function()
+						if control.Refresh then control:Refresh(getOptions(), false) end
+					end)
+				end
 				if originalCallback then originalCallback(value) end
 			end
 
-			local control = self:Dropdown(config)
+			control = self:Dropdown(config)
 			local function refreshPlayers()
 				if control and control.Refresh then
 					control:Refresh(getOptions(), false)
 				end
 			end
 
-			Owl:AddConnection(playerService.PlayerAdded, refreshPlayers)
+			Owl:AddConnection(playerService.PlayerAdded, function()
+				for _, joining in ipairs(playerService:GetPlayers()) do
+					departedPlayers[joining.Name] = nil
+				end
+				refreshPlayers()
+			end)
 			Owl:AddConnection(playerService.PlayerRemoving, function(leaving)
 				if selectedNames[leaving.Name] then
+					departedPlayers[leaving.Name] = leaving
 					local thumbnail = ""
 					pcall(function()
 						thumbnail = playerService:GetUserThumbnailAsync(
@@ -9563,6 +9744,7 @@ function Owl:Init(library)
 						Duration = 4,
 					})
 				end
+				if not selectedNames[leaving.Name] then departedPlayers[leaving.Name] = nil end
 				task.defer(refreshPlayers)
 			end)
 
