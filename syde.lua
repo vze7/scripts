@@ -240,7 +240,7 @@ function syde:DecimalPlaces(num)
 	local str = string.format("%.10f", tonumber(num) or 0)
 	str = str:gsub("0+$", "")
 	str = str:gsub("%.$", "")
-	local dot = string.find(str, "%.", 1, true)
+	local dot = string.find(str, ".", 1, true)
 	if not dot then
 		return 0
 	end
@@ -2420,7 +2420,7 @@ local function createPerformanceOverlay()
 		end
 		local availableWidth = controlsLeft - titleRight - 20
 		local width = math.min(142, availableWidth)
-		frame.Visible = performanceOverlay.enabled and not uiclosed and width >= 105
+		frame.Visible = performanceOverlay.enabled and not uiclosed and not settingsOpen and width >= 105
 		local left = controlsLeft - width - 8
 		frame.Position = UDim2.fromOffset(left, math.max(0, controlsTop + (controls.AbsoluteSize.Y - frame.AbsoluteSize.Y) / 2))
 		frame.Size = UDim2.fromOffset(math.max(0, width), 20)
@@ -2439,7 +2439,7 @@ function syde:SetPerformanceOverlay(enabled)
 	performanceOverlay.enabled = enabled == true
 	createPerformanceOverlay()
 	if not performanceOverlay.frame then return false end
-	performanceOverlay.frame.Visible = performanceOverlay.enabled and not uiclosed and performanceOverlay.frame.Size.X.Offset >= 105
+	performanceOverlay.frame.Visible = performanceOverlay.enabled and not uiclosed and not settingsOpen and performanceOverlay.frame.Size.X.Offset >= 105
 	if performanceOverlay.connection then
 		performanceOverlay.connection:Disconnect()
 		performanceOverlay.connection = nil
@@ -2975,7 +2975,7 @@ end
 function syde:MakeWindow(WindowConfig)
 	WindowConfig = WindowConfig or {}
 	WindowConfig.Name = WindowConfig.Name or "Fire Hub"
-	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name or "FireHub"
+	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name:gsub("<.->", "")
 	WindowConfig.SaveConfig = true
 	syde.CornerImageDefault = WindowConfig.CornerImageId or ""
 
@@ -3236,7 +3236,7 @@ function openui()
 	uiclosed = false
 	if sydeBlurEffect then sydeBlurEffect.Enabled = true end
 	if performanceOverlay.frame then
-		performanceOverlay.frame.Visible = performanceOverlay.enabled and performanceOverlay.frame.Size.X.Offset >= 105
+		performanceOverlay.frame.Visible = performanceOverlay.enabled and not settingsOpen and performanceOverlay.frame.Size.X.Offset >= 105
 	end
 	window.shadow.glow.Visible = glow
 	window.shadow.glow1.Visible = glow
@@ -3513,12 +3513,18 @@ function syde:Init(library)
 
 
 	if not uiclosed then
-		ui.minihome.open.quickfunc.interact.MouseButton1Click:Connect(function()
+		local reopenButton = ui.minihome.open.quickfunc.interact
+		reopenButton.AnchorPoint = Vector2.new(0.5, 0.5)
+		reopenButton.Position = UDim2.fromScale(0.5, 0.5)
+		reopenButton.Size = UDim2.fromOffset(44, 44)
+		reopenButton.Activated:Connect(function()
 			ToggleUI()
 		end)
 	end
 
 	--ui elements
+	top.title.RichText = true
+	top.title.sub.RichText = true
 	top.title.Text = Data.Title
 	top.title.sub.Text = Data.SubText
 
@@ -4278,6 +4284,7 @@ function syde:Init(library)
 
 
 	function opensettings()
+		if performanceOverlay.frame then performanceOverlay.frame.Visible = false end
 		window.settings.Visible = true
 		window.dim.Visible = true
 
@@ -4296,6 +4303,7 @@ function syde:Init(library)
 	end
 
 	function closesettings()
+		if performanceOverlay.frame then performanceOverlay.frame.Visible = false end
 		tweenservice:Create(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 150)}):Play()
 		tweenservice:Create(window.dim, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
 		tweenservice:Create(window.settings.UICorner, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0, 90)}):Play()
@@ -4309,8 +4317,12 @@ function syde:Init(library)
 		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
 		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { ImageTransparency = 1}):Play()
 		task.wait(0.6)
+		if settingsOpen then return end
 		window.settings.Visible = false
 		window.dim.Visible = false
+		if performanceOverlay.frame then
+			performanceOverlay.frame.Visible = performanceOverlay.enabled and not uiclosed and performanceOverlay.frame.Size.X.Offset >= 105
+		end
 	end
 
 	if not settingsOpen then
@@ -6538,6 +6550,7 @@ function syde:Init(library)
 							end
 
 							Options.StarterValue = newValue
+							Options.Value = newValue
 						end
 					end
 
@@ -6590,10 +6603,12 @@ function syde:Init(library)
 
 					function Options:Set(NewVal, skipSave)
 						local range = Options.Range[2] - Options.Range[1]
+						NewVal = math.clamp(tonumber(NewVal) or Options.StarterValue, Options.Range[1], Options.Range[2])
 
 						-- snap value to increment (same logic as UpdateSlider)
 						NewVal = math.floor((NewVal - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
 						NewVal = syde:RoundTo(NewVal, syde:DecimalPlaces(Options.Increment))
+						NewVal = math.clamp(NewVal, Options.Range[1], Options.Range[2])
 
 						local sliderPosition = (NewVal - Options.Range[1]) / range
 
@@ -6628,6 +6643,9 @@ function syde:Init(library)
 							TextTransparency = 0
 						}):Play()
 
+						Options.StarterValue = NewVal
+						Options.Value = NewVal
+
 						-- Callback
 						local success, result = pcall(function()
 							Options.CallBack(NewVal)
@@ -6637,7 +6655,6 @@ function syde:Init(library)
 							syde:Report("Slider '" .. Slider.Name .. "' callback", result)
 						end
 
-						Options.StarterValue = NewVal
 					end
 
 					-- click the value to type a custom number (reverts if outside range)
@@ -8763,6 +8780,7 @@ function syde:Init(library)
 					if dragging then
 						local sliderStart = Slider.slide.AbsolutePosition.X
 						local sliderWidth = Slider.slide.AbsoluteSize.X
+						if sliderWidth <= 0 then return end
 						local sliderPosition = (x - sliderStart) / sliderWidth
 						sliderPosition = math.clamp(sliderPosition, 0, 1)
 
@@ -8771,33 +8789,9 @@ function syde:Init(library)
 						newValue = math.floor((newValue - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
 						newValue = syde:RoundTo(newValue, syde:DecimalPlaces(Options.Increment))
 
-						-- Update the slider visual position
-						local snapPosition = (newValue - Options.Range[1]) / range
-						Slider.slide.slideframe:TweenSize(UDim2.new(snapPosition, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.55, true)
-
-						syde:registerLoadTween(
-							Slider.slide.slideframe,
-							{Size = UDim2.new(snapPosition, 0, 1, 0)},
-							{Size = UDim2.new(0, 100,1, 0)},
-							TweenInfo.new(0.85, Enum.EasingStyle.Quint)
-						)
-
-
-						-- Update the displayed value
-						local decimalPlaces = syde:DecimalPlaces(Options.Increment)
-						Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
-
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-						local success, errorMsg = pcall(function()
-							Options.CallBack(newValue)
-						end)
-						if not success then
-							syde:Report("Slider '" .. Slider.Name .. "' callback", errorMsg)
+						if newValue ~= Options.Value then
+							Options:Set(newValue)
 						end
-
-
-						Options:Set(newValue)
 
 					end
 				end
@@ -8852,6 +8846,9 @@ function syde:Init(library)
 
 				function Options:Set(NewVal, skipSave)
 					local range = Options.Range[2] - Options.Range[1]
+					NewVal = math.clamp(tonumber(NewVal) or Options.StarterValue, Options.Range[1], Options.Range[2])
+					NewVal = math.floor((NewVal - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
+					NewVal = math.clamp(syde:RoundTo(NewVal, syde:DecimalPlaces(Options.Increment)), Options.Range[1], Options.Range[2])
 					local sliderPosition = (NewVal - Options.Range[1]) / range
 
 					Slider.slide.slideframe:TweenSize(
@@ -8879,6 +8876,9 @@ function syde:Init(library)
 						TextTransparency = 0
 					}):Play()
 
+					Options.StarterValue = NewVal
+					Options.Value = NewVal
+
 					-- Callback
 					local success, result = pcall(function()
 						Options.CallBack(NewVal)
@@ -8887,7 +8887,6 @@ function syde:Init(library)
 						syde:Report("Slider '" .. slider.Name .. "' callback", result)
 					end
 
-					Options.StarterValue = NewVal
 				end
 
 				-- click the value to type a custom number (reverts if outside range)
