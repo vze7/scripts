@@ -2116,6 +2116,7 @@ local function SaveCfg(Name)
 					Data[i] = colorList
 				end
 			elseif v.Type == "Colorpicker" or v.Type == "ColorPicker" then
+				if v.SetRainbow then Data[i .. "_Rainbow"] = v.Rainbow == true end
 				if v.Pickers and v.Pickers[1] then
 					Data[i] = PackColor(v.Pickers[1].Value)
 				elseif v.Value and typeof(v.Value) == "Color3" then
@@ -2213,6 +2214,10 @@ local function LoadCfg(Config)
 					syde:SetTheme()
 				end
 			end)
+		elseif type(a) == "string" and a:sub(-8) == "_Rainbow" then
+			local picker = syde.Flags[a:sub(1, -9)]
+			if picker and picker.SetRainbow then picker:SetRainbow(b == true, true) end
+			flagsProcessed += 1
 		elseif type(a) == "string" and a:sub(-8) == "_Keybind" then
 			local toggle = syde.Flags[a:sub(1, -9)]
 			if toggle and toggle.Type == "Toggle" and toggle.SetKeybind and type(b) == "string" then
@@ -6148,8 +6153,11 @@ function syde:Init(library)
 
 				local isRainbowEnabled = false
 
-				local function ToggleRainbowEffect()
-					isRainbowEnabled = not isRainbowEnabled
+				local function SetRainbowEffect(enabled, skipSave)
+					enabled = enabled == true
+					if isRainbowEnabled == enabled then return end
+					isRainbowEnabled = enabled
+					data.Rainbow = enabled
 					if isRainbowEnabled then
 						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 						task.spawn(function()
@@ -6169,11 +6177,16 @@ function syde:Init(library)
 					else
 						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
 						syde:SaveThemeCfg()
-						SaveConfig(game and game.GameId)
 					end
+					if not skipSave then SaveConfig(game and game.GameId) end
 				end
 
-				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(ToggleRainbowEffect)
+				function data:SetRainbow(enabled, skipSave)
+					SetRainbowEffect(enabled, skipSave)
+				end
+				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(function()
+					data:SetRainbow(not data.Rainbow)
+				end)
 
 				function data:Set(RGBColor)
 					if typeof(RGBColor) == "table" then
@@ -6195,6 +6208,9 @@ function syde:Init(library)
 				data.Flag = flagKey
 				if flagKey then
 					syde.Flags[flagKey] = data
+					if syde.LoadedConfig and syde.LoadedConfig[flagKey .. "_Rainbow"] == true then
+						data:SetRainbow(true, true)
+					end
 				end
 				if data.SFlag then
 					syde.SettingsFlags[data.SFlag] = data
@@ -11284,8 +11300,11 @@ function syde:Init(library)
 
 			local isRainbowEnabled = false
 
-			local function ToggleRainbowEffect()
-				isRainbowEnabled = not isRainbowEnabled
+			local function SetRainbowEffect(enabled, skipSave)
+				enabled = enabled == true
+				if isRainbowEnabled == enabled then return end
+				isRainbowEnabled = enabled
+				data.Rainbow = enabled
 				if isRainbowEnabled then
 					if not huerender then
 						local lastUpdate = os.clock()
@@ -11300,20 +11319,29 @@ function syde:Init(library)
 							HueValue = (HueValue + math.min(now - lastUpdate, 0.2) * 0.12) % 1
 							lastUpdate = now
 							HSV[1] = HueValue
-							updatestuff()
+							syde._rainbowUpdating = true
+							local ok, failure = pcall(updatestuff)
+							syde._rainbowUpdating = false
+							if not ok then warn("[Syde RGB] " .. tostring(failure)) end
 						end)
 						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 					end
 				else
 					if huerender then
 						huerender:Disconnect()
-						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
 						huerender = nil
 					end
+					tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
 				end
+				if not skipSave then SaveConfig(game and game.GameId) end
 			end
 
-			colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(ToggleRainbowEffect)
+			function data:SetRainbow(enabled, skipSave)
+				SetRainbowEffect(enabled, skipSave)
+			end
+			colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(function()
+				data:SetRainbow(not data.Rainbow)
+			end)
 
 			function data:Set(RGBColor, skipSave)
 				if typeof(RGBColor) ~= "Color3" then return end
@@ -11333,6 +11361,9 @@ function syde:Init(library)
 					if typeof(unpacked) == "Color3" then
 						data:Set(unpacked, true)
 					end
+				end
+				if syde.LoadedConfig and syde.LoadedConfig[data.Flag .. "_Rainbow"] == true then
+					data:SetRainbow(true, true)
 				end
 			end
 
@@ -11895,7 +11926,7 @@ function syde:Init(library)
 				Save = ColorpickerConfig.Save ~= false,
 				CallBack = function(col)
 					if cb then cb(col) end
-					SaveCfg(game and game.GameId)
+					if not syde._rainbowUpdating then SaveCfg(game and game.GameId) end
 				end
 			})
 			pickerData.Type = "Colorpicker"
