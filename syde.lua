@@ -1130,21 +1130,19 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			if startPosition and mouse then
 				local delta = mouse - startPosition
 
-				local newWidth = math.max(MinSize.X, startSize.X + delta.X)
-				local newHeight = math.max(MinSize.Y, startSize.Y + delta.Y)
+				local viewport = workspace.CurrentCamera.ViewportSize
+				local maxWidth = math.max(1, viewport.X - 24)
+				local maxHeight = math.max(1, viewport.Y - 24)
+				local newWidth = math.clamp(startSize.X + delta.X, math.min(MinSize.X, maxWidth), maxWidth)
+				local newHeight = math.clamp(startSize.Y + delta.Y, math.min(MinSize.Y, maxHeight), maxHeight)
 
 				if LockAspectRatio then
 					local aspectRatio = startSize.X / startSize.Y
-					newHeight = newWidth / aspectRatio
+					newHeight = math.clamp(newWidth / aspectRatio, math.min(MinSize.Y, maxHeight), maxHeight)
 				end
 
-				Object:TweenSize(
-					UDim2.fromOffset(newWidth, newHeight),
-					Enum.EasingDirection.Out,
-					Enum.EasingStyle.Quint,
-					0.4,
-					true
-				)
+				-- One direct size update per input event; no accumulating resize tweens.
+				Object.Size = UDim2.fromOffset(newWidth, newHeight)
 
 				if Callback then
 					Callback(Vector2.new(newWidth, newHeight))
@@ -1299,7 +1297,10 @@ end
 
 
 
+local activeLayouts = setmetatable({}, {__mode = "k"})
 function syde:updateLayout(container, spacing)
+	if activeLayouts[container] or not container.Parent then return end
+	activeLayouts[container] = true
 	spacing = spacing or 8
 	local yOffset = 8
 
@@ -1309,19 +1310,18 @@ function syde:updateLayout(container, spacing)
 		end
 	end
 
-	if resizing == false then
-		for _, child in ipairs(container:GetChildren()) do
-			if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
-				if child.Size.X.Offset ~= -16 or child.Size.X.Scale ~= 1 then
-					child.Size = UDim2.new(1, -16, 0, child.Size.Y.Offset)
-				end
-				tweenservice:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0, 8, 0, yOffset)}):Play()
-				yOffset = yOffset + child.AbsoluteSize.Y + spacing
+	for _, child in ipairs(container:GetChildren()) do
+		if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
+			if child.Size.X.Offset ~= -16 or child.Size.X.Scale ~= 1 then
+				child.Size = UDim2.new(1, -16, child.Size.Y.Scale, child.Size.Y.Offset)
 			end
+			child.Position = UDim2.fromOffset(8, yOffset)
+			yOffset += child.AbsoluteSize.Y + spacing
 		end
 	end
 
 	container.CanvasSize = UDim2.new(0, 0, 0, yOffset + 14)
+	activeLayouts[container] = nil
 end
 
 local dragSpeed = 0.6
@@ -2265,6 +2265,16 @@ local performanceOverlay = {
 	elapsed = 0,
 }
 
+local function getNetworkPingMs()
+	local localPlayer = player.LocalPlayer
+	if not localPlayer then return nil end
+	local ok, seconds = pcall(function()
+		return localPlayer:GetNetworkPing()
+	end)
+	if not ok or type(seconds) ~= "number" or seconds < 0 then return nil end
+	return math.floor(seconds * 1000 + 0.5)
+end
+
 local function createPerformanceOverlay()
 	if performanceOverlay.frame and performanceOverlay.frame.Parent then return end
 	local header = window and window:FindFirstChild("top")
@@ -2298,15 +2308,17 @@ local function createPerformanceOverlay()
 		local controlsLeft = controls.AbsolutePosition.X - header.AbsolutePosition.X
 		local controlsTop = controls.AbsolutePosition.Y - header.AbsolutePosition.Y
 		local title = header:FindFirstChild("title")
-		local titleRight = title and (title.Position.X.Offset + title.AbsoluteSize.X) or 110
-		local left = math.max(112, titleRight + 10)
-		local availableWidth = controlsLeft - left - 8
-		if availableWidth < 100 then
-			left = math.max(112, controlsLeft - 108)
-			availableWidth = math.max(0, controlsLeft - left - 8)
+		local titleRight = title and (title.AbsolutePosition.X - header.AbsolutePosition.X + title.AbsoluteSize.X) or 110
+		local subtitle = title and title:FindFirstChild("sub")
+		if subtitle then
+			titleRight = math.max(titleRight, subtitle.AbsolutePosition.X - header.AbsolutePosition.X + subtitle.AbsoluteSize.X)
 		end
+		local availableWidth = controlsLeft - titleRight - 20
+		local width = math.min(142, availableWidth)
+		frame.Visible = performanceOverlay.enabled and not uiclosed and width >= 105
+		local left = controlsLeft - width - 8
 		frame.Position = UDim2.fromOffset(left, math.max(0, controlsTop + (controls.AbsoluteSize.Y - frame.AbsoluteSize.Y) / 2))
-		frame.Size = UDim2.fromOffset(math.max(0, math.min(142, availableWidth)), 20)
+		frame.Size = UDim2.fromOffset(math.max(0, width), 20)
 	end
 
 	syde:AddConnection(header:GetPropertyChangedSignal("AbsoluteSize"), align)
@@ -2322,7 +2334,7 @@ function syde:SetPerformanceOverlay(enabled)
 	performanceOverlay.enabled = enabled == true
 	createPerformanceOverlay()
 	if not performanceOverlay.frame then return false end
-	performanceOverlay.frame.Visible = performanceOverlay.enabled
+	performanceOverlay.frame.Visible = performanceOverlay.enabled and not uiclosed and performanceOverlay.frame.Size.X.Offset >= 105
 	if performanceOverlay.connection then
 		performanceOverlay.connection:Disconnect()
 		performanceOverlay.connection = nil
@@ -2331,20 +2343,13 @@ function syde:SetPerformanceOverlay(enabled)
 
 	performanceOverlay.frameCount = 0
 	performanceOverlay.elapsed = 0
-	performanceOverlay.connection = runservice.Heartbeat:Connect(function(deltaTime)
+	performanceOverlay.connection = runservice.RenderStepped:Connect(function(deltaTime)
 		performanceOverlay.frameCount += 1
 		performanceOverlay.elapsed += deltaTime
 		if performanceOverlay.elapsed < 0.25 then return end
 
 		local fps = math.floor(performanceOverlay.frameCount / performanceOverlay.elapsed + 0.5)
-		local ping
-		local localPlayer = player.LocalPlayer
-		local pingOk, pingSeconds = pcall(function()
-			return localPlayer and localPlayer:GetNetworkPing()
-		end)
-		if pingOk and type(pingSeconds) == "number" then
-			ping = math.floor(math.max(0, pingSeconds) * 1000 + 0.5)
-		end
+		local ping = getNetworkPingMs()
 		if performanceOverlay.label and performanceOverlay.label.Parent then
 			performanceOverlay.label.Text = string.format("%d FPS  ·  %s ms", fps, ping and tostring(ping) or "--")
 		end
@@ -2922,7 +2927,76 @@ function syde:CreateWindow(WindowConfig)
 	return self:MakeWindow(WindowConfig)
 end
 
+function syde:Rejoin()
+	if self._rejoining then return false end
+	local localPlayer = player.LocalPlayer
+	if not localPlayer then return false end
+
+	self._rejoining = true
+	local teleports = game:GetService("TeleportService")
+	local failureConnection
+	local fallbackStarted = false
+	local fallbackAttempt = 0
+	local retryScheduled = false
+	local function finish()
+		if failureConnection then
+			failureConnection:Disconnect()
+			failureConnection = nil
+		end
+		self._rejoining = false
+	end
+	local function tryFallback()
+		if not self._rejoining or retryScheduled then return end
+		if fallbackAttempt >= 3 then finish() return end
+		fallbackStarted = true
+		retryScheduled = true
+		task.delay(fallbackAttempt == 0 and 0 or 1, function()
+			if not self._rejoining then return end
+			retryScheduled = false
+			fallbackAttempt += 1
+			local thisAttempt = fallbackAttempt
+			local ok, err = pcall(function()
+				teleports:Teleport(game.PlaceId, localPlayer)
+			end)
+			if not ok then
+				warn("[Syde Rejoin] Fallback " .. thisAttempt .. " failed: " .. tostring(err))
+				tryFallback()
+			else
+				-- A successful call may still report TeleportInitFailed later.
+				task.delay(10, function()
+					if self._rejoining and fallbackAttempt == thisAttempt then finish() end
+				end)
+			end
+		end)
+	end
+
+	failureConnection = teleports.TeleportInitFailed:Connect(function(failedPlayer)
+		if failedPlayer == localPlayer then tryFallback() end
+	end)
+	if game.JobId == "" then
+		tryFallback()
+		return true
+	end
+
+	local ok, err = pcall(function()
+		teleports:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer)
+	end)
+	if not ok then
+		warn("[Syde Rejoin] Same-server teleport failed: " .. tostring(err))
+		tryFallback()
+	else
+		-- A successful call starts an asynchronous teleport. A reported failure
+		-- starts the normal-place fallback; the timeout just unlocks the button.
+		task.delay(10, function()
+			if not fallbackStarted then finish() end
+		end)
+	end
+	return true
+end
+
 function syde:Destroy()
+	if rs and rs.Connected then rs:Disconnect() end
+	if ss and ss.Connected then ss:Disconnect() end
 	if performanceOverlay.connection then
 		performanceOverlay.connection:Disconnect()
 		performanceOverlay.connection = nil
@@ -2936,6 +3010,7 @@ function syde:Destroy()
 	performanceOverlay.frame = nil
 	performanceOverlay.label = nil
 	performanceOverlay.enabled = false
+	syde._currentWindow = nil
 	syde:UnlockMouse(false)
 	pcall(function()
 		if Library and Library.Parent then
@@ -3028,6 +3103,14 @@ function openui()
 	window.user.Visible = true
 	window.Visible = true
 	uiclosed = false
+	if performanceOverlay.frame then
+		performanceOverlay.frame.Visible = performanceOverlay.enabled and performanceOverlay.frame.Size.X.Offset >= 105
+	end
+	window.shadow.glow.Visible = glow
+	window.shadow.glow1.Visible = glow
+	for _, effect in ipairs(window.clipframe:GetChildren()) do
+		if effect:IsA("ImageLabel") then effect.Visible = glow end
+	end
 
 	if syde.FreeMouse ~= false then
 		syde:UnlockMouse(true)
@@ -3085,44 +3168,21 @@ function openui()
 	end
 end
 
+local lastHideToastAt = 0
 function closeui()
-	-- Mark closed before starting any animations so the reopen path is immediate.
 	sizeBeforeMinimize = window.Size
 	uiclosed = true
-	local fastTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
 	pages.Visible = false
 	window.tabs.Visible = false
 	window.user.Visible = false
-
-	tweenservice:Create(window, fastTween, {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window, fastTween, {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 120) }):Play()
-	tweenservice:Create(window.top.separator, fastTween, {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title, fastTween, {TextTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title.sub, fastTween, {TextTransparency = 1 }):Play()
-
-	if window.wallpaper.ison.Value then
-		tweenservice:Create(window.wallpaper, fastTween, {ImageTransparency = 1 }):Play()
+	window.Visible = false
+	if performanceOverlay.frame then performanceOverlay.frame.Visible = false end
+	window.shadow.glow.Visible = false
+	window.shadow.glow1.Visible = false
+	for _, effect in ipairs(window.clipframe:GetChildren()) do
+		if effect:IsA("ImageLabel") then effect.Visible = false end
 	end
-
-	syde:UnbindFrame(window)
-	tweenservice:Create(window.top.functions, fastTween, {BackgroundTransparency = 1 }):Play()
-
-	for i,v in pairs(window.top.functions:GetChildren()) do
-		if v:IsA("Frame") then
-			tweenservice:Create(v, fastTween, {BackgroundTransparency = 1 }):Play()
-			v.Visible = false
-			for i,v2 in pairs(v:GetChildren()) do
-				if v2:IsA("ImageLabel") then
-					tweenservice:Create(v2, fastTween, {ImageTransparency = 1 }):Play()
-					v2.Visible = false
-				end
-			end
-		end
-	end
-
-	tweenservice:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 1 }):Play()
-	tweenservice:Create(window.resize, fastTween, {ImageTransparency = 1 }):Play()
+	if syde:HasBinding(window) then syde:UnbindFrame(window) end
 
 	-- These helpers wait for their closing animations. Hiding these transient
 	-- panels directly avoids blocking the minimize notification and next reopen.
@@ -3139,16 +3199,13 @@ function closeui()
 		syde:UnlockMouse(false)
 	end
 
-	task.delay(0.2, function()
-		if uiclosed then
-			window.Visible = false
-		end
-	end)
-
-	syde:Toast({
-		Content = 'UI Hidden, Use '.. uitoggle.Name ..' To Open Back.',
-		Duration = 2,
-	})
+	if tick() - lastHideToastAt >= 2 then
+		lastHideToastAt = tick()
+		syde:Toast({
+			Content = 'UI Hidden, Use '.. uitoggle.Name ..' To Open Back.',
+			Duration = 2,
+		})
+	end
 end
 
 local bounce = false
@@ -3301,7 +3358,7 @@ function syde:Init(library)
 		rs = RunService.RenderStepped:Connect(function()
 			-- stop cleanly if the watermark/minihome was hidden or destroyed
 			local info = Minihome and Minihome:FindFirstChild("info")
-			if not info then
+			if not info or not Minihome.Parent then
 				if rs then rs:Disconnect() end
 				return
 			end
@@ -3691,22 +3748,8 @@ function syde:Init(library)
 		repeat task.wait() until graph.AbsoluteSize.X > 0
 
 
-		local Players = game:GetService("Players")
-		local RunService = game:GetService("RunService")
-
 		local function getPing()
-
-			local ping =
-				Players.LocalPlayer:GetNetworkPing() * 1000
-
-			if ping == 0 and RunService:IsStudio() then
-
-				return 50 + math.noise(os.clock()*0.5)*40
-
-			end
-
-			return math.floor(ping)
-
+			return getNetworkPingMs() or 0
 		end
 
 
@@ -3841,7 +3884,7 @@ function syde:Init(library)
 
 
 		task.spawn(function()
-			while true do
+			while ui and ui.Parent and graph.Parent do
 
 				local ping = getPing()
 				-- replace with getPing() when ready
@@ -3893,12 +3936,7 @@ function syde:Init(library)
 		end)
 
 		bh.Rejoin.interact.MouseButton1Click:Connect(function()
-
-			local TeleportService = game:GetService("TeleportService")
-			local player = game:GetService("Players").LocalPlayer
-
-			TeleportService:Teleport(game.PlaceId, player)
-
+			syde:Rejoin()
 		end)
 
 		local HttpService = game:GetService("HttpService")
@@ -4325,32 +4363,15 @@ function syde:Init(library)
 					button.ImageLabel.Size = UDim2.new(0, 16,0, 16)
 					button.ImageLabel.Position = UDim2.new(1, -41,0.5, 0)
 
-					local function CancelOperation()
-						Holding = false
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
-						tweenservice:Create(button.title.timer, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-						if not Complete then
-							tweenservice:Create(button.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-							tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(1, Enum.EasingStyle.Linear), { Offset = Vector2.new(-1, 0) }):Play()
-							tweenservice:Create(button, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { Position = UDim2.new(0 ,-15 ,0 ,button.Position.Y.Offset) }):Play()
-							task.wait(0.15)
-							tweenservice:Create(button, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { Position = UDim2.new(0 ,30 ,0 ,button.Position.Y.Offset) }):Play()
-							task.wait(0.15)
-							tweenservice:Create(button, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { Position = UDim2.new(0 ,0 ,0 ,button.Position.Y.Offset) }):Play()
-							task.wait(1)
-							tweenservice:Create(button.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
-						end
-
-						-- did not complete 
-
-						--	button.UIStroke.UIGradient.Offset = Vector2.new(-1, 0)
-						--	tweenservice:Create(button.UIStroke, TweenInfo.new(HoldTime, Enum.EasingStyle.Linear), { Offset = Vector2.new(-1, 0) }):Play()
-
-						TimeLeft = HoldTime
-						button.title.timer.Text = tostring(HoldTime)
-						task.wait(0.1)
-						Complete = false
-					end
+				local function CancelOperation()
+					Holding = false
+					TimeLeft = HoldTime
+					button.title.timer.Text = tostring(HoldTime)
+					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.15), { ImageTransparency = 0.95 }):Play()
+					tweenservice:Create(button.title.timer, TweenInfo.new(0.15), { TextTransparency = 1 }):Play()
+					tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(0.15), { Offset = Vector2.new(-1, 0) }):Play()
+					Complete = false
+				end
 
 					button.interact.MouseButton1Down:Connect(function()
 
@@ -6815,6 +6836,7 @@ function syde:Init(library)
 					glow = true
 					for i, glow in pairs(window.clipframe:GetChildren()) do
 						if glow:IsA("ImageLabel") then
+							glow.Visible = true
 							tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
 						end
 					end
@@ -6832,6 +6854,7 @@ function syde:Init(library)
 					for i, glow in pairs(window.clipframe:GetChildren()) do
 						if glow:IsA("ImageLabel") then
 							tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+							glow.Visible = false
 						end
 					end
 
@@ -7364,6 +7387,14 @@ function syde:Init(library)
 		Tab.Parent = tabs
 		Tab.title.Text = tdata.Title
 		Tab.Name = tdata.Title
+		local tabDivider = Instance.new("Frame")
+		tabDivider.Name = "SubtleDivider"
+		tabDivider.BackgroundColor3 = Color3.fromRGB(105, 105, 110)
+		tabDivider.BackgroundTransparency = 0.86
+		tabDivider.BorderSizePixel = 0
+		tabDivider.Position = UDim2.new(0, 10, 1, 3)
+		tabDivider.Size = UDim2.new(0, 145, 0, 1)
+		tabDivider.Parent = Tab
 
 		Tab.title.TextTransparency = 1
 		Tab.indicator.BackgroundTransparency = 1
@@ -7826,7 +7857,7 @@ function syde:Init(library)
 
 				for _, page in ipairs(Pages:GetChildren()) do
 					if page:IsA("ScrollingFrame") then
-						for _, child in ipairs(page:GetChildren()) do
+						for _, child in ipairs(page:GetDescendants()) do
 							if child:IsA("Frame") and child:GetAttribute("Searchable") then
 								local name = child.Name:lower()
 								local ftype = getFunctionType(child):lower()
@@ -7946,6 +7977,7 @@ function syde:Init(library)
 				local Holding = false
 				local TimeLeft = HoldTime
 				local Complete = false
+				local holdSession = 0
 
 				button.ImageLabel.Image = 'rbxassetid://127075195365098'
 				button.ImageLabel.Rotation = 0
@@ -7954,33 +7986,19 @@ function syde:Init(library)
 
 				local function CancelOperation()
 					Holding = false
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
-					tweenservice:Create(button.title.timer, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					if not Complete then
-						tweenservice:Create(button.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-						tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(1, Enum.EasingStyle.Linear), { Offset = Vector2.new(-1, 0) }):Play()
-						tweenservice:Create(button, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { Position = UDim2.new(0 ,-15 ,0 ,button.Position.Y.Offset) }):Play()
-						task.wait(0.15)
-						tweenservice:Create(button, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { Position = UDim2.new(0 ,30 ,0 ,button.Position.Y.Offset) }):Play()
-						task.wait(0.15)
-						tweenservice:Create(button, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { Position = UDim2.new(0 ,0 ,0 ,button.Position.Y.Offset) }):Play()
-						task.wait(1)
-						tweenservice:Create(button.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
-					end
-
-					-- did not complete 
-
-					--	button.UIStroke.UIGradient.Offset = Vector2.new(-1, 0)
-					--	tweenservice:Create(button.UIStroke, TweenInfo.new(HoldTime, Enum.EasingStyle.Linear), { Offset = Vector2.new(-1, 0) }):Play()
-
+					holdSession += 1
 					TimeLeft = HoldTime
 					button.title.timer.Text = tostring(HoldTime)
-					task.wait(0.1)
+					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.15), { ImageTransparency = 0.95 }):Play()
+					tweenservice:Create(button.title.timer, TweenInfo.new(0.15), { TextTransparency = 1 }):Play()
+					tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(0.15), { Offset = Vector2.new(-1, 0) }):Play()
 					Complete = false
 				end
 
 				button.interact.MouseButton1Down:Connect(function()
-
+					if Holding or Complete then return end
+					holdSession += 1
+					local thisSession = holdSession
 					Holding = true
 					TimeLeft = HoldTime
 					button.title.timer.Text = tostring(TimeLeft)
@@ -7990,13 +8008,14 @@ function syde:Init(library)
 					tweenservice:Create(button.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0}):Play()
 
 					-- Countdown loop
-					while Holding and TimeLeft > 0 do
+					while Holding and holdSession == thisSession and TimeLeft > 0 do
 						TimeLeft = math.max(0, TimeLeft - runservice.Heartbeat:Wait())
 						button.title.timer.Text = string.format("%.1f", TimeLeft) 
 
 					end
 
-					if TimeLeft <= 0 then
+					if Holding and holdSession == thisSession and TimeLeft <= 0 then
+						Holding = false
 						Complete = true
 
 						if data.CallBack then
