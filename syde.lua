@@ -1993,6 +1993,8 @@ function syde:SaveThemeCfg()
 		if self.theme.Accent then ThemeColorsToSave["Accent"] = PackColor(self.theme.Accent) end
 		if self.theme.HitBox then ThemeColorsToSave["HitBox"] = PackColor(self.theme.HitBox) end
 	end
+	if self.HeaderTitleColor then ThemeColorsToSave["HeaderTitleColor"] = PackColor(self.HeaderTitleColor) end
+	if self.HeaderSubtitleColor then ThemeColorsToSave["HeaderSubtitleColor"] = PackColor(self.HeaderSubtitleColor) end
 
 	if makefolder and isfolder and not isfolder(THEME_FOLDER) then
 		pcall(makefolder, THEME_FOLDER)
@@ -2018,7 +2020,11 @@ local function LoadThemeCfg(Config)
 
 			for TypeName, Value in pairs(Data) do
 				local c = UnpackColor(Value)
-				syde.Themes.Custom[TypeName] = c
+				if TypeName == "HeaderTitleColor" or TypeName == "HeaderSubtitleColor" then
+					syde[TypeName] = c
+				else
+					syde.Themes.Custom[TypeName] = c
+				end
 				if TypeName == "Accent" or TypeName == "HitBox" then
 					if syde.theme then
 						syde.theme[TypeName] = c
@@ -2357,11 +2363,19 @@ local glow = false
 
 local uitoggle = Enum.KeyCode.RightShift
 local sydeBlurEffect
+local sydeBlurLayer
+local function updateBlurVisibility()
+	local visible = bluron and not uiclosed
+	if sydeBlurEffect then sydeBlurEffect.Enabled = visible end
+	if sydeBlurLayer then sydeBlurLayer.Enabled = visible end
+end
 local function setBackgroundBlur(enabled)
 	bluron = enabled == true
 	if not bluron then
 		if sydeBlurEffect then sydeBlurEffect:Destroy() end
 		sydeBlurEffect = nil
+		if sydeBlurLayer then sydeBlurLayer:Destroy() end
+		sydeBlurLayer = nil
 		return
 	end
 	if not sydeBlurEffect then
@@ -2370,7 +2384,26 @@ local function setBackgroundBlur(enabled)
 		sydeBlurEffect.Size = 12
 		sydeBlurEffect.Parent = game:GetService("Lighting")
 	end
-	sydeBlurEffect.Enabled = not uiclosed
+	if not sydeBlurLayer then
+		local oldLayer = coregui:FindFirstChild("SydeBlurLayer")
+		if oldLayer then oldLayer:Destroy() end
+		if ui.DisplayOrder < 1000 then ui.DisplayOrder = 1000 end
+		sydeBlurLayer = Instance.new("ScreenGui")
+		sydeBlurLayer.Name = "SydeBlurLayer"
+		sydeBlurLayer.DisplayOrder = ui.DisplayOrder - 1
+		sydeBlurLayer.IgnoreGuiInset = true
+		sydeBlurLayer.ResetOnSpawn = false
+		local shade = Instance.new("Frame")
+		shade.Name = "Shade"
+		shade.Size = UDim2.fromScale(1, 1)
+		shade.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+		shade.BackgroundTransparency = 0.48
+		shade.BorderSizePixel = 0
+		shade.Active = false
+		shade.Parent = sydeBlurLayer
+		sydeBlurLayer.Parent = coregui
+	end
+	updateBlurVisibility()
 end
 --
 
@@ -3372,7 +3405,7 @@ function openui()
 	window.user.Visible = true
 	window.Visible = true
 	uiclosed = false
-	if sydeBlurEffect then sydeBlurEffect.Enabled = true end
+	updateBlurVisibility()
 	if performanceOverlay.frame then
 		performanceOverlay.frame.Visible = performanceOverlay.enabled and not settingsOpen and performanceOverlay.frame.Size.X.Offset >= 105
 	end
@@ -3438,7 +3471,7 @@ function closeui()
 	window.tabs.Visible = false
 	window.user.Visible = false
 	window.Visible = false
-	if sydeBlurEffect then sydeBlurEffect.Enabled = false end
+	updateBlurVisibility()
 	if performanceOverlay.frame then performanceOverlay.frame.Visible = false end
 	window.shadow.glow.Visible = false
 	window.shadow.glow1.Visible = false
@@ -3677,6 +3710,8 @@ function syde:Init(library)
 	end
 	setHeaderTitle(Data.Title)
 	top.title.sub.Text = normalizeWindowRichText(Data.SubText)
+	top.title.TextColor3 = syde.HeaderTitleColor or syde.theme.Text or Color3.fromRGB(240, 240, 240)
+	top.title.sub.TextColor3 = syde.HeaderSubtitleColor or syde.theme.TextDark or Color3.fromRGB(150, 150, 150)
 
 	--dragging
 	syde:AddDrag(top, window, true)
@@ -6111,31 +6146,30 @@ function syde:Init(library)
 
 				HueSat.Changed:Connect(updateColorPicker)
 
-				local hueIncrement = 0.005 
-
-				local function RainbowEffect()
-					HueValue = (HueValue + hueIncrement) % 1
-					HSV[1] = HueValue
-
-					updatestuff()
-				end
-
 				local isRainbowEnabled = false
-				local huerender = nil
 
 				local function ToggleRainbowEffect()
 					isRainbowEnabled = not isRainbowEnabled
 					if isRainbowEnabled then
-						if not huerender then
-							huerender = runservice.RenderStepped:Connect(RainbowEffect)
-							tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-						end
+						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+						task.spawn(function()
+							local lastUpdate = os.clock()
+							while isRainbowEnabled and colorpicker.Parent do
+								local now = os.clock()
+								HueValue = (HueValue + math.min(now - lastUpdate, 0.2) * 0.12) % 1
+								lastUpdate = now
+								HSV[1] = HueValue
+								syde._rainbowUpdating = true
+								local ok, failure = pcall(updatestuff)
+								syde._rainbowUpdating = false
+								if not ok then warn("[Syde RGB] " .. tostring(failure)) break end
+								task.wait(0.08)
+							end
+						end)
 					else
-						if huerender then
-							huerender:Disconnect()
-							tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
-							huerender = nil
-						end
+						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
+						syde:SaveThemeCfg()
+						SaveConfig(game and game.GameId)
 					end
 				end
 
@@ -6165,8 +6199,6 @@ function syde:Init(library)
 				if data.SFlag then
 					syde.SettingsFlags[data.SFlag] = data
 				end
-
-				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(ToggleRainbowEffect)
 
 				return data
 
@@ -7117,8 +7149,10 @@ function syde:Init(library)
 				syde:UpdateTheme({
 					['Accent'] = v
 				})
-				syde:SaveThemeCfg()
-				SaveCfg(game and game.GameId)
+				if not syde._rainbowUpdating then
+					syde:SaveThemeCfg()
+					SaveCfg(game and game.GameId)
+				end
 			end,
 		})
 
@@ -7134,8 +7168,10 @@ function syde:Init(library)
 				syde:UpdateTheme({
 					['HitBox'] = c
 				})
-				syde:SaveThemeCfg()
-				SaveCfg(game and game.GameId)
+				if not syde._rainbowUpdating then
+					syde:SaveThemeCfg()
+					SaveCfg(game and game.GameId)
+				end
 			end,
 		})
 
@@ -7344,6 +7380,32 @@ function syde:Init(library)
 					})
 				end
 			end
+		})
+
+		a:ColorPicker({
+			Title = 'Hub title color',
+			Color = syde.HeaderTitleColor or top.title.TextColor3,
+			Flag = 'HeaderTitleColor',
+			SFlag = 'HTC',
+			Save = true,
+			CallBack = function(color)
+				syde.HeaderTitleColor = color
+				top.title.TextColor3 = color
+				if not syde._rainbowUpdating then syde:SaveThemeCfg() end
+			end,
+		})
+
+		a:ColorPicker({
+			Title = 'Hub subtitle color',
+			Color = syde.HeaderSubtitleColor or top.title.sub.TextColor3,
+			Flag = 'HeaderSubtitleColor',
+			SFlag = 'HSC',
+			Save = true,
+			CallBack = function(color)
+				syde.HeaderSubtitleColor = color
+				top.title.sub.TextColor3 = color
+				if not syde._rainbowUpdating then syde:SaveThemeCfg() end
+			end,
 		})
 		local cornerImageId = syde.LoadedConfig and syde.LoadedConfig.CornerImageId or syde.CornerImageDefault or ""
 		syde.Flags.CornerImageId = {
@@ -11220,23 +11282,26 @@ function syde:Init(library)
 
 			HueSat.Changed:Connect(updateColorPicker)
 
-			local hueIncrement = 0.005 
-
-			local function RainbowEffect()
-				HueValue = (HueValue + hueIncrement) % 1
-				HSV[1] = HueValue
-
-				updatestuff()
-			end
-
 			local isRainbowEnabled = false
-			local huerender = nil
 
 			local function ToggleRainbowEffect()
 				isRainbowEnabled = not isRainbowEnabled
 				if isRainbowEnabled then
 					if not huerender then
-						huerender = runservice.RenderStepped:Connect(RainbowEffect)
+						local lastUpdate = os.clock()
+						huerender = runservice.Heartbeat:Connect(function()
+							if not colorpicker.Parent then
+								huerender:Disconnect()
+								huerender = nil
+								return
+							end
+							local now = os.clock()
+							if now - lastUpdate < 0.08 then return end
+							HueValue = (HueValue + math.min(now - lastUpdate, 0.2) * 0.12) % 1
+							lastUpdate = now
+							HSV[1] = HueValue
+							updatestuff()
+						end)
 						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 					end
 				else
