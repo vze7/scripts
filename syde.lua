@@ -6609,11 +6609,13 @@ function syde:Init(library)
 						StarterValue = Options.StarterValue or 16;
 						CallBack = Options.CallBack;
 						SFlag = Options.SFlag;
+						ShowTicks = Options.ShowTicks == true;
 						SettingsConfig = true;
 					}
 
 					Slider.Name = Options.Title
 					Slider.Title.Text = Options.Title
+					Slider.slide.Ticks.Visible = Options.ShowTicks
 					Options.Value = Options.StarterValue
 					local slideSize = Slider.slide.Size
 					Slider.slide.Size = UDim2.new(slideSize.X.Scale, slideSize.X.Offset, slideSize.Y.Scale, slideSize.Y.Offset + 4)
@@ -6720,7 +6722,7 @@ function syde:Init(library)
 					end
 
 					-- Connect AbsoluteSize change **only once**
-					if Options.Increment > 4 then
+					if Options.ShowTicks and Options.Increment > 4 then
 						if not Slider.slide.Ticks:FindFirstChild("_ResizeConnection") then
 							local pendingTickRefresh = false
 							local conn = Slider.slide.Ticks:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -8887,7 +8889,8 @@ function syde:Init(library)
 						Increment = Slider.Increment or 1,
 						StarterValue = Slider.Default ~= nil and Slider.Default or (Slider.StarterValue or 0),
 						CallBack = Slider.Callback or Slider.CallBack,
-						Flag = Slider.Flag
+						Flag = Slider.Flag,
+						ShowTicks = Slider.ShowTicks == true
 					}
 				}
 			end
@@ -8913,10 +8916,12 @@ function syde:Init(library)
 					StarterValue = Options.StarterValue or 16;
 					CallBack = Options.CallBack;
 					Flag = Options.Flag;
+					ShowTicks = Options.ShowTicks == true;
 				}
 
 				Slider.Name = Options.Title
 				Slider.Title.Text = Options.Title
+				Slider.slide.Ticks.Visible = Options.ShowTicks
 				Options.Value = Options.StarterValue
 				local slideSize = Slider.slide.Size
 				Slider.slide.Size = UDim2.new(slideSize.X.Scale, slideSize.X.Offset, slideSize.Y.Scale, slideSize.Y.Offset + 4)
@@ -9023,7 +9028,7 @@ function syde:Init(library)
 				end
 
 				-- Connect AbsoluteSize change **only once**
-				if Options.Increment > 4 then
+				if Options.ShowTicks and Options.Increment > 4 then
 					if not Slider.slide.Ticks:FindFirstChild("_ResizeConnection") then
 						local pendingTickRefresh = false
 						local conn = Slider.slide.Ticks:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -11425,7 +11430,6 @@ function syde:Init(library)
 		function initelement:AddSlider(SliderConfig)
 			SliderConfig = SliderConfig or {}
 			local flagName = SliderConfig.Flag or SliderConfig.Name or SliderConfig.Title or SliderConfig.ValueName or "Slider"
-			local userCb = SliderConfig.Callback or SliderConfig.CallBack
 
 			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
 				SliderConfig.Default = syde.LoadedConfig[flagName]
@@ -11436,7 +11440,7 @@ function syde:Init(library)
 			local origCb = SliderConfig.Callback or SliderConfig.CallBack
 			SliderConfig.Callback = function(val)
 				if origCb then origCb(val) end
-				SaveCfg(game and game.GameId)
+				SaveConfig(game and game.GameId)
 			end
 
 			local sliderObj = self:Slider(SliderConfig)
