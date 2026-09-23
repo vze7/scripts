@@ -2272,11 +2272,12 @@ local function createPerformanceOverlay()
 
 	local frame = Instance.new("Frame")
 	frame.Name = "PerformanceOverlay"
-	frame.BackgroundTransparency = 1
+	frame.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+	frame.BackgroundTransparency = 0.15
 	frame.BorderSizePixel = 0
 	frame.Size = UDim2.fromOffset(142, 20)
 	frame.Visible = false
-	frame.ZIndex = 5
+	frame.ZIndex = 50
 	frame.Active = false
 	frame.Parent = header
 
@@ -2287,7 +2288,7 @@ local function createPerformanceOverlay()
 	label.Text = "-- FPS  ·  -- ms"
 	label.TextColor3 = Color3.fromRGB(255, 255, 255)
 	label.TextSize = 10
-	label.ZIndex = 6
+	label.ZIndex = 51
 	label.Active = false
 	label.Parent = frame
 
@@ -2295,10 +2296,16 @@ local function createPerformanceOverlay()
 		if not frame.Parent or not controls.Parent then return end
 		local controlsLeft = controls.AbsolutePosition.X - header.AbsolutePosition.X
 		local controlsTop = controls.AbsolutePosition.Y - header.AbsolutePosition.Y
-		frame.Position = UDim2.fromOffset(
-			math.max(112, controlsLeft - frame.AbsoluteSize.X - 8),
-			math.max(0, controlsTop + (controls.AbsoluteSize.Y - frame.AbsoluteSize.Y) / 2)
-		)
+		local title = header:FindFirstChild("title")
+		local titleRight = title and (title.Position.X.Offset + title.AbsoluteSize.X) or 110
+		local left = math.max(112, titleRight + 10)
+		local availableWidth = controlsLeft - left - 8
+		if availableWidth < 100 then
+			left = math.max(112, controlsLeft - 108)
+			availableWidth = math.max(0, controlsLeft - left - 8)
+		end
+		frame.Position = UDim2.fromOffset(left, math.max(0, controlsTop + (controls.AbsoluteSize.Y - frame.AbsoluteSize.Y) / 2))
+		frame.Size = UDim2.fromOffset(math.max(0, math.min(142, availableWidth)), 20)
 	end
 
 	syde:AddConnection(header:GetPropertyChangedSignal("AbsoluteSize"), align)
@@ -2670,7 +2677,7 @@ local toasts = {}
 local toastSpacing = 8
 
 local tweenInfo = TweenInfo.new(
-	0.55,
+	0.18,
 	Enum.EasingStyle.Exponential,
 	Enum.EasingDirection.Out
 )
@@ -2884,7 +2891,7 @@ function syde:MakeWindow(WindowConfig)
 		Title = WindowConfig.Name or WindowConfig.Title or "Syde",
 		SubText = WindowConfig.TagText or WindowConfig.SubText or "Hub",
 		Home = WindowConfig.Home or {
-			Enabled = WindowConfig.HomeEnabled == true,
+			Enabled = WindowConfig.HomeEnabled ~= false,
 			profileImage = WindowConfig.ProfileImage,
 			hTitle = WindowConfig.HomeTitle,
 			hSubText = WindowConfig.HomeSubText,
@@ -3085,6 +3092,8 @@ function openui()
 end
 
 function closeui()
+	-- Mark closed before starting any animations so the reopen path is immediate.
+	uiclosed = true
 	local fastTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	pages.Visible = false
@@ -3120,9 +3129,16 @@ function closeui()
 	tweenservice:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 1 }):Play()
 	tweenservice:Create(window.resize, fastTween, {ImageTransparency = 1 }):Play()
 
-	closesettings()
-	closesearch()
+	-- These helpers wait for their closing animations. Hiding these transient
+	-- panels directly avoids blocking the minimize notification and next reopen.
 	settingsOpen = false
+	searchopen = false
+	window.settings.Visible = false
+	window.settings.pages.Visible = false
+	window.settings.tabs.Visible = false
+	window.search.Container.Visible = false
+	window.search.Visible = false
+	window.dim.Visible = false
 
 	if syde.FreeMouse ~= false then
 		syde:UnlockMouse(false)
@@ -3134,7 +3150,6 @@ function closeui()
 		end
 	end)
 
-	uiclosed = true
 	syde:Toast({
 		Content = 'UI Hidden, Use '.. uitoggle.Name ..' To Open Back.',
 		Duration = 2,
@@ -3148,24 +3163,13 @@ function ToggleUI()
 	bounce = true
 
 	if uiclosed then
-		--	task.wait(0.2)
 		openui()
-
-		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-			screenSize = workspace.CurrentCamera.ViewportSize
-			isMobile = userinput.TouchEnabled
-			updateLayout()
-		end)
-
 		updateLayout()
-
-		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayout)
-		userinput:GetPropertyChangedSignal("TouchEnabled"):Connect(updateLayout)
 	else
 		closeui()
 	end
 
-	task.delay(0.2, function()
+	task.delay(0.08, function()
 		bounce = false
 	end)
 end
