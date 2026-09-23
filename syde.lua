@@ -8,6 +8,9 @@ o.`Y8b   8P    8I  dY 88""
 
 ]]
 
+--------------------------------------------------------------------------------
+-- [ SERVICES & CONSTANTS ]
+--------------------------------------------------------------------------------
 local inputservice =	game:GetService("InsertService")
 local tweenservice = 	game:GetService("TweenService")
 local https = 			game:GetService("HttpService")
@@ -19,6 +22,23 @@ local player =          game:GetService('Players')
 local textservice =     game:GetService('TextService')
 local coregui =         (gethui and gethui()) or game:GetService("CoreGui")
 
+local function syde_tween(...)
+	local args = {...}
+	local obj = args[1]
+	local props = args[#args]
+	if not obj then return end
+	
+	local ti_args = {}
+	for i = 2, #args - 1 do
+		table.insert(ti_args, args[i])
+	end
+	
+	local tweenInfo = TweenInfo.new(unpack(ti_args))
+	local tween = tweenservice:Create(obj, tweenInfo, props)
+	tween:Play()
+	return tween
+end
+
 -- update check
 local update = false
 if update then
@@ -26,69 +46,77 @@ if update then
 	updategui.Parent = coregui
 
 	local cord = '/GzumVvz3QM'
-
 	task.wait(0.5)
 	updategui.Enabled = true
 
-	updategui.main.BackgroundTransparency = 1
-	updategui.main.Size = UDim2.new(0, 150,0, 150)
-	updategui.main.time.TextTransparency = 1
-	updategui.main.info.TextTransparency = 1
-	updategui.main.text.TextLabel.TextTransparency = 1
-	updategui.main.text.more.TextTransparency = 1
+	local main = updategui.main
+	local textNode = main.text
 
-	tweenservice:Create(updategui.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-	tweenservice:Create(updategui.main, TweenInfo.new(0.75, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 350,0, 230)}):Play()
+	-- Reset initial state
+	main.BackgroundTransparency = 1
+	main.Size = UDim2.new(0, 150, 0, 150)
+	main.time.TextTransparency = 1
+	main.info.TextTransparency = 1
+	textNode.TextLabel.TextTransparency = 1
+	textNode.more.TextTransparency = 1
 
+	-- Helper function to simplify tweens
+	local function tween(obj, duration, style, props)
+		syde_tween(obj, duration, style, props)
+	end
+
+	-- Entrance animations
+	tween(main, 0.5, Enum.EasingStyle.Exponential, {Transparency = 0})
+	tween(main, 0.75, Enum.EasingStyle.Quart, {Size = UDim2.new(0, 350, 0, 230)})
 	task.wait(0.07)
 
-	tweenservice:Create(updategui.main.time, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-	tweenservice:Create(updategui.main.info, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+	tween(main.time, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+	tween(main.info, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 	task.wait(0.07)
-	tweenservice:Create(updategui.main.text.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+	
+	tween(textNode.TextLabel, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 	task.wait(0.07)
-	tweenservice:Create(updategui.main.text.more, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+	
+	tween(textNode.more, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 
 	local duration = 25
 	local startTime = tick()
-
 	local connection
+
 	connection = runservice.Heartbeat:Connect(function()
 		local elapsed = tick() - startTime
 		local remaining = math.max(duration - elapsed, 0)
-
-		updategui.main.time.Text = "Destroying in " .. string.format("%.1f", remaining) .. " secs"
+		
+		main.time.Text = string.format("Destroying in %.1f secs", remaining)
 
 		if remaining <= 0 then
 			connection:Disconnect()
 
-			tweenservice:Create(updategui.main.text.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			-- Exit animations
+			tween(textNode.TextLabel, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 1})
 			task.wait(0.07)
-			tweenservice:Create(updategui.main.text.more, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			
+			tween(textNode.more, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 1})
 			task.wait(0.2)
-			tweenservice:Create(updategui.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			tweenservice:Create(updategui.main, TweenInfo.new(0.75, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 150,0, 130)}):Play()
-			updategui.main.s2.Visible = false
-
-
-
+			
+			tween(main, 0.5, Enum.EasingStyle.Exponential, {Transparency = 1})
+			tween(main, 0.75, Enum.EasingStyle.Quart, {Size = UDim2.new(0, 150, 0, 130)})
+			main.s2.Visible = false
 			task.wait(0.07)
 
-			tweenservice:Create(updategui.main.time, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(updategui.main.info, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tween(main.time, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 1})
+			tween(main.info, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 1})
 
 			task.wait(0.75)
 			updategui:Destroy()
 		end
 	end)
 
-	updategui.main.s2.interact.MouseButton1Click:Connect(function()
-
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(74, 255, 33)}):Play()
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0}):Play()
+	main.s2.interact.MouseButton1Click:Connect(function()
+		local stroke = main.s2.Frame.UIStroke
+		tween(stroke, 0.5, Enum.EasingStyle.Quart, {Color = Color3.fromRGB(74, 255, 33), Transparency = 0})
 		task.wait(0.5)
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(87, 101, 242)}):Play()
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
+		tween(stroke, 0.5, Enum.EasingStyle.Quart, {Color = Color3.fromRGB(87, 101, 242), Transparency = 0.5})
 		setclipboard(cord)
 	end)
 end
@@ -172,7 +200,9 @@ local syde = {
 	_currentWindow = nil;
 }
 
--- @Utilities
+--------------------------------------------------------------------------------
+-- [ CORE UTILITIES & ANIMATIONS ]
+--------------------------------------------------------------------------------
 
 function syde:DeepMerge(target, source)
 	for k, v in pairs(source) do
@@ -300,9 +330,9 @@ end
 -- Brief green flash on a copy icon to confirm the copy worked.
 function syde:FlashCopy(icon)
 	if not icon then return end
-	tweenservice:Create(icon, TweenInfo.new(0.12, Enum.EasingStyle.Quint), { ImageColor3 = Color3.fromRGB(120, 220, 120) }):Play()
+	syde_tween(icon, 0.12, Enum.EasingStyle.Quint, { ImageColor3 = Color3.fromRGB(120, 220, 120) })
 	task.delay(0.4, function()
-		tweenservice:Create(icon, TweenInfo.new(0.3, Enum.EasingStyle.Quint), { ImageColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+		syde_tween(icon, 0.3, Enum.EasingStyle.Quint, { ImageColor3 = Color3.fromRGB(255, 255, 255) })
 	end)
 end
 
@@ -845,15 +875,11 @@ function Bento:Tween(frame, goal)
 		self.ActiveTweens[frame]:Cancel()
 	end
 
-	local tween = tweenservice:Create(
-		frame,
-		TweenInfo.new(
+	local tween = tweenservice:Create(frame, TweenInfo.new(
 			self.TweenTime,
 			Enum.EasingStyle.Quad,
 			Enum.EasingDirection.Out
-		),
-		goal
-	)
+		), goal)
 
 	self.ActiveTweens[frame] = tween
 	tween:Play()
@@ -1183,7 +1209,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			preview.Size = Object.Size
 			preview.Visible = true
 			previewStroke.Transparency = 1
-			tweenservice:Create(previewStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 0.2}):Play()
+			syde_tween(previewStroke, 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {Transparency = 0.2})
 			local arrow = Dragger:FindFirstChild("ResizeArrow")
 			if arrow then arrow.TextTransparency = 0.1 end
 			renderConnection = runservice.RenderStepped:Connect(applyPendingSize)
@@ -1230,7 +1256,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			activeTouch = nil
 			startPosition, startSize, pendingSize, lastAppliedSize = nil, nil, nil, nil
 			local generation = previewGeneration
-			tweenservice:Create(previewStroke, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+			syde_tween(previewStroke, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {Transparency = 1})
 			task.delay(0.12, function()
 				if preview.Parent and previewGeneration == generation and not isResizing then preview.Visible = false end
 			end)
@@ -1704,55 +1730,55 @@ do
 
 			clone.interact.MouseButton1Click:Connect(function()
 				if value ~= '' then
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(74, 255, 33)}):Play()
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0}):Play()
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Color = Color3.fromRGB(74, 255, 33)})
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Transparency = 0})
 					task.wait(0.5)
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Styles[platform].BackGroundColor}):Play()
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Color = Styles[platform].BackGroundColor})
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Transparency = 0.5})
 				else
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(255, 41, 45)}):Play()
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0}):Play()
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Color = Color3.fromRGB(255, 41, 45)})
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Transparency = 0})
 					task.wait(0.5)
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Styles[platform].BackGroundColor}):Play()
-					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Color = Styles[platform].BackGroundColor})
+					syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Transparency = 0.5})
 				end
 
 				setclipboard(value)
 			end)
 
 			clone.MouseEnter:Connect(function()
-				tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
+				syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Transparency = 0.5})
 			end)
 			clone.MouseLeave:Connect(function()
-				tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0}):Play()
+				syde_tween(clone.Frame.UIStroke, 0.5, Enum.EasingStyle.Quart, {Transparency = 0})
 			end)
 
 			loadedsocial = true
 		end
 
-		tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-		--	tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Quint), {Position = UDim2.new(0.5, 0,0, 105)}):Play()
+		syde_tween(logo, 1, Enum.EasingStyle.Exponential, {ImageTransparency = 0})
+		--	syde_tween(logo, 1, Enum.EasingStyle.Quint, {Position = UDim2.new(0.5, 0,0, 105)})
 
-		tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		syde_tween(logo.Title, 2, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 		task.wait(0.4)
 
 
 		--	local function initLoader()
-		--	tweenservice:Create( LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 25,0, 25)}):Play()
-		--	tweenservice:Create( LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+		--	syde_tween(LOADER.load.Salt, 0.65, Enum.EasingStyle.Quint, {Size = UDim2.new(0, 25,0, 25)})
+		--	syde_tween(LOADER.load.Salt, 0.65, Enum.EasingStyle.Exponential, {TextTransparency = 1})
 		--	end
 
 		local function TweenWorkLabel(Finish, icon, Text)
 			LOADER.loader.work.Position = UDim2.new(0.5, 0,1, -40)
 			LOADER.loader.work.Text = Text
 			LOADER.loader.work.ImageLabel.Image = icon
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { TextTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { ImageTransparency = 0 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -73) }):Play()
+			syde_tween(LOADER.loader.work, 0.2, Enum.EasingStyle.Quint, { TextTransparency = 0 })
+			syde_tween(LOADER.loader.work.ImageLabel, 0.2, Enum.EasingStyle.Quint, { ImageTransparency = 0 })
+			syde_tween(LOADER.loader.work, 0.2, Enum.EasingStyle.Quint, { Position = UDim2.new(0.5, 0,1, -73) })
 			task.wait(Finish or 0.15)
-			tweenservice:Create(LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { TextTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work.ImageLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { ImageTransparency = 1 }):Play()
-			tweenservice:Create( LOADER.loader.work, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0,1, -100) }):Play()
+			syde_tween(LOADER.loader.work, 0.2, Enum.EasingStyle.Quint, { TextTransparency = 1 })
+			syde_tween(LOADER.loader.work.ImageLabel, 0.2, Enum.EasingStyle.Quint, { ImageTransparency = 1 })
+			syde_tween(LOADER.loader.work, 0.2, Enum.EasingStyle.Quint, { Position = UDim2.new(0.5, 0,1, -100) })
 			task.wait(0.1)
 			-- reset
 
@@ -1806,16 +1832,16 @@ do
 			TweenWorkLabel(0.18,'rbxassetid://105810189969774', '')
 
 			local UI_TAG = "sydeUILoader"
-			local MARKER_NAME = "SYDEUIDetector"
-			local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
-			local PROTECTION_EVENT = Instance.new("BindableEvent")
+			local markerName = "SYDEUIDetector"
+			local internalUuid = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
+			local protectionEvent = Instance.new("BindableEvent")
 			local HttpService = game:GetService("HttpService")
 
 
 			-- Cleanup old UI 
 			local function deepCleanup()
 				for _, v in ipairs(coregui:GetChildren()) do
-					if v:IsA("ScreenGui") and v:FindFirstChild(MARKER_NAME) then
+					if v:IsA("ScreenGui") and v:FindFirstChild(markerName) then
 						pcall(function()
 							v:Destroy()
 						end)
@@ -1838,8 +1864,8 @@ do
 			Library.ResetOnSpawn = false
 
 			local marker = Instance.new("StringValue")
-			marker.Name = MARKER_NAME
-			marker.Value = INTERNAL_UUID
+			marker.Name = markerName
+			marker.Value = internalUuid
 			marker.Parent = Library
 
 			pcall(function()
@@ -1929,8 +1955,8 @@ do
 			TweenWorkLabel(0.18,'rbxassetid://136405833725573', '')
 			task.wait(0.4)
 			loaded = true
-			--	tweenservice:Create( LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 146,0, 25)}):Play()
-			--	tweenservice:Create( LOADER.load.Salt.ImageLabel, TweenInfo.new(0.65, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+			--	syde_tween(LOADER.load.Salt, 0.65, Enum.EasingStyle.Quint, {Size = UDim2.new(0, 146,0, 25)})
+			--	syde_tween(LOADER.load.Salt.ImageLabel, 0.65, Enum.EasingStyle.Exponential, {ImageTransparency = 0})
 		end
 
 		--	initLoader()
@@ -1949,11 +1975,11 @@ do
 end
 
 local HttpService = https
-local THEME_FOLDER = "BlizTOrionTheme"
-local FILE_PATH = THEME_FOLDER .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
+local themeFolder = "BlizTOrionTheme"
+local filePath = themeFolder .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
 
-if makefolder and isfolder and not isfolder(THEME_FOLDER) then
-	pcall(makefolder, THEME_FOLDER)
+if makefolder and isfolder and not isfolder(themeFolder) then
+	pcall(makefolder, themeFolder)
 end
 
 local LoadedThemeFile = false
@@ -1975,6 +2001,10 @@ local function UnpackColor(Color)
 	return Color3.fromRGB(Color.R, Color.G, Color.B)
 end
 
+
+--------------------------------------------------------------------------------
+-- [ THEME & COLOR MANAGEMENT ]
+--------------------------------------------------------------------------------
 function syde:SaveThemeCfg()
 	if not LoadedThemeFile then return end
 
@@ -1996,18 +2026,18 @@ function syde:SaveThemeCfg()
 	if self.HeaderTitleColor then ThemeColorsToSave["HeaderTitleColor"] = PackColor(self.HeaderTitleColor) end
 	if self.HeaderSubtitleColor then ThemeColorsToSave["HeaderSubtitleColor"] = PackColor(self.HeaderSubtitleColor) end
 
-	if makefolder and isfolder and not isfolder(THEME_FOLDER) then
-		pcall(makefolder, THEME_FOLDER)
+	if makefolder and isfolder and not isfolder(themeFolder) then
+		pcall(makefolder, themeFolder)
 	end
 	if writefile then
 		pcall(function()
-			writefile(FILE_PATH, HttpService:JSONEncode(ThemeColorsToSave))
+			writefile(filePath, HttpService:JSONEncode(ThemeColorsToSave))
 		end)
 	end
 end
 
 local function LoadThemeCfg(Config)
-	Config = Config or FILE_PATH
+	Config = Config or filePath
 	if isfile and isfile(Config) then
 		local ok, dataOrErr = pcall(function()
 			return HttpService:JSONDecode(readfile(Config))
@@ -2091,6 +2121,10 @@ function syde:GenTheme(mainColor)
 	return t
 end
 
+
+--------------------------------------------------------------------------------
+-- [ CONFIGURATION & SAVING SYSTEM ]
+--------------------------------------------------------------------------------
 local function normalizeConfigName(name)
 	name = tostring(name or "default")
 	name = name:gsub("[^%w_%-]", "_"):gsub("_+", "_"):sub(1, 64)
@@ -2564,7 +2598,7 @@ function applyLayout(isMobile)
 	local viewport = camera.ViewportSize
 	local width = math.min(isMobile and 543 or 715, math.max(1, viewport.X - 24))
 	local height = math.min(isMobile and 321 or 575, math.max(1, viewport.Y - 24))
-	tweenservice:Create(Library.main, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Size = UDim2.fromOffset(width, height)}):Play()
+	syde_tween(Library.main, 0.2, Enum.EasingStyle.Quint, {Size = UDim2.fromOffset(width, height)})
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then
 		shadow.Visible = not isMobile 
@@ -2602,6 +2636,9 @@ for _, temp in ipairs(Library.Notification:GetChildren()) do
 	end
 end 
 
+--------------------------------------------------------------------------------
+-- [ NOTIFICATION SYSTEM ]
+--------------------------------------------------------------------------------
 function syde:Notify(Notification)
 	if syde.SuppressNotify then return end
 	task.spawn(function()
@@ -2633,15 +2670,15 @@ function syde:Notify(Notification)
 
 			if Notification and Notification.Parent then
 				table.remove(notifications, table.find(notifications, Notification))
-				tweenservice:Create(Notification.UIScale, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Scale = 0.9}):Play()
-				tweenservice:Create(Notification.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {ImageTransparency = 0.95}):Play()
-				tweenservice:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.75}):Play()
-				--	tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0.5}):Play()
-				tweenservice:Create(Notification.Content, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0.78}):Play()
+				syde_tween(Notification.UIScale, 0.5, Enum.EasingStyle.Exponential, {Scale = 0.9})
+				syde_tween(Notification.close, 0.5, Enum.EasingStyle.Exponential, {ImageTransparency = 0.95})
+				syde_tween(Notification, 0.5, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0.75})
+				--	syde_tween(Notification.Title, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0.5})
+				syde_tween(Notification.Content, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0.78})
 
 				task.wait(0.15)
 
-				tweenservice:Create(Notification, TweenInfo.new(0.95, Enum.EasingStyle.Exponential), {Position = UDim2.new(0, Notification.Position.X.Offset + 400, 0, Notification.Position.Y.Offset) }):Play()
+				syde_tween(Notification, 0.95, Enum.EasingStyle.Exponential, {Position = UDim2.new(0, Notification.Position.X.Offset + 400, 0, Notification.Position.Y.Offset) })
 				task.wait(0.4)
 				Notification:Destroy()
 				updatePositions()
@@ -2686,26 +2723,26 @@ function syde:Notify(Notification)
 		task.wait(0.45)
 
 		if NotifData.Icon ~= '' then
-			tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 10)}):Play()
+			syde_tween(Notification.Title, 0.5, Enum.EasingStyle.Quint, {Position = UDim2.new(0, 40,0, 10)})
 			task.wait(0.035)
-			tweenservice:Create(Notification.Content, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 30)}):Play()
+			syde_tween(Notification.Content, 0.5, Enum.EasingStyle.Quint, {Position = UDim2.new(0, 40,0, 30)})
 
-			tweenservice:Create(Notification.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+			syde_tween(Notification.icon, 1, Enum.EasingStyle.Exponential, {ImageTransparency = 0})
 		end
 
 
-		tweenservice:Create(Notification.UIScale, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Scale = 1}):Play()
-		tweenservice:Create(Notification.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {ImageTransparency = 0.75}):Play()
-		tweenservice:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-		--	tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-		tweenservice:Create(Notification.Content, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		syde_tween(Notification.UIScale, 0.5, Enum.EasingStyle.Exponential, {Scale = 1})
+		syde_tween(Notification.close, 0.5, Enum.EasingStyle.Exponential, {ImageTransparency = 0.75})
+		syde_tween(Notification, 0.5, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+		--	syde_tween(Notification.Title, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+		syde_tween(Notification.Content, 0.5, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 
 		Notification.close.MouseEnter:Connect(function()
-			tweenservice:Create(Notification.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {ImageTransparency = 0.25}):Play()
+			syde_tween(Notification.close, 0.5, Enum.EasingStyle.Exponential, {ImageTransparency = 0.25})
 		end)
 
 		Notification.close.MouseLeave:Connect(function()
-			tweenservice:Create(Notification.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {ImageTransparency = 0.75}):Play()
+			syde_tween(Notification.close, 0.5, Enum.EasingStyle.Exponential, {ImageTransparency = 0.75})
 		end)
 
 		Notification.close.MouseButton1Click:Connect(function()
@@ -2826,21 +2863,21 @@ function syde:Modal(Modal)
 		if dim then
 			dim.ZIndex = 190
 			dim.Visible = true
-			tweenservice:Create(dim, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { BackgroundTransparency = 0.3 }):Play()
+			syde_tween(dim, 0.2, Enum.EasingStyle.Quint, { BackgroundTransparency = 0.3 })
 		end
 
 		local function closeModal()
 			activeModals = math.max(0, activeModals - 1)
 			pcall(function()
-				tweenservice:Create(ModalInstance, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+				syde_tween(ModalInstance, 0.2, Enum.EasingStyle.Quint, {
 					Size = UDim2.new(0, 320, 0, 120),
 					BackgroundTransparency = 1
-				}):Play()
+				})
 			end)
 			task.wait(0.2)
 			ModalInstance:Destroy()
 			if activeModals == 0 and dim then
-				tweenservice:Create(dim, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { BackgroundTransparency = 1 }):Play()
+				syde_tween(dim, 0.2, Enum.EasingStyle.Quint, { BackgroundTransparency = 1 })
 				task.delay(0.2, function()
 					if activeModals == 0 then dim.Visible = false end
 				end)
@@ -2848,10 +2885,10 @@ function syde:Modal(Modal)
 		end
 
 		activeModals += 1
-		tweenservice:Create(ModalInstance, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		syde_tween(ModalInstance, 0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, {
 			Size = UDim2.new(0, 360, 0, 150),
 			BackgroundTransparency = 0
-		}):Play()
+		})
 
 		local confirmBtn = ModalInstance:FindFirstChild("Buttons") and ModalInstance.Buttons:FindFirstChild("Confirm")
 		local cancelBtn = ModalInstance:FindFirstChild("Buttons") and ModalInstance.Buttons:FindFirstChild("Cancel")
@@ -2923,7 +2960,7 @@ function syde:Toast(Toasty)
 		-- task.wait(0) -- allow TextBounds update
 
 		Toast.Size = UDim2.new(1, Toast.Content.TextBounds.X - 140 ,0, 40)
-		--  tweenservice:Create(Toast, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = UDim2.new(1, Toast.Content.TextBounds.X - 140 ,0, 40)}):Play()
+		--  syde_tween(Toast, 0.4, Enum.EasingStyle.Quart, {Size = UDim2.new(1, Toast.Content.TextBounds.X - 140 ,0, 40)})
 
 		if Data.Icon ~= "" then
 			Toast.icon.ImageLabel.Image = "rbxassetid://" .. Data.Icon
@@ -2948,28 +2985,24 @@ function syde:Toast(Toasty)
 
 			table.remove(toasts, table.find(toasts, Toast))
 
-			tweenservice:Create(
-				Toast,
-				TweenInfo.new(0.4, Enum.EasingStyle.Exponential),
-				{
+			syde_tween(Toast, 0.4, Enum.EasingStyle.Exponential, {
 					Position = Toast.Position - UDim2.fromOffset(0, 30),
 					BackgroundTransparency = 1
-				}
-			):Play()
+				})
 
 			for _, v in ipairs(Toast:GetDescendants()) do
 				if v:IsA("TextLabel") then
-					tweenservice:Create(v, TweenInfo.new(0.3), {
+					syde_tween(v, 0.3, {
 						TextTransparency = 1
-					}):Play()
+					})
 				elseif v:IsA("ImageLabel") then
-					tweenservice:Create(v, TweenInfo.new(0.3), {
+					syde_tween(v, 0.3, {
 						ImageTransparency = 1
-					}):Play()
+					})
 				elseif v:IsA("Frame") then
-					tweenservice:Create(v, TweenInfo.new(0.3), {
+					syde_tween(v, 0.3, {
 						BackgroundTransparency = 1
-					}):Play()
+					})
 				end
 			end
 
@@ -2980,6 +3013,10 @@ function syde:Toast(Toasty)
 	end)
 end
 
+
+--------------------------------------------------------------------------------
+-- [ SEARCH SYSTEM & NOTIFICATIONS ]
+--------------------------------------------------------------------------------
 function syde:MakeNotification(NotificationConfig)
 	NotificationConfig = NotificationConfig or {}
 	local icon = NotificationConfig.Image or NotificationConfig.Icon or ""
@@ -3147,6 +3184,9 @@ local function showWindowIntro(config)
 	end
 end
 
+--------------------------------------------------------------------------------
+-- [ WINDOW INITIALIZATION ]
+--------------------------------------------------------------------------------
 function syde:MakeWindow(WindowConfig)
 	WindowConfig = WindowConfig or {}
 	WindowConfig.Name = WindowConfig.Name or WindowConfig.Title or "Fire Hub"
@@ -3163,11 +3203,11 @@ function syde:MakeWindow(WindowConfig)
 
 	if makefolder and isfolder then
 		if not isfolder(cfgFolder) then pcall(makefolder, cfgFolder) end
-		if not isfolder(THEME_FOLDER) then pcall(makefolder, THEME_FOLDER) end
+		if not isfolder(themeFolder) then pcall(makefolder, themeFolder) end
 	end
 
 	-- Preload theme configuration
-	LoadThemeCfg(FILE_PATH)
+	LoadThemeCfg(filePath)
 
 	-- Preload element configuration so defaults use saved values
 	local configFilePath = string.format("%s/%s.txt", cfgFolder, tostring(game and game.GameId or "default"))
@@ -3346,15 +3386,15 @@ end
 function SetUserInfo()
 	local LocalPlayer = player.LocalPlayer
 
-	local PLACEHOLDER_IMAGE = "rbxassetid://0" 
-	local THUMBNAIL_TYPE = Enum.ThumbnailType.HeadShot
-	local THUMBNAIL_SIZE = Enum.ThumbnailSize.Size420x420
+	local placeholderImage = "rbxassetid://0" 
+	local thumbnailType = Enum.ThumbnailType.HeadShot
+	local thumbnailSize = Enum.ThumbnailSize.Size420x420
 
 	local imageLabel = window:WaitForChild("user"):WaitForChild("headshot")
-	imageLabel.Image = PLACEHOLDER_IMAGE
+	imageLabel.Image = placeholderImage
 
 	local success, thumbnail = pcall(function()
-		return player:GetUserThumbnailAsync(LocalPlayer.UserId, THUMBNAIL_TYPE, THUMBNAIL_SIZE)
+		return player:GetUserThumbnailAsync(LocalPlayer.UserId, thumbnailType, thumbnailSize)
 	end)
 
 	if success and thumbnail then
@@ -3362,7 +3402,7 @@ function SetUserInfo()
 		window.user.headshot.id.username.Text = LocalPlayer.Name
 		window.user.headshot.id.displayname.Text = "@"..LocalPlayer.DisplayName
 	else
-		imageLabel.Image = PLACEHOLDER_IMAGE
+		imageLabel.Image = placeholderImage
 	end
 end
 
@@ -3378,33 +3418,33 @@ function opensearch()
 
 
 	if window.search.Frame.TextBox.Text ~= '' then
-		tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 230) }):Play()
+		syde_tween(window.search, 0.5, Enum.EasingStyle.Exponential, { Size = UDim2.new(0, 350,0, 230) })
 	else
-		tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
+		syde_tween(window.search, 0.5, Enum.EasingStyle.Exponential, { Size = UDim2.new(0, 350,0, 60) })
 	end
 
-	tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	syde_tween(window.dim, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.45 })
+	syde_tween(window.search, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0 })
+	syde_tween(window.search.Frame.ImageLabel, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 0 })
 
-	tweenservice:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	syde_tween(window.search.close, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0 })
+	syde_tween(window.search.close.ImageLabel, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 0 })
 
-	tweenservice:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	syde_tween(window.search.Frame.TextBox, 0.5, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
 end
 
 function closesearch()
 	searchopen = false
 	window.search.Container.Visible = false
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
-	tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	tweenservice:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	syde_tween(window.search, 0.5, Enum.EasingStyle.Exponential, { Size = UDim2.new(0, 350,0, 60) })
+	syde_tween(window.dim, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1 })
+	syde_tween(window.search, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1})
+	syde_tween(window.search.Frame.ImageLabel, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
 
-	tweenservice:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	tweenservice:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	syde_tween(window.search.close, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1})
+	syde_tween(window.search.close.ImageLabel, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
 
-	tweenservice:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	syde_tween(window.search.Frame.TextBox, 0.5, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
 	task.wait(0.5)
 	window.dim.Visible = false
 	window.search.Visible = false
@@ -3478,6 +3518,10 @@ function openui()
 	end
 end
 
+
+--------------------------------------------------------------------------------
+-- [ WINDOW & MINIMIZE CONTROLLERS ]
+--------------------------------------------------------------------------------
 local lastHideToastAt = 0
 function closeui()
 	sizeBeforeMinimize = window.Size
@@ -3555,6 +3599,10 @@ syde:HidePH(tabs, 'btn')
 syde:HidePH(pages, 'page')
 
 --@@Initialize
+
+--------------------------------------------------------------------------------
+-- [ CORE UI INITIALIZATION (INIT) ]
+--------------------------------------------------------------------------------
 function syde:Init(library)
 	if syde._currentWindow and (not library or library == true or type(library) ~= "table" or not library.Title) then
 		pcall(function()
@@ -3587,15 +3635,15 @@ function syde:Init(library)
 	ui.Enabled = true
 	if loaded == false then
 		local UI_TAG = "sydeUILoader"
-		local MARKER_NAME = "SYDEUIDetector"
-		local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
-		local PROTECTION_EVENT = Instance.new("BindableEvent")
+		local markerName = "SYDEUIDetector"
+		local internalUuid = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
+		local protectionEvent = Instance.new("BindableEvent")
 		local HttpService = game:GetService("HttpService")
 
 		-- Cleanup old UI 
 		local function deepCleanup()
 			for _, v in ipairs(coregui:GetChildren()) do
-				if v:IsA("ScreenGui") and v:FindFirstChild(MARKER_NAME) then
+				if v:IsA("ScreenGui") and v:FindFirstChild(markerName) then
 					pcall(function()
 						v:Destroy()
 					end)
@@ -3618,8 +3666,8 @@ function syde:Init(library)
 		Library.ResetOnSpawn = false
 
 		local marker = Instance.new("StringValue")
-		marker.Name = MARKER_NAME
-		marker.Value = INTERNAL_UUID
+		marker.Name = markerName
+		marker.Value = internalUuid
 		marker.Parent = Library
 
 		pcall(function()
@@ -3750,9 +3798,9 @@ function syde:Init(library)
 
 	--initial transparency setup
 	top.title.TextTransparency = 1
-	tweenservice:Create(top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+	syde_tween(top.title, 0.4, Enum.EasingStyle.Exponential, {TextTransparency = 1})
 	top.title.sub.TextTransparency = 1
-	tweenservice:Create(top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+	syde_tween(top.title.sub, 0.4, Enum.EasingStyle.Exponential, {TextTransparency = 1})
 
 	task.spawn(function()
 		task.wait(0.5)
@@ -3766,9 +3814,9 @@ function syde:Init(library)
 		task.wait()
 		local textSize = top.title.TextBounds.X + 3
 
-		tweenservice:Create(top.title, TweenInfo.new(1.55, Enum.EasingStyle.Quint), {
+		syde_tween(top.title, 1.55, Enum.EasingStyle.Quint, {
 			Size = UDim2.new(0, textSize, 0, 20)
-		}):Play()
+		})
 	end)
 
 	local titleVariants = {Data.Title}
@@ -3796,7 +3844,7 @@ function syde:Init(library)
 				end
 				setHeaderTitle(titleVariants[titleIndex])
 				if not uiclosed then
-					tweenservice:Create(top.title, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+					syde_tween(top.title, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {TextTransparency = 0})
 				end
 			end
 		end)
@@ -3840,7 +3888,7 @@ function syde:Init(library)
 
 
 			if v.Name == "plugins" and gradient then
-				tweenservice:Create(v.rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+				syde_tween(v.rainbow, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 0 })
 				local state = RainbowStates[v]
 				if state.connection then return end
 
@@ -3874,7 +3922,7 @@ function syde:Init(library)
 
 
 			if v.Name == "plugins" then
-				tweenservice:Create(v.rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				syde_tween(v.rainbow, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
 				local state = RainbowStates[v]
 				if state and state.connection then
 					state.connection:Disconnect()
@@ -3896,7 +3944,7 @@ function syde:Init(library)
 
 
 	local debounce = false
-	local DEBOUNCE_TIME = 0.1
+	local debounceTime = 0.1
 
 	top.functions.search.interact.MouseButton1Click:Connect(function()
 		if debounce then return end
@@ -3908,7 +3956,7 @@ function syde:Init(library)
 			closesearch()
 		end
 
-		task.delay(DEBOUNCE_TIME, function()
+		task.delay(debounceTime, function()
 			debounce = false
 		end)
 	end)
@@ -3919,29 +3967,29 @@ function syde:Init(library)
 		if p == "Accent" then
 			for i, glow in pairs(window.clipframe:GetChildren()) do
 				if glow:IsA("ImageLabel") then
-					tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
+					syde_tween(glow, 0.5, Enum.EasingStyle.Exponential, {ImageColor3 = value})
 				end
 			end
-			tweenservice:Create(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
-			tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageColor3 = value}):Play()
+			syde_tween(window.shadow.glow, 0.5, Enum.EasingStyle.Exponential, {ImageColor3 = value})
+			syde_tween(window.shadow.glow1, 0.5, Enum.EasingStyle.Exponential, {ImageColor3 = value})
 		end
 	end)
 
 	-- Syde Connection (Coming Soon)
 	SetUserInfo()
-	tweenservice:Create(window.user.headshot.id.username, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = UDim2.new(0, window.user.headshot.id.username.TextBounds.X + 10,0, 10)}):Play()
+	syde_tween(window.user.headshot.id.username, 0.5, Enum.EasingStyle.Quart, {Size = UDim2.new(0, window.user.headshot.id.username.TextBounds.X + 10,0, 10)})
 
 	if userinfodisabled == false then
-		tweenservice:Create(window.tabs, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 200,1, -115) }):Play()
+		syde_tween(window.tabs, 0.4, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, 200,1, -115) })
 	else
-		tweenservice:Create(window.tabs, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 200,1, -75) }):Play()
+		syde_tween(window.tabs, 0.4, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, 200,1, -75) })
 	end
 
 	window.user.MouseEnter:Connect(function()
-		tweenservice:Create(window.user.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Quart), {Thickness = 1}):Play()
+		syde_tween(window.user.UIStroke, 1, Enum.EasingStyle.Quart, {Thickness = 1})
 	end)
 	window.user.MouseLeave:Connect(function()
-		tweenservice:Create(window.user.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
+		syde_tween(window.user.UIStroke, 1, Enum.EasingStyle.Quart, {Thickness = 0})
 	end)
 
 	if Data.Home.Enabled then
@@ -4110,11 +4158,11 @@ function syde:Init(library)
 		pointTemplate.Visible = false
 		lineTemplate.Visible = false
 
-		local UPDATE_INTERVAL = 0.3
-		local MAX_POINTS = 15
+		local updateInterval = 0.3
+		local maxPoints = 15
 		local MAX_PING = 300
 
-		local SMOOTH_SPEED = 0.25
+		local smoothSpeed = 0.25
 
 		local history = {}
 		local smoothHistory = {}
@@ -4199,7 +4247,7 @@ function syde:Init(library)
 			local w = graph.AbsoluteSize.X
 			local h = graph.AbsoluteSize.Y
 
-			local step = w/(MAX_POINTS-1)
+			local step = w/(maxPoints-1)
 
 			local lastX,lastY
 
@@ -4269,7 +4317,7 @@ function syde:Init(library)
 
 				table.insert(history,ping)
 
-				if #history > MAX_POINTS then
+				if #history > maxPoints then
 					table.remove(history,1)
 				end
 
@@ -4281,14 +4329,14 @@ function syde:Init(library)
 						smoothHistory[i] or v
 
 					smoothHistory[i] =
-						current + (v-current)*SMOOTH_SPEED
+						current + (v-current)*smoothSpeed
 
 				end
 
 
 				draw()
 
-				task.wait(UPDATE_INTERVAL)
+				task.wait(updateInterval)
 
 			end
 		end)
@@ -4298,11 +4346,11 @@ function syde:Init(library)
 		for i,v in ipairs(window.pages.home.general.Quick.QuickSettings.QuickButtons.holder:GetChildren()) do
 			if v:IsA('Frame') then
 				v.MouseEnter:Connect(function()
-					tweenservice:Create(v.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+					syde_tween(v.UIStroke, 0.4, Enum.EasingStyle.Exponential, {Transparency = 0})
 				end)
 
 				v.MouseLeave:Connect(function()
-					tweenservice:Create(v.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+					syde_tween(v.UIStroke, 0.4, Enum.EasingStyle.Exponential, {Transparency = 1})
 				end)
 			end
 		end
@@ -4523,34 +4571,34 @@ function syde:Init(library)
 		window.settings.Visible = true
 		window.dim.Visible = true
 
-		tweenservice:Create(window.settings, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 400)}):Play()
-		tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.2 }):Play()
-		tweenservice:Create(window.settings.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0,20)}):Play()
+		syde_tween(window.settings, 0.5, Enum.EasingStyle.Quart, { Size = UDim2.new(0, 360,0, 400)})
+		syde_tween(window.dim, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.2 })
+		syde_tween(window.settings.UICorner, 0.5, Enum.EasingStyle.Quart, { CornerRadius = UDim.new(0,20)})
 
-		tweenservice:Create(window.settings, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
+		syde_tween(window.settings, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0})
 		window.settings.pages.Visible = true
 		window.settings.tabs.Visible = true
 
-		tweenservice:Create(window.settings.top.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0}):Play()
+		syde_tween(window.settings.top.title, 0.5, Enum.EasingStyle.Exponential, { TextTransparency = 0})
+		syde_tween(window.settings.top.separator, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0})
+		syde_tween(window.settings.top.functions.close, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0})
+		syde_tween(window.settings.top.functions.close.ImageLabel, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 0})
 	end
 
 	function closesettings()
 		if performanceOverlay.frame then performanceOverlay.frame.Visible = false end
-		tweenservice:Create(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 150)}):Play()
-		tweenservice:Create(window.dim, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.UICorner, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0, 90)}):Play()
+		syde_tween(window.settings, 0.35, Enum.EasingStyle.Quart, { Size = UDim2.new(0, 360,0, 150)})
+		syde_tween(window.dim, 0.35, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1})
+		syde_tween(window.settings.UICorner, 0.35, Enum.EasingStyle.Quart, { CornerRadius = UDim.new(0, 90)})
 
-		tweenservice:Create(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
+		syde_tween(window.settings, 0.35, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1})
 		window.settings.pages.Visible = false
 		window.settings.tabs.Visible = false
 
-		tweenservice:Create(window.settings.top.title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { ImageTransparency = 1}):Play()
+		syde_tween(window.settings.top.title, 0.35, Enum.EasingStyle.Exponential, { TextTransparency = 1})
+		syde_tween(window.settings.top.separator, 0.35, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1})
+		syde_tween(window.settings.top.functions.close, 0.35, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1})
+		syde_tween(window.settings.top.functions.close.ImageLabel, 0.35, Enum.EasingStyle.Exponential, { ImageTransparency = 1})
 		task.wait(0.6)
 		if settingsOpen then return end
 		window.settings.Visible = false
@@ -4604,7 +4652,11 @@ function syde:Init(library)
 			selected = false
 		}
 
-		function settings:inittab(tab)
+		
+--------------------------------------------------------------------------------
+-- [ SETTINGS TAB MANAGEMENT ]
+--------------------------------------------------------------------------------
+function settings:inittab(tab)
 			local telement = {}
 			local tdata = {
 				Title = tab.Title
@@ -4679,7 +4731,11 @@ function syde:Init(library)
 				tbdata.selectedTab = Tab
 			end)
 
-			function telement:Button(Button)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: BUTTONS ]
+--------------------------------------------------------------------------------
+function telement:Button(Button)
 				local data = {
 					Title = Button.Title or "Temp Button";
 					CallBack = Button.CallBack;
@@ -4709,12 +4765,12 @@ function syde:Init(library)
 					button.interact.MouseButton1Down:Connect(function()
 						tweenservice:Create(button.UIStroke, fOTween, { Transparency = 1 }):Play()
 						tweenservice:Create(button.ImageLabel, fOTween, { ImageTransparency = 1 }):Play()
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+						syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
 					end)
 
 					button.interact.MouseButton1Up:Connect(function()
 						tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+						syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 0.95 })
 
 
 					end)
@@ -4734,7 +4790,7 @@ function syde:Init(library)
 					-- Extra Check 
 					button.interact.MouseLeave:Connect(function()
 						tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+						syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 0.95 })
 					end)
 				elseif data.Type == 'Hold' then
 					local HoldTime = data.HoldTime
@@ -4751,9 +4807,9 @@ function syde:Init(library)
 					Holding = false
 					TimeLeft = HoldTime
 					button.title.timer.Text = tostring(HoldTime)
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.15), { ImageTransparency = 0.95 }):Play()
-					tweenservice:Create(button.title.timer, TweenInfo.new(0.15), { TextTransparency = 1 }):Play()
-					tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(0.15), { Offset = Vector2.new(-1, 0) }):Play()
+					syde_tween(button.ImageLabel, 0.15, { ImageTransparency = 0.95 })
+					syde_tween(button.title.timer, 0.15, { TextTransparency = 1 })
+					syde_tween(button.UIStroke.UIGradient, 0.15, { Offset = Vector2.new(-1, 0) })
 					Complete = false
 				end
 
@@ -4762,10 +4818,10 @@ function syde:Init(library)
 						Holding = true
 						TimeLeft = HoldTime
 						button.title.timer.Text = tostring(TimeLeft)
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-						tweenservice:Create(button.title.timer, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-						tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(HoldTime, Enum.EasingStyle.Linear), { Offset = Vector2.new(0.7, 0) }):Play()
-						tweenservice:Create(button.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0}):Play()
+						syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
+						syde_tween(button.title.timer, 0.8, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+						syde_tween(button.UIStroke.UIGradient, HoldTime, Enum.EasingStyle.Linear, { Offset = Vector2.new(0.7, 0) })
+						syde_tween(button.UIStroke, 1, Enum.EasingStyle.Exponential, { Transparency = 0})
 
 						-- Countdown loop
 						while Holding and TimeLeft > 0 do
@@ -4786,10 +4842,10 @@ function syde:Init(library)
 								warn("[CALLBACK MISSING]: No Function Assigned To", data.Title)
 							end
 
-							tweenservice:Create(button, TweenInfo.new(0.34, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(24, 24, 24) }):Play()
-							tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(0.1, Enum.EasingStyle.Linear), { Offset = Vector2.new(-1, 0) }):Play()
+							syde_tween(button, 0.34, Enum.EasingStyle.Exponential, { BackgroundColor3 = Color3.fromRGB(24, 24, 24) })
+							syde_tween(button.UIStroke.UIGradient, 0.1, Enum.EasingStyle.Linear, { Offset = Vector2.new(-1, 0) })
 							task.wait(0.34)
-							tweenservice:Create(button, TweenInfo.new(0.34, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(17, 17, 17) }):Play()
+							syde_tween(button, 0.34, Enum.EasingStyle.Exponential, { BackgroundColor3 = Color3.fromRGB(17, 17, 17) })
 						end
 					end)
 
@@ -4823,7 +4879,7 @@ function syde:Init(library)
 
 							local newDescSize = UDim2.new(1, -150, 0, textSize.Y)
 							local newButtonSize = UDim2.new(button.Size.X.Scale, button.Size.X.Offset, 0, button.title.Size.Y.Offset + textSize.Y + 10)
-							tweenservice:Create(button.UICorner, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { CornerRadius = UDim.new(0,20) }):Play()
+							syde_tween(button.UICorner, 0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, { CornerRadius = UDim.new(0,20) })
 							local descTween = tweenservice:Create(descLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
 							descTween:Play()
 
@@ -4841,7 +4897,11 @@ function syde:Init(library)
 
 			end
 
-			function telement:Toggle(Toggle)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: TOGGLES ]
+--------------------------------------------------------------------------------
+function telement:Toggle(Toggle)
 				local data = {
 					Title = Toggle.Title or "Temp Toggle";
 					Desc = Toggle.Description or "";
@@ -4864,7 +4924,7 @@ function syde:Init(library)
 				toggleConfiguration.Visible = false
 
 				toggleConfiguration.Container.KeyBind.Bind.v.Text = 'None'
-				tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) }):Play()
+				syde_tween(toggleConfiguration.Container.KeyBind.Bind, 0.5, Enum.EasingStyle.Quint, { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) })
 
 				toggleConfiguration.BackgroundTransparency = 1
 				toggleConfiguration.Container.KeyBind.Title.TextTransparency = 1
@@ -4934,7 +4994,7 @@ function syde:Init(library)
 
 							local newDescSize = UDim2.new(1, -150, 0, textSize.Y)
 							local newButtonSize = UDim2.new(toggle.Size.X.Scale, toggle.Size.X.Offset, 0, toggle.title.Size.Y.Offset + textSize.Y + 10) -- Adding extra padding
-							tweenservice:Create(toggle.UICorner, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { CornerRadius = UDim.new(0,20) }):Play()
+							syde_tween(toggle.UICorner, 0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, { CornerRadius = UDim.new(0,20) })
 							local descTween = tweenservice:Create(descLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
 							descTween:Play()
 
@@ -4977,7 +5037,7 @@ function syde:Init(library)
 						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, enterTween, { TextTransparency = 0 }):Play()
 						tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, enterTween, { ImageTransparency = 0 }):Play()
 						tweenservice:Create(toggleConfiguration.Container.Clear.Title, enterTween, { TextTransparency = 0 }):Play()
-						tweenservice:Create(toggleConfiguration, TweenInfo.new(0.7, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 174,0, 88) }):Play()
+						syde_tween(toggleConfiguration, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(0, 174,0, 88) })
 						--	tweenservice:Create(toggleConfiguration.shadow.ImageLabel, enterTween, { ImageTransparency = 0.57 }):Play()
 
 					end
@@ -4992,7 +5052,7 @@ function syde:Init(library)
 						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, enterTween, { TextTransparency = 1 }):Play()
 						tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, enterTween, { ImageTransparency = 1 }):Play()
 						tweenservice:Create(toggleConfiguration.Container.Clear.Title, enterTween, { TextTransparency = 1 }):Play()
-						tweenservice:Create(toggleConfiguration, TweenInfo.new(0.7, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 75,0, 53) }):Play()
+						syde_tween(toggleConfiguration, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(0, 75,0, 53) })
 						--	tweenservice:Create(toggleConfiguration.shadow.ImageLabel, enterTween, { ImageTransparency = 1 }):Play()
 						task.wait(0.5)
 
@@ -5031,7 +5091,7 @@ function syde:Init(library)
 					end)
 
 					local function ResizeBindFrame()
-						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) }):Play()
+						syde_tween(toggleConfiguration.Container.KeyBind.Bind, 0.5, Enum.EasingStyle.Quint, { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) })
 					end
 
 					local function setKeybind(key)
@@ -5043,9 +5103,9 @@ function syde:Init(library)
 							data.Keybind = key
 							data.KeybindReady = false
 
-							tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+							syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
 							toggleConfiguration.Container.KeyBind.Bind.v.Text = key.Name
-							tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+							syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 1, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
 							ResizeBindFrame()
 
 							task.delay(0.5, function()
@@ -5055,10 +5115,10 @@ function syde:Init(library)
 					end
 
 					toggleConfiguration.Container.KeyBind.Interact.MouseButton1Click:Connect(function()
-						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
 						task.wait(0.2)
 						toggleConfiguration.Container.KeyBind.Bind.v.Text = "..."
-						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
 						ResizeBindFrame()
 
 
@@ -5096,11 +5156,11 @@ function syde:Init(library)
 						setKeybind(nil)
 
 						local function blink()
-							tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint), { Rotation = 13 }):Play()
+							syde_tween(toggleConfiguration.Container.Clear.clear.ImageLabel, 0.25, Enum.EasingStyle.Quint, { Rotation = 13 })
 							task.wait(0.2)
-							tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint), { Rotation = -13 }):Play()
+							syde_tween(toggleConfiguration.Container.Clear.clear.ImageLabel, 0.25, Enum.EasingStyle.Quint, { Rotation = -13 })
 							task.wait(0.2)
-							tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+							syde_tween(toggleConfiguration.Container.Clear.clear.ImageLabel, 0.25, Enum.EasingStyle.Quint, { Rotation = 0 })
 						end
 
 						blink()
@@ -5111,11 +5171,11 @@ function syde:Init(library)
 					end)
 
 					toggleConfiguration.Container.Clear.MouseEnter:Connect(function()
-						tweenservice:Create(toggleConfiguration.Container.Clear.clear, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.9 }):Play()
+						syde_tween(toggleConfiguration.Container.Clear.clear, 0.7, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.9 })
 					end)
 
 					toggleConfiguration.Container.Clear.MouseLeave:Connect(function()
-						tweenservice:Create(toggleConfiguration.Container.Clear.clear, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+						syde_tween(toggleConfiguration.Container.Clear.clear, 0.7, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1 })
 					end)
 
 				end
@@ -5161,7 +5221,11 @@ function syde:Init(library)
 				return data
 			end
 
-			function telement:Keybind(Keybind)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: KEYBINDS ]
+--------------------------------------------------------------------------------
+function telement:Keybind(Keybind)
 				local flagKey = Keybind.Flag or Keybind.SFlag or Keybind.Title or "Keybind"
 				local initialKey = Keybind.Key or Keybind.Default
 				if syde.LoadedConfig and syde.LoadedConfig[flagKey] ~= nil then
@@ -5196,16 +5260,16 @@ function syde:Init(library)
 				KeyBind.Name = data.Title
 
 				KeyBind.Bind.v.Text = data.Key and (typeof(data.Key) == "EnumItem" and data.Key.Name or tostring(data.Key)) or "NONE"
-				tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
+				syde_tween(KeyBind.Bind, 0.55, Enum.EasingStyle.Quint , {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)})
 
 				KeyBind.interact.MouseButton1Click:Connect(function()
 					KeyBind.Bind.v.Text = '...'
-					tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 1}):Play()
+					syde_tween(KeyBind.Bind.UIStroke, 0.25, Enum.EasingStyle.Quart, {Thickness = 1})
 					data.WaitingForKey = true
 				end)
 
 				KeyBind.Bind.v:GetPropertyChangedSignal('TextBounds'):Connect(function()
-					tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
+					syde_tween(KeyBind.Bind, 0.55, Enum.EasingStyle.Quint , {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)})
 				end)
 
 				local function SetKeybind(keyCode)
@@ -5216,7 +5280,7 @@ function syde:Init(library)
 						data.Key = keyCode
 						data.Value = typeof(keyCode) == "EnumItem" and keyCode.Name or tostring(keyCode)
 						KeyBind.Bind.v.Text = data.Value
-						tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
+						syde_tween(KeyBind.Bind.UIStroke, 0.25, Enum.EasingStyle.Quart, {Thickness = 0})
 						if typeof(Keybind.OnKeyChanged) == "function" then
 							pcall(Keybind.OnKeyChanged, keyCode)
 						end
@@ -5308,7 +5372,11 @@ function syde:Init(library)
 				return data
 			end
 
-			function telement:ColorPicker(ColorPicker)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: COLOR PICKERS ]
+--------------------------------------------------------------------------------
+function telement:ColorPicker(ColorPicker)
 				local data = {
 					Title = ColorPicker.Title;
 					Color = ColorPicker.Color;
@@ -5357,15 +5425,15 @@ function syde:Init(library)
 					}
 
 					local GAP = 8
-					local ITEM_HEIGHT = 30
-					local ITEM_WIDTH = 120
-					local HORIZONTAL_THRESHOLD = 260
+					local itemHeight = 30
+					local itemWidth = 120
+					local horizontalThreshold = 260
 
 					local function updateHueValuesLayout()
 						if not HueValues.Visible then return end
 
 						local width = HueValues.AbsoluteSize.X
-						local horizontal = width >= HORIZONTAL_THRESHOLD
+						local horizontal = width >= horizontalThreshold
 
 						local x, y = 0, 0
 						local totalHeight = 0
@@ -5374,14 +5442,14 @@ function syde:Init(library)
 							item.AnchorPoint = Vector2.new(1, 0)
 
 							if horizontal then
-								item.Size = UDim2.new(0, ITEM_WIDTH, 0, ITEM_HEIGHT)
+								item.Size = UDim2.new(0, itemWidth, 0, itemHeight)
 								item.Position = UDim2.new(1, -x, 0, 0)
-								x += ITEM_WIDTH + GAP
-								totalHeight = ITEM_HEIGHT
+								x += itemWidth + GAP
+								totalHeight = itemHeight
 							else
-								item.Size = UDim2.new(1, -4, 0, ITEM_HEIGHT)
+								item.Size = UDim2.new(1, -4, 0, itemHeight)
 								item.Position = UDim2.new(1, 0, 0, -y)
-								y += ITEM_HEIGHT + GAP
+								y += itemHeight + GAP
 								totalHeight = y
 							end
 						end
@@ -5390,11 +5458,7 @@ function syde:Init(library)
 						HueValues.Position = UDim2.new(0.5, 0,1, -50)
 
 						if Open then
-							tweenservice:Create(
-								colorpicker,
-								TweenInfo.new(0.35, Enum.EasingStyle.Quart),
-								{ Size = UDim2.new(1, -35, 0, 295 + totalHeight) }
-							):Play()
+							syde_tween(colorpicker, 0.35, Enum.EasingStyle.Quart, { Size = UDim2.new(1, -35, 0, 295 + totalHeight) })
 						end
 					end
 
@@ -5442,7 +5506,7 @@ function syde:Init(library)
 				colorpicker.HueValues.Link.Frame.ImageLabel.ImageTransparency = 1
 
 				colorpicker.QuickClose.Interactable = false
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundColor3 = data.Color }):Play()
+				syde_tween(colorpicker.color,  0.6, Enum.EasingStyle.Exponential , { BackgroundColor3 = data.Color })
 
 				local recentContainer = colorpicker.color.Values.Recent
 				local spacing = 5
@@ -5465,7 +5529,7 @@ function syde:Init(library)
 
 					for _, frame in ipairs(children) do
 						--	frame.Position = UDim2.new(0, startX, 0.5, -frame.Size.Y.Offset / 2)
-						tweenservice:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Position = UDim2.new(0, startX , 0.8, -frame.Size.Y.Offset / 2) }):Play()
+						syde_tween(frame, 0.5, Enum.EasingStyle.Quart, {Position = UDim2.new(0, startX , 0.8, -frame.Size.Y.Offset / 2) })
 						startX += frameSize + spacing
 					end
 				end
@@ -5559,17 +5623,17 @@ function syde:Init(library)
 
 					HueSat.Value = data.Color
 
-					tweenservice:Create(HUESlider.Pin, TweenInfo.new(0.1, Enum.EasingStyle.Exponential), {BackgroundColor3 = newColor2}):Play()
-					tweenservice:Create(SVPicker.Pin, TweenInfo.new(0.1, Enum.EasingStyle.Exponential), {BackgroundColor3 = newColor}):Play()
+					syde_tween(HUESlider.Pin, 0.1, Enum.EasingStyle.Exponential, {BackgroundColor3 = newColor2})
+					syde_tween(SVPicker.Pin, 0.1, Enum.EasingStyle.Exponential, {BackgroundColor3 = newColor})
 
 
-					tweenservice:Create(SVPicker.Pin, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					syde_tween(SVPicker.Pin, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
 						Position = UDim2.new(HSV[2], 0, 1 - HSV[3], 0)
-					}):Play()
+					})
 
-					tweenservice:Create(HUESlider.Pin, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					syde_tween(HUESlider.Pin, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
 						Position = UDim2.new(1 - HSV[1], 0, 0.5, 0)
-					}):Play()
+					})
 
 					local formattedHex = FormatColor(data.Color, 'Hex')
 					colorpicker.HueValues.HEX.V.HEXBox.PlaceholderText = formattedHex
@@ -5734,63 +5798,63 @@ function syde:Init(library)
 
 					colorpicker:SetAttribute("UpdateHueLayout", not colorpicker:GetAttribute("UpdateHueLayout"))
 
-					tweenservice:Create(colorpicker.UICorner, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { CornerRadius = UDim.new(0,20) }):Play()
-					tweenservice:Create(colorpicker.color, TweenInfo.new( 0.95, Enum.EasingStyle.Quart ), { Size = UDim2.new(0, 1,0, 1) }):Play()
-					tweenservice:Create(colorpicker, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(35, 35, 35) }):Play()
-					tweenservice:Create(colorpicker.color, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromHSV(HSV[1], 1, 1) }):Play()
-					tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					--	tweenservice:Create(colorpicker.color.glow, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 1}):Play()
+					syde_tween(colorpicker.UICorner, 0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, { CornerRadius = UDim.new(0,20) })
+					syde_tween(colorpicker.color,  0.95, Enum.EasingStyle.Quart , { Size = UDim2.new(0, 1,0, 1) })
+					syde_tween(colorpicker,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(35, 35, 35) })
+					syde_tween(colorpicker.color,  1, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromHSV(HSV[1], 1, 1) })
+					syde_tween(colorpicker.QuickClose,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					--	syde_tween(colorpicker.color.glow,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 1})
 					task.wait(0.12)
-					tweenservice:Create(colorpicker.color, TweenInfo.new( 0.9, Enum.EasingStyle.Quart ), { Size = UDim2.new(1, -40,0, 160) }):Play()
-					tweenservice:Create(colorpicker.color, TweenInfo.new( 0.9, Enum.EasingStyle.Quart ), { Position = UDim2.new(0.5, 0,0, 40) }):Play()
+					syde_tween(colorpicker.color,  0.9, Enum.EasingStyle.Quart , { Size = UDim2.new(1, -40,0, 160) })
+					syde_tween(colorpicker.color,  0.9, Enum.EasingStyle.Quart , { Position = UDim2.new(0.5, 0,0, 40) })
 
-					tweenservice:Create(colorpicker, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(17, 17, 17) }):Play()
-					tweenservice:Create(colorpicker, TweenInfo.new( 0.8, Enum.EasingStyle.Quart ), { Size = UDim2.new(1, -35,0, 300) }):Play()
-					tweenservice:Create(colorpicker.color.UICorner, TweenInfo.new( 0.8, Enum.EasingStyle.Quart ), { CornerRadius = UDim.new(0, 10) }):Play()
+					syde_tween(colorpicker,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(17, 17, 17) })
+					syde_tween(colorpicker,  0.8, Enum.EasingStyle.Quart , { Size = UDim2.new(1, -35,0, 300) })
+					syde_tween(colorpicker.color.UICorner,  0.8, Enum.EasingStyle.Quart , { CornerRadius = UDim.new(0, 10) })
 
-					tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+					syde_tween(colorpicker.color.Values.Rainbow,  1, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 
 
 					task.wait(0.6)
 
-					tweenservice:Create(colorpicker.color.SVPicker.Brightness, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.SVPicker.Saturation, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.SVPicker.Pin, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.SVPicker.Pin.UIStroke, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
+					syde_tween(colorpicker.color.SVPicker.Brightness,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.SVPicker.Saturation,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.SVPicker.Pin,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.SVPicker.Pin.UIStroke,  2, Enum.EasingStyle.Exponential , { Transparency = 0 })
 
 					task.wait(0.5)
-					tweenservice:Create(colorpicker.color.Values.Hue, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Hue.Pin, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Hue.Pin.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
+					syde_tween(colorpicker.color.Values.Hue,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.Values.Hue.Pin,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.Values.Hue.Pin.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0 })
 
 					if data.Type == "Gradient" then
-						tweenservice:Create(colorpicker.color.Values.Grad, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin1, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin1.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin2, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin2.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
+						syde_tween(colorpicker.color.Values.Grad,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+						syde_tween(colorpicker.color.Values.Grad.Pin1,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+						syde_tween(colorpicker.color.Values.Grad.Pin1.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0 })
+						syde_tween(colorpicker.color.Values.Grad.Pin2,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+						syde_tween(colorpicker.color.Values.Grad.Pin2.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0 })
 					end
 
-					tweenservice:Create(colorpicker.HueValues.HEX, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0.9 }):Play()
-					tweenservice:Create(colorpicker.HueValues.HEX.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0.4 }):Play()
-					tweenservice:Create(colorpicker.HueValues.HEX.V.HEXBox, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { TextTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.HueValues.HEX.Copy, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+					syde_tween(colorpicker.HueValues.HEX,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0.9 })
+					syde_tween(colorpicker.HueValues.HEX.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0.4 })
+					syde_tween(colorpicker.HueValues.HEX.V.HEXBox,  0.8, Enum.EasingStyle.Exponential , { TextTransparency = 0 })
+					syde_tween(colorpicker.HueValues.HEX.Copy,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 
 					task.wait(0.09)
-					tweenservice:Create(colorpicker.HueValues.RGB, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0.9 }):Play()
-					tweenservice:Create(colorpicker.HueValues.RGB.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0.4 }):Play()
-					tweenservice:Create(colorpicker.HueValues.RGB.V.RGBBox, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { TextTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.HueValues.RGB.Copy, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+					syde_tween(colorpicker.HueValues.RGB,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0.9 })
+					syde_tween(colorpicker.HueValues.RGB.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0.4 })
+					syde_tween(colorpicker.HueValues.RGB.V.RGBBox,  0.8, Enum.EasingStyle.Exponential , { TextTransparency = 0 })
+					syde_tween(colorpicker.HueValues.RGB.Copy,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 					task.wait(0.09)
-					tweenservice:Create(colorpicker.HueValues.Link, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0.9 }):Play()
-					tweenservice:Create(colorpicker.HueValues.Link.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0.4 }):Play()
-					tweenservice:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.HueValues.Link.Frame.ImageLabel, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+					syde_tween(colorpicker.HueValues.Link,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0.9 })
+					syde_tween(colorpicker.HueValues.Link.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0.4 })
+					syde_tween(colorpicker.HueValues.Link.Frame,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.HueValues.Link.Frame.ImageLabel,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 
 					for _,v in ipairs(colorpicker.color.Values.Recent:GetChildren()) do
 						if v:IsA('Frame') then
 							task.wait(0.1)
-							tweenservice:Create(v, TweenInfo.new( 0.3, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
+							syde_tween(v,  0.3, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
 						end
 					end
 
@@ -5808,48 +5872,48 @@ function syde:Init(library)
 				end)
 
 				colorpicker.QuickClose.hitbox.MouseEnter:Connect(function()
-					tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Quint ), { Size = UDim2.new(0, 70,0, 3) }):Play()
-					tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+					syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Quint , { Size = UDim2.new(0, 70,0, 3) })
+					syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(255, 255, 255) })
 				end)
 
 				colorpicker.QuickClose.hitbox.MouseLeave:Connect(function()
-					tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Quint ), { Size = UDim2.new(0, 60,0, 3) }):Play()
-					tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+					syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Quint , { Size = UDim2.new(0, 60,0, 3) })
+					syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(33, 33, 33) })
 				end)
 
 				local function ClosePicker()
 					Open = false
 					DeBounce = true
-					tweenservice:Create(colorpicker.UICorner, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { CornerRadius = UDim.new(1,0) }):Play()
-					tweenservice:Create(colorpicker, TweenInfo.new( 0.55, Enum.EasingStyle.Quint ), { Size = UDim2.new(1, -35,0, 40) }):Play()
-					--	tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color, TweenInfo.new( 0.7, Enum.EasingStyle.Quart ), { Position = UDim2.new(1, -30,0, 10)}):Play()
-					tweenservice:Create(colorpicker.color, TweenInfo.new( 0.55, Enum.EasingStyle.Quint ), { Size = UDim2.new(0, 20,0, 20) }):Play()
-					tweenservice:Create(colorpicker.color, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundColor3 = data.Color }):Play()
-					tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					--	tweenservice:Create(colorpicker.color.glow, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { ImageTransparency = 0.7}):Play()
+					syde_tween(colorpicker.UICorner, 0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, { CornerRadius = UDim.new(1,0) })
+					syde_tween(colorpicker,  0.55, Enum.EasingStyle.Quint , { Size = UDim2.new(1, -35,0, 40) })
+					--	syde_tween(colorpicker.QuickClose,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color,  0.7, Enum.EasingStyle.Quart , { Position = UDim2.new(1, -30,0, 10)})
+					syde_tween(colorpicker.color,  0.55, Enum.EasingStyle.Quint , { Size = UDim2.new(0, 20,0, 20) })
+					syde_tween(colorpicker.color,  0.5, Enum.EasingStyle.Exponential , { BackgroundColor3 = data.Color })
+					syde_tween(colorpicker.QuickClose,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					--	syde_tween(colorpicker.color.glow,  0.5, Enum.EasingStyle.Exponential , { ImageTransparency = 0.7})
 					colorpicker.interact.Interactable = true
 					colorpicker.QuickClose.Interactable = false
 
 					--	task.wait(0.6)
 
-					tweenservice:Create(colorpicker.color.SVPicker.Brightness, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.SVPicker.Saturation, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.SVPicker.Pin, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.SVPicker.Pin.UIStroke, TweenInfo.new( 0.4, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
+					syde_tween(colorpicker.color.SVPicker.Brightness,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.SVPicker.Saturation,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.SVPicker.Pin,  1, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.SVPicker.Pin.UIStroke,  0.4, Enum.EasingStyle.Exponential , { Transparency = 1 })
 
-					tweenservice:Create(colorpicker.color.Values.Hue, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Hue.Pin, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Hue.Pin.UIStroke, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
+					syde_tween(colorpicker.color.Values.Hue,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.Values.Hue.Pin,  1, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.Values.Hue.Pin.UIStroke,  0.5, Enum.EasingStyle.Exponential , { Transparency = 1 })
 
-					tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+					syde_tween(colorpicker.color.Values.Rainbow,  0.5, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 
 					if data.Type == "Gradient" then
-						tweenservice:Create(colorpicker.color.Values.Grad, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin1, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin1.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin2, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-						tweenservice:Create(colorpicker.color.Values.Grad.Pin2.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
+						syde_tween(colorpicker.color.Values.Grad,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+						syde_tween(colorpicker.color.Values.Grad.Pin1,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+						syde_tween(colorpicker.color.Values.Grad.Pin1.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 1 })
+						syde_tween(colorpicker.color.Values.Grad.Pin2,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+						syde_tween(colorpicker.color.Values.Grad.Pin2.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 1 })
 					end
 
 					local displayGrad = colorpicker.color:FindFirstChildOfClass("UIGradient")
@@ -5858,29 +5922,29 @@ function syde:Init(library)
 						displayGrad.Enabled = true
 						displayGrad.Color = ColorSequence.new(Keys)
 						-- Set to White so the gradient isn't "multiplied" or tinted by a background color
-						tweenservice:Create(colorpicker.color, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.new(1, 1, 1) }):Play()
+						syde_tween(colorpicker.color, 0.5, Enum.EasingStyle.Exponential, { BackgroundColor3 = Color3.new(1, 1, 1) })
 					else
 						if displayGrad then displayGrad.Enabled = false end
-						tweenservice:Create(colorpicker.color, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundColor3 = data.Color }):Play()
+						syde_tween(colorpicker.color, 0.5, Enum.EasingStyle.Exponential, { BackgroundColor3 = data.Color })
 					end
 
-					tweenservice:Create(colorpicker.HueValues.RGB, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.RGB.UIStroke, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.RGB.V.RGBBox, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.RGB.Copy, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+					syde_tween(colorpicker.HueValues.RGB,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.HueValues.RGB.UIStroke,  0.5, Enum.EasingStyle.Exponential , { Transparency = 1 })
+					syde_tween(colorpicker.HueValues.RGB.V.RGBBox,  0.5, Enum.EasingStyle.Exponential , { TextTransparency = 1 })
+					syde_tween(colorpicker.HueValues.RGB.Copy,  0.5, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 
-					tweenservice:Create(colorpicker.HueValues.HEX, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.HEX.UIStroke, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.HEX.V.HEXBox, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.HEX.Copy, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+					syde_tween(colorpicker.HueValues.HEX,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.HueValues.HEX.UIStroke,  0.5, Enum.EasingStyle.Exponential , { Transparency = 1 })
+					syde_tween(colorpicker.HueValues.HEX.V.HEXBox,  0.5, Enum.EasingStyle.Exponential , { TextTransparency = 1 })
+					syde_tween(colorpicker.HueValues.HEX.Copy,  0.5, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 
-					tweenservice:Create(colorpicker.HueValues.Link, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.Link.UIStroke, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.HueValues.Link.Frame.ImageLabel, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+					syde_tween(colorpicker.HueValues.Link,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.HueValues.Link.UIStroke,  0.5, Enum.EasingStyle.Exponential , { Transparency = 1 })
+					syde_tween(colorpicker.HueValues.Link.Frame,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.HueValues.Link.Frame.ImageLabel,  0.5, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 					for _,v in ipairs(colorpicker.color.Values.Recent:GetChildren()) do
 						if v:IsA('Frame') then
-							tweenservice:Create(v, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
+							syde_tween(v,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
 						end
 					end
 					colorpicker.HueValues.Visible = false
@@ -5905,10 +5969,10 @@ function syde:Init(library)
 						for _,v2 in ipairs(v:GetChildren()) do
 							if v2:IsA("ImageLabel") then
 								v2.MouseEnter:Connect(function()
-									tweenservice:Create(v2, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+									syde_tween(v2, 0.3, Enum.EasingStyle.Exponential, {ImageColor3 = Color3.fromRGB(255, 255, 255) })
 								end)
 								v2.MouseLeave:Connect(function()
-									tweenservice:Create(v2, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageColor3 = Color3.fromRGB(66, 66, 66) }):Play()
+									syde_tween(v2, 0.3, Enum.EasingStyle.Exponential, {ImageColor3 = Color3.fromRGB(66, 66, 66) })
 								end)
 							end
 						end
@@ -5930,9 +5994,9 @@ function syde:Init(library)
 					recentFrame.BackgroundColor3 = newColor
 
 					recentFrame.interact.MouseButton1Click:Connect(function()
-				--[[	tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 5,0, 5) }):Play()
+				--[[	syde_tween(recentFrame, 0.3, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, 5,0, 5) })
 					task.wait(0.09)
-					tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 12,0, 12) }):Play() ]]
+					syde_tween(recentFrame, 0.3, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, 12,0, 12) }) ]]
 
 						local h, s, v = newColor:ToHSV()
 						if s > 0.02 then
@@ -5945,11 +6009,11 @@ function syde:Init(library)
 					end)
 
 					recentFrame.interact.MouseEnter:Connect(function()
-						tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 20,0, 20) }):Play()
+						syde_tween(recentFrame, 0.3, Enum.EasingStyle.Quint, {Size = UDim2.new(0, 20,0, 20) })
 					end)
 
 					recentFrame.interact.MouseLeave:Connect(function()
-						tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 12,0, 12) }):Play()
+						syde_tween(recentFrame, 0.3, Enum.EasingStyle.Quint, {Size = UDim2.new(0, 12,0, 12) })
 					end)
 
 					local maxRecentColors = 10
@@ -6169,7 +6233,7 @@ function syde:Init(library)
 					isRainbowEnabled = enabled
 					data.Rainbow = enabled
 					if isRainbowEnabled then
-						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+						syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(255, 255, 255)})
 						task.spawn(function()
 							local lastUpdate = os.clock()
 							while isRainbowEnabled and colorpicker.Parent do
@@ -6185,7 +6249,7 @@ function syde:Init(library)
 							end
 						end)
 					else
-						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
+						syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(62, 62, 62)})
 						syde:SaveThemeCfg()
 					end
 					if not skipSave then SaveConfig(game and game.GameId) end
@@ -6231,7 +6295,11 @@ function syde:Init(library)
 			end
 
 
-			function telement:Dropdown(Dropdown)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: DROPDOWNS ]
+--------------------------------------------------------------------------------
+function telement:Dropdown(Dropdown)
 				local data = {
 					Title = Dropdown.Title or "Temp Dropdown";
 					Options = Dropdown.Options or {};
@@ -6248,7 +6316,7 @@ function syde:Init(library)
 				dropdown.Name = data.Title
 				dropdown.dropholder.drop.Container.Option.Visible = false
 				dropdown.dropholder.drop.Container.Visible = false
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+				syde_tween(dropdown.dropholder.drop.Container, 1, Enum.EasingStyle.Quint, { Size = UDim2.new(0.33, -20,0.576, -75) })
 				dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
 
 				local DropOpen = false
@@ -6261,7 +6329,7 @@ function syde:Init(library)
 					local yOffset = 0
 					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option.Visible then
-							tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+							syde_tween(option, 0.5, Enum.EasingStyle.Quint, {Position = UDim2.new(0, 0, 0, yOffset)})
 							yOffset = yOffset + option.Size.Y.Offset + 7
 						end
 					end
@@ -6272,33 +6340,33 @@ function syde:Init(library)
 					dropdown.dropholder.drop.Container.Visible = true
 					dropdown.dropholder.drop.search.Visible = true
 
-					tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+					syde_tween(dropdown, 1.34, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -35, 0, 300) })
+					syde_tween(dropdown.dropholder.drop.UICorner, 0.5, Enum.EasingStyle.Quint, { CornerRadius = UDim.new(0, 20) })
+					syde_tween(dropdown.dropholder.drop.Container, 1, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -20, 1, -75) })
+					syde_tween(dropdown.dropholder.drop.v0, 1.34, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0 })
+					syde_tween(dropdown.dropholder.drop.down, 0.35, Enum.EasingStyle.Quint, { Rotation = 180 })
 
-					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+					syde_tween(dropdown.dropholder.drop.search, 1, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.65 })
+					syde_tween(dropdown.dropholder.drop.search.UIStroke, 1, Enum.EasingStyle.Exponential, { Transparency = 0.4 })
+					syde_tween(dropdown.dropholder.drop.search.TextBox, 1, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+					syde_tween(dropdown.dropholder.drop.search.ImageLabel, 1, Enum.EasingStyle.Exponential, { ImageTransparency = 0.9 })
+					syde_tween(dropdown.dropholder.drop.search.icon, 1, Enum.EasingStyle.Exponential, { ImageTransparency = 0.85 })
 
 				end
 
 				local function CloseDrop()
 					DropOpen = false
-					tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+					syde_tween(dropdown, 1, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -35, 0, 95) })
+					syde_tween(dropdown.dropholder.drop.UICorner, 1, Enum.EasingStyle.Quint, { CornerRadius = UDim.new(1,0) })
+					syde_tween(dropdown.dropholder.drop.Container, 1, Enum.EasingStyle.Quint, { Size = UDim2.new(0.33, -20, 0.576, -75) })
+					syde_tween(dropdown.dropholder.drop.v0, 1.34, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1 })
+					syde_tween(dropdown.dropholder.drop.down, 0.35, Enum.EasingStyle.Quint, { Rotation = 0 })
 
-					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					syde_tween(dropdown.dropholder.drop.search, 1, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1 })
+					syde_tween(dropdown.dropholder.drop.search.UIStroke, 1, Enum.EasingStyle.Exponential, { Transparency = 1 })
+					syde_tween(dropdown.dropholder.drop.search.TextBox, 1, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
+					syde_tween(dropdown.dropholder.drop.search.ImageLabel, 1, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
+					syde_tween(dropdown.dropholder.drop.search.icon, 1, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
 
 					task.wait(0.6)
 					dropdown.dropholder.drop.Container.Visible = false
@@ -6414,11 +6482,11 @@ function syde:Init(library)
 									-- Visually update the dropdown list
 									for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 										if opt:IsA("Frame") and opt.Name == option then
-											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-											tweenservice:Create(opt.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-											tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-											tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
+											syde_tween(opt, 1, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+											syde_tween(opt, 1, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+											syde_tween(opt.Title, 1, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+											syde_tween(opt.UIStroke, 1, Enum.EasingStyle.Exponential, {Transparency = 0.5})
+											syde_tween(opt.ImageLabel, 1, Enum.EasingStyle.Exponential, {ImageTransparency = 0.9})
 										end
 									end
 
@@ -6438,7 +6506,7 @@ function syde:Init(library)
 
 									optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
 
-									tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
+									syde_tween(optionGroup, 0.67, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, totalWidth, 0, 20)})
 								end)
 							end
 						end
@@ -6467,25 +6535,25 @@ function syde:Init(library)
 							if shouldShow then
 								option.Visible = true
 								if SelectedOptions[option.Title.Text] then
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-									tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+									syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+									syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+									syde_tween(option.Title, 0.7, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+									syde_tween(option.UIStroke, 0.7, Enum.EasingStyle.Exponential, {Transparency = 1})
+									syde_tween(option.ImageLabel, 0.7, Enum.EasingStyle.Exponential, {ImageTransparency = 0})
 								else
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-									tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
+									syde_tween(option, 1, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+									syde_tween(option, 1, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+									syde_tween(option.Title, 1, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+									syde_tween(option.UIStroke, 1, Enum.EasingStyle.Exponential, {Transparency = 0.5})
+									syde_tween(option.ImageLabel, 1, Enum.EasingStyle.Exponential, {ImageTransparency = 0.9})
 								end
 							else
 								-- Hide with animation, but wait before setting Visible = false
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+								syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundTransparency = 1})
+								syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+								syde_tween(option.Title, 0.7, Enum.EasingStyle.Exponential, {TextTransparency = 1})
+								syde_tween(option.UIStroke, 0.7, Enum.EasingStyle.Exponential, {Transparency = 1})
+								syde_tween(option.ImageLabel, 0.7, Enum.EasingStyle.Exponential, {ImageTransparency = 1})
 								option.Visible = false
 							end
 						end
@@ -6514,20 +6582,20 @@ function syde:Init(library)
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
-							tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+							syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+							syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
 						end
 
 						option.Interact.Activated:Connect(function()
 							if data.Multi then
 								if SelectedOptions[OptionText] then
 									RemoveFromSelected(OptionText)
-									tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
+									syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+									syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0.9})
 								else
 									AddToSelected(OptionText)
-									tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+									syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+									syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
 								end
 
 								if data.CallBack then
@@ -6541,13 +6609,13 @@ function syde:Init(library)
 
 								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 									if opt:IsA("Frame") then
-										tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-										tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
+										syde_tween(opt, 0.3, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+										syde_tween(opt.ImageLabel, 0.3, {ImageTransparency = 0.9})
 									end
 								end
 
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+								syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+								syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
 
 
 								if data.CallBack then
@@ -6593,7 +6661,11 @@ function syde:Init(library)
 				return data
 			end
 
-			function telement:Slider(Slider)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: SLIDERS ]
+--------------------------------------------------------------------------------
+function telement:Slider(Slider)
 				local data = {
 					Title = Slider.Title;
 					Desc = Slider.Description;
@@ -6714,14 +6786,10 @@ function syde:Init(library)
 							tick.Parent = ticksFrame
 
 							local finalPos = UDim2.fromOffset(i * spacing, height / 1.5)
-							tweenservice:Create(
-								tick,
-								TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-								{
+							syde_tween(tick, 0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, {
 									Position = finalPos,
 									BackgroundTransparency = 0.85
-								}
-							):Play()
+								})
 						end
 
 						-- Destroy extra ticks
@@ -6785,7 +6853,7 @@ function syde:Init(library)
 							Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
 
-							tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+							syde_tween(Slider.Title, 0.55, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 
 							local success, errorMsg = pcall(function()
 								Options.CallBack(newValue)
@@ -6818,7 +6886,7 @@ function syde:Init(library)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeTouch then
 							dragging = false
 							activeTouch = nil
-							tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+							syde_tween(Slider.Title,  0.5, Enum.EasingStyle.Exponential , { TextTransparency = 0.6 })
 						end
 					end)
 
@@ -6884,9 +6952,9 @@ function syde:Init(library)
 						)
 
 						-- Tween title appearance
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+						syde_tween(Slider.Title, 0.55, Enum.EasingStyle.Exponential, {
 							TextTransparency = 0
-						}):Play()
+						})
 
 						Options.StarterValue = NewVal
 						Options.Value = NewVal
@@ -6949,7 +7017,11 @@ function syde:Init(library)
 				end
 			end
 
-			function telement:Paragraph(Paragraph)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: PARAGRAPHS ]
+--------------------------------------------------------------------------------
+function telement:Paragraph(Paragraph)
 				local ParaData = {
 					Title = Paragraph.Title;
 					Content = Paragraph.Content;
@@ -6998,7 +7070,11 @@ function syde:Init(library)
 				return ParagraphSettings
 			end
 
-			function telement:TextInput(TextInput)
+			
+--------------------------------------------------------------------------------
+-- [ ELEMENT: TEXTBOXES ]
+--------------------------------------------------------------------------------
+function telement:TextInput(TextInput)
 				local data = {
 					Title = TextInput.Title or "Text Input",
 					PlaceHolder = TextInput.PlaceHolder or "Enter text...",
@@ -7024,11 +7100,11 @@ function syde:Init(library)
 
 
 				textinput.TextFrame.Enter.MouseEnter:Connect(function()
-					tweenservice:Create(textinput.TextFrame.Enter, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+					syde_tween(textinput.TextFrame.Enter, 0.4, Enum.EasingStyle.Exponential, {TextColor3 = Color3.fromRGB(255, 255, 255)})
 				end)
 
 				textinput.TextFrame.Enter.MouseLeave:Connect(function()
-					tweenservice:Create(textinput.TextFrame.Enter, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+					syde_tween(textinput.TextFrame.Enter, 0.4, Enum.EasingStyle.Exponential, {TextColor3 = Color3.fromRGB(40, 40, 40)})
 				end)
 
 				textBox:GetPropertyChangedSignal("Text"):Connect(function()
@@ -7059,13 +7135,9 @@ function syde:Init(library)
 
 
 
-					tweenservice:Create(
-						textinput,
-						TweenInfo.new(0.7, Enum.EasingStyle.Quint),
-						{ Size = UDim2.new(1, -35, 0, newHeight + extraHeight + 35) }
-					):Play()
+					syde_tween(textinput, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -35, 0, newHeight + extraHeight + 35) })
 
-					--	tweenservice:Create(textinput.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quart), { Position = UDim2.new(1, -20,1, -15) }):Play()
+					--	syde_tween(textinput.ImageLabel, 0.3, Enum.EasingStyle.Quart, { Position = UDim2.new(1, -20,1, -15) })
 
 
 				end)
@@ -7074,11 +7146,7 @@ function syde:Init(library)
 					local newHeight = textBox.Size.Y.Offset
 					local totalHeight = math.max(newHeight, defaultHeight)
 
-					tweenservice:Create(
-						textinput.TextFrame,
-						TweenInfo.new(0.7, Enum.EasingStyle.Quint),
-						{ Size = UDim2.new(1, -60, 0, totalHeight + 0) }
-					):Play()
+					syde_tween(textinput.TextFrame, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -60, 0, totalHeight + 0) })
 
 
 				end)
@@ -7285,7 +7353,7 @@ function syde:Init(library)
 					for i, glow in pairs(window.clipframe:GetChildren()) do
 						if glow:IsA("ImageLabel") then
 							glow.Visible = true
-							tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
+							syde_tween(glow, 0.5, Enum.EasingStyle.Exponential, {ImageTransparency = 0.8})
 						end
 					end
 					window.pages.v0.Visible = false
@@ -7301,7 +7369,7 @@ function syde:Init(library)
 					glow = false
 					for i, glow in pairs(window.clipframe:GetChildren()) do
 						if glow:IsA("ImageLabel") then
-							tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+							syde_tween(glow, 0.5, Enum.EasingStyle.Exponential, {ImageTransparency = 1})
 							glow.Visible = false
 						end
 					end
@@ -7342,7 +7410,7 @@ function syde:Init(library)
 					Increment = 0.1,
 					StarterValue = window.shadow.ImageLabel.ImageTransparency,
 					CallBack = function(v)
-						tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.65, Enum.EasingStyle.Exponential), {ImageTransparency = v}):Play()
+						syde_tween(window.shadow.ImageLabel, 0.65, Enum.EasingStyle.Exponential, {ImageTransparency = v})
 					end,
 					SFlag = 'GDensity',
 					SettingConfig = true
@@ -7632,7 +7700,7 @@ function syde:Init(library)
 		end
 
 		function syde:LoadSettingsConfig()
-			LoadThemeCfg(FILE_PATH)
+			LoadThemeCfg(filePath)
 			local folder = syde.Folder or syde.ConfigFolder or "FireHub"
 			local filePath = folder .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
 			if isfile and isfile(filePath) then
@@ -7805,6 +7873,9 @@ function syde:Init(library)
 		end)
 	end
 
+--------------------------------------------------------------------------------
+-- [ TABS & SECTIONS MANAGEMENT ]
+--------------------------------------------------------------------------------
 	function tbdata:InitTab(tab)
 		-- bootstrap Home-mode once so first-created tabs don't auto-open
 
@@ -7902,7 +7973,7 @@ function syde:Init(library)
 			task.delay(0.1, function()
 				pages.clipframe.title.Text = Name
 				pages.clipframe.title.Position = UDim2.new(0, 5, 0.5, 12)
-				tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { TextTransparency = 0, Position = UDim2.new(0, 5, 0.5, 0) }):Play()
+				syde_tween(pages.clipframe.title, 0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, { TextTransparency = 0, Position = UDim2.new(0, 5, 0.5, 0) })
 			end)
 		end
 
@@ -7941,13 +8012,13 @@ function syde:Init(library)
 			end
 
 			if isActive then
-				--	tweenservice:Create(HomeButton.text, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(HomeButton.homeicon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-				tweenservice:Create(HomeButton.homeicon.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+				--	syde_tween(HomeButton.text, 1, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+				syde_tween(HomeButton.homeicon, 1, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.45 })
+				syde_tween(HomeButton.homeicon.ImageLabel, 1, Enum.EasingStyle.Exponential, { ImageTransparency = 0 })
 			else
-				--	tweenservice:Create(HomeButton.text, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0.67 }):Play()
-				tweenservice:Create(HomeButton.homeicon, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.85 }):Play()
-				tweenservice:Create(HomeButton.homeicon.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.67 }):Play()
+				--	syde_tween(HomeButton.text, 1, Enum.EasingStyle.Exponential, { TextTransparency = 0.67 })
+				syde_tween(HomeButton.homeicon, 0.5, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.85 })
+				syde_tween(HomeButton.homeicon.ImageLabel, 1, Enum.EasingStyle.Exponential, { ImageTransparency = 0.67 })
 			end
 		end
 
@@ -7965,9 +8036,9 @@ function syde:Init(library)
 				task.spawn(function()
 					for _, v in ipairs(tabs:GetChildren()) do
 						if v:IsA("Frame") then
-							tweenservice:Create(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) }):Play()
+							syde_tween(v, 0.75, Enum.EasingStyle.Quart, { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) })
 							task.wait(0.15)
-							tweenservice:Create(tabButton, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = targetSize }):Play()
+							syde_tween(tabButton, 0.75, Enum.EasingStyle.Quart, { Size = targetSize })
 							isInit = false
 						end
 					end
@@ -8014,7 +8085,7 @@ function syde:Init(library)
 
 			if HomePage then
 				HomePage.Visible = true
-				pcall(function() tweenservice:Create(HomePage, TweenInfo.new(0.45, Enum.EasingStyle.Quint), { BackgroundTransparency = 1 }):Play() end)
+				pcall(function() syde_tween(HomePage, 0.45, Enum.EasingStyle.Quint, { BackgroundTransparency = 1 }) end)
 			end
 
 			ApplyHomeButtonStyle(true)
@@ -8137,13 +8208,13 @@ function syde:Init(library)
 				if tbdata.first ~= tdata.Title then return end
 
 				-- live accent update
-				tweenservice:Create(Tab.indicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+				syde_tween(Tab.indicator, 0.25, Enum.EasingStyle.Exponential, {
 					BackgroundColor3 = color
-				}):Play()
+				})
 
-				tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+				syde_tween(Tab.indicator.glow, 0.25, Enum.EasingStyle.Exponential, {
 					ImageColor3 = color
-				}):Play()
+				})
 			end
 		end)
 
@@ -8259,44 +8330,40 @@ function syde:Init(library)
 				local y = func.AbsolutePosition.Y - openedPage.AbsolutePosition.Y + openedPage.CanvasPosition.Y
 
 				-- Scroll to the function
-				tweenservice:Create(
-					openedPage,
-					TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-					{ CanvasPosition = Vector2.new(0, math.max(0, y - 20)) }
-				):Play()
+				syde_tween(openedPage, 0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, { CanvasPosition = Vector2.new(0, math.max(0, y - 20)) })
 
 				-- Highlight flash
 				local original = func.BackgroundColor3
-				tweenservice:Create(func, TweenInfo.new(0.2), {
+				syde_tween(func, 0.2, {
 					BackgroundColor3 = syde:GetLighter(original, 0.03)
-				}):Play()
+				})
 
 				task.delay(0.35, function()
-					tweenservice:Create(func, TweenInfo.new(0.35), {
+					syde_tween(func, 0.35, {
 						BackgroundColor3 = original
-					}):Play()
+					})
 				end)
 			end)
 
 			result.MouseEnter:Connect(function()
-				tweenservice:Create(result.ImageLabel, TweenInfo.new(0.2), {
+				syde_tween(result.ImageLabel, 0.2, {
 					ImageColor3 = Color3.fromRGB(255, 255, 255)
-				}):Play()
+				})
 
-				--	tweenservice:Create(result.UIStroke, TweenInfo.new(0.2), {Thickness = 1}):Play()
+				--	syde_tween(result.UIStroke, 0.2, {Thickness = 1})
 			end)
 
 			result.MouseLeave:Connect(function()
-				tweenservice:Create(result.ImageLabel, TweenInfo.new(0.2), {
+				syde_tween(result.ImageLabel, 0.2, {
 					ImageColor3 = Color3.fromRGB(130, 130, 130)
-				}):Play()
-				--	tweenservice:Create(result.UIStroke, TweenInfo.new(0.2), {Thickness = 0}):Play()
+				})
+				--	syde_tween(result.UIStroke, 0.2, {Thickness = 0})
 			end)
 
-			-- tweenservice:Create(result, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-			tweenservice:Create(result.info.badge, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-			tweenservice:Create(result.info.title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(result.info.badge["function"], TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			-- syde_tween(result, 0.7, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+			syde_tween(result.info.badge, 0.7, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+			syde_tween(result.info.title, 0.7, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+			syde_tween(result.info.badge["function"], 0.7, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 		end
 
 		local function searchFunctions(query)
@@ -8332,11 +8399,11 @@ function syde:Init(library)
 		SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
 			searchFunctions(SearchBox.Text)
 			--	window.search.Size = UDim2.new(0, 350,0, 230)
-			tweenservice:Create(window.search, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0, 230)}):Play()
-			tweenservice:Create(window.search.UICorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(0,25)}):Play()
+			syde_tween(window.search, 0.7, Enum.EasingStyle.Quart, {Size =  UDim2.new(0, 350,0, 230)})
+			syde_tween(window.search.UICorner, 0.7, Enum.EasingStyle.Quart, {CornerRadius =  UDim.new(0,25)})
 			if SearchBox.Text == '' then
-				tweenservice:Create(window.search, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {Size =  UDim2.new(0, 350,0,60)}):Play()
-				tweenservice:Create(window.search.UICorner, TweenInfo.new(0.7, Enum.EasingStyle.Quart), {CornerRadius =  UDim.new(1,0)}):Play()
+				syde_tween(window.search, 0.7, Enum.EasingStyle.Quart, {Size =  UDim2.new(0, 350,0,60)})
+				syde_tween(window.search.UICorner, 0.7, Enum.EasingStyle.Quart, {CornerRadius =  UDim.new(1,0)})
 			end
 		end)
 
@@ -8401,12 +8468,12 @@ function syde:Init(library)
 				button.interact.MouseButton1Down:Connect(function()
 					tweenservice:Create(button.UIStroke, fOTween, { Transparency = 1 }):Play()
 					tweenservice:Create(button.ImageLabel, fOTween, { ImageTransparency = 1 }):Play()
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
 				end)
 
 				button.interact.MouseButton1Up:Connect(function()
 					tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+					syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 0.95 })
 
 
 				end)
@@ -8426,7 +8493,7 @@ function syde:Init(library)
 				-- Extra Check 
 				button.interact.MouseLeave:Connect(function()
 					tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+					syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 0.95 })
 				end)
 			elseif data.Type == 'Hold' then
 				local HoldTime = data.HoldTime
@@ -8445,9 +8512,9 @@ function syde:Init(library)
 					holdSession += 1
 					TimeLeft = HoldTime
 					button.title.timer.Text = tostring(HoldTime)
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.15), { ImageTransparency = 0.95 }):Play()
-					tweenservice:Create(button.title.timer, TweenInfo.new(0.15), { TextTransparency = 1 }):Play()
-					tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(0.15), { Offset = Vector2.new(-1, 0) }):Play()
+					syde_tween(button.ImageLabel, 0.15, { ImageTransparency = 0.95 })
+					syde_tween(button.title.timer, 0.15, { TextTransparency = 1 })
+					syde_tween(button.UIStroke.UIGradient, 0.15, { Offset = Vector2.new(-1, 0) })
 					Complete = false
 				end
 
@@ -8458,10 +8525,10 @@ function syde:Init(library)
 					Holding = true
 					TimeLeft = HoldTime
 					button.title.timer.Text = tostring(TimeLeft)
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					tweenservice:Create(button.title.timer, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(HoldTime, Enum.EasingStyle.Linear), { Offset = Vector2.new(0.7, 0) }):Play()
-					tweenservice:Create(button.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0}):Play()
+					syde_tween(button.ImageLabel, 0.8, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
+					syde_tween(button.title.timer, 0.8, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+					syde_tween(button.UIStroke.UIGradient, HoldTime, Enum.EasingStyle.Linear, { Offset = Vector2.new(0.7, 0) })
+					syde_tween(button.UIStroke, 1, Enum.EasingStyle.Exponential, { Transparency = 0})
 
 					-- Countdown loop
 					while Holding and holdSession == thisSession and TimeLeft > 0 do
@@ -8483,10 +8550,10 @@ function syde:Init(library)
 							warn("[CALLBACK MISSING]: No Function Assigned To", data.Title)
 						end
 
-						tweenservice:Create(button, TweenInfo.new(0.34, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(24, 24, 24) }):Play()
-						tweenservice:Create(button.UIStroke.UIGradient, TweenInfo.new(0.1, Enum.EasingStyle.Linear), { Offset = Vector2.new(-1, 0) }):Play()
+						syde_tween(button, 0.34, Enum.EasingStyle.Exponential, { BackgroundColor3 = Color3.fromRGB(24, 24, 24) })
+						syde_tween(button.UIStroke.UIGradient, 0.1, Enum.EasingStyle.Linear, { Offset = Vector2.new(-1, 0) })
 						task.wait(0.34)
-						tweenservice:Create(button, TweenInfo.new(0.34, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(17, 17, 17) }):Play()
+						syde_tween(button, 0.34, Enum.EasingStyle.Exponential, { BackgroundColor3 = Color3.fromRGB(17, 17, 17) })
 					end
 				end)
 
@@ -8569,7 +8636,7 @@ function syde:Init(library)
 			toggleConfiguration.Visible = false
 
 			toggleConfiguration.Container.KeyBind.Bind.v.Text = 'None'
-			tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) }):Play()
+			syde_tween(toggleConfiguration.Container.KeyBind.Bind, 0.5, Enum.EasingStyle.Quint, { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) })
 
 			toggleConfiguration.BackgroundTransparency = 1
 			toggleConfiguration.Container.KeyBind.Title.TextTransparency = 1
@@ -8684,7 +8751,7 @@ function syde:Init(library)
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, enterTween, { TextTransparency = 0 }):Play()
 					tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, enterTween, { ImageTransparency = 0 }):Play()
 					tweenservice:Create(toggleConfiguration.Container.Clear.Title, enterTween, { TextTransparency = 0 }):Play()
-					tweenservice:Create(toggleConfiguration, TweenInfo.new(0.7, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 174,0, 88) }):Play()
+					syde_tween(toggleConfiguration, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(0, 174,0, 88) })
 					--	tweenservice:Create(toggleConfiguration.shadow.ImageLabel, enterTween, { ImageTransparency = 0.57 }):Play()
 
 				end
@@ -8704,7 +8771,7 @@ function syde:Init(library)
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, enterTween, { TextTransparency = 1 }):Play()
 					tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, enterTween, { ImageTransparency = 1 }):Play()
 					tweenservice:Create(toggleConfiguration.Container.Clear.Title, enterTween, { TextTransparency = 1 }):Play()
-					tweenservice:Create(toggleConfiguration, TweenInfo.new(0.7, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 75,0, 53) }):Play()
+					syde_tween(toggleConfiguration, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(0, 75,0, 53) })
 					--	tweenservice:Create(toggleConfiguration.shadow.ImageLabel, enterTween, { ImageTransparency = 1 }):Play()
 					task.wait(0.5)
 
@@ -8757,7 +8824,7 @@ function syde:Init(library)
 				end)
 
 				local function ResizeBindFrame()
-					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) }):Play()
+					syde_tween(toggleConfiguration.Container.KeyBind.Bind, 0.5, Enum.EasingStyle.Quint, { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) })
 				end
 
 				local function setKeybind(key, skipSave)
@@ -8769,9 +8836,9 @@ function syde:Init(library)
 						data.Keybind = key
 						data.KeybindReady = false
 
-						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
 						toggleConfiguration.Container.KeyBind.Bind.v.Text = key.Name
-						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 1, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
 						ResizeBindFrame()
 
 						task.delay(0.5, function()
@@ -8784,9 +8851,9 @@ function syde:Init(library)
 
 				toggleConfiguration.Container.KeyBind.Interact.MouseButton1Click:Connect(function()
 					if captureConnection then captureConnection:Disconnect() end
-					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+					syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
 					toggleConfiguration.Container.KeyBind.Bind.v.Text = "..."
-					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+					syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
 					ResizeBindFrame()
 
 
@@ -8815,11 +8882,11 @@ function syde:Init(library)
 					setKeybind(nil)
 
 					local function blink()
-						tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint), { Rotation = 13 }):Play()
+						syde_tween(toggleConfiguration.Container.Clear.clear.ImageLabel, 0.25, Enum.EasingStyle.Quint, { Rotation = 13 })
 						task.wait(0.2)
-						tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint), { Rotation = -13 }):Play()
+						syde_tween(toggleConfiguration.Container.Clear.clear.ImageLabel, 0.25, Enum.EasingStyle.Quint, { Rotation = -13 })
 						task.wait(0.2)
-						tweenservice:Create(toggleConfiguration.Container.Clear.clear.ImageLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+						syde_tween(toggleConfiguration.Container.Clear.clear.ImageLabel, 0.25, Enum.EasingStyle.Quint, { Rotation = 0 })
 					end
 
 					blink()
@@ -8830,11 +8897,11 @@ function syde:Init(library)
 				end)
 
 				toggleConfiguration.Container.Clear.MouseEnter:Connect(function()
-					tweenservice:Create(toggleConfiguration.Container.Clear.clear, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.9 }):Play()
+					syde_tween(toggleConfiguration.Container.Clear.clear, 0.7, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.9 })
 				end)
 
 				toggleConfiguration.Container.Clear.MouseLeave:Connect(function()
-					tweenservice:Create(toggleConfiguration.Container.Clear.clear, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					syde_tween(toggleConfiguration.Container.Clear.clear, 0.7, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1 })
 				end)
 
 			end
@@ -9021,14 +9088,10 @@ function syde:Init(library)
 						tick.Parent = ticksFrame
 
 						local finalPos = UDim2.fromOffset(i * spacing, height / 1.5)
-						tweenservice:Create(
-							tick,
-							TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-							{
+						syde_tween(tick, 0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, {
 								Position = finalPos,
 								BackgroundTransparency = 0.85
-							}
-						):Play()
+							})
 					end
 
 					-- Destroy extra ticks
@@ -9110,7 +9173,7 @@ function syde:Init(library)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeTouch then
 						dragging = false
 						activeTouch = nil
-						tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+						syde_tween(Slider.Title,  0.5, Enum.EasingStyle.Exponential , { TextTransparency = 0.6 })
 					end
 				end)
 
@@ -9166,9 +9229,9 @@ function syde:Init(library)
 					Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", NewVal, Options.Range[2])
 
 					-- Tween title appearance
-					tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+					syde_tween(Slider.Title, 0.55, Enum.EasingStyle.Exponential, {
 						TextTransparency = 0
-					}):Play()
+					})
 
 					Options.StarterValue = NewVal
 					Options.Value = NewVal
@@ -9249,9 +9312,9 @@ function syde:Init(library)
 						if ok and blocked ~= lastBlocked then
 							lastBlocked = blocked
 							slider.slideholder.Interactable = not blocked
-							tweenservice:Create(slider, TweenInfo.new(0.3), {
+							syde_tween(slider, 0.3, {
 								BackgroundTransparency = blocked and 0.8 or 0
-							}):Play()
+							})
 						end
 						task.wait(0.2)
 					end
@@ -9297,22 +9360,22 @@ function syde:Init(library)
 				keyText = data.Key.Name
 			end
 			KeyBind.Bind.v.Text = keyText
-			tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
+			syde_tween(KeyBind.Bind, 0.55, Enum.EasingStyle.Quint , {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)})
 
 			KeyBind.interact.MouseButton1Click:Connect(function()
 				KeyBind.Bind.v.Text = '...'
-				tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 1}):Play()
+				syde_tween(KeyBind.Bind.UIStroke, 0.25, Enum.EasingStyle.Quart, {Thickness = 1})
 				data.WaitingForKey = true
 			end)
 
 			KeyBind.Bind.v:GetPropertyChangedSignal('TextBounds'):Connect(function()
-				tweenservice:Create(KeyBind.Bind, TweenInfo.new(0.55, Enum.EasingStyle.Quint ), {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)}):Play()
+				syde_tween(KeyBind.Bind, 0.55, Enum.EasingStyle.Quint , {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)})
 			end)
 
 			local function SetKeybind(keyCode)
 				if typeof(keyCode) == "EnumItem" and keyCode ~= Enum.KeyCode.Unknown then
 					data.Key = keyCode
-					tweenservice:Create(KeyBind.Bind.UIStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Thickness = 0}):Play()
+					syde_tween(KeyBind.Bind.UIStroke, 0.25, Enum.EasingStyle.Quart, {Thickness = 0})
 					KeyBind.Bind.v.Text = keyCode.Name
 				else
 					data.Key = nil
@@ -9416,11 +9479,11 @@ function syde:Init(library)
 
 
 			textinput.TextFrame.Enter.MouseEnter:Connect(function()
-				tweenservice:Create(textinput.TextFrame.Enter, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+				syde_tween(textinput.TextFrame.Enter, 0.4, Enum.EasingStyle.Exponential, {TextColor3 = Color3.fromRGB(255, 255, 255)})
 			end)
 
 			textinput.TextFrame.Enter.MouseLeave:Connect(function()
-				tweenservice:Create(textinput.TextFrame.Enter, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+				syde_tween(textinput.TextFrame.Enter, 0.4, Enum.EasingStyle.Exponential, {TextColor3 = Color3.fromRGB(40, 40, 40)})
 			end)
 
 			textBox:GetPropertyChangedSignal("Text"):Connect(function()
@@ -9451,13 +9514,9 @@ function syde:Init(library)
 
 
 
-				tweenservice:Create(
-					textinput,
-					TweenInfo.new(0.7, Enum.EasingStyle.Quint),
-					{ Size = UDim2.new(1, -35, 0, newHeight + extraHeight + 35) }
-				):Play()
+				syde_tween(textinput, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -35, 0, newHeight + extraHeight + 35) })
 
-				--	tweenservice:Create(textinput.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quart), { Position = UDim2.new(1, -20,1, -15) }):Play()
+				--	syde_tween(textinput.ImageLabel, 0.3, Enum.EasingStyle.Quart, { Position = UDim2.new(1, -20,1, -15) })
 
 
 			end)
@@ -9466,11 +9525,7 @@ function syde:Init(library)
 				local newHeight = textBox.Size.Y.Offset
 				local totalHeight = math.max(newHeight, defaultHeight)
 
-				tweenservice:Create(
-					textinput.TextFrame,
-					TweenInfo.new(0.7, Enum.EasingStyle.Quint),
-					{ Size = UDim2.new(1, -60, 0, totalHeight + 0) }
-				):Play()
+				syde_tween(textinput.TextFrame, 0.7, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -60, 0, totalHeight + 0) })
 
 
 			end)
@@ -9582,9 +9637,9 @@ function syde:Init(library)
 			end
 
 			if Viewdata.UserRotate == false then
-				tweenservice:Create(EnchancedView.ViewFrame.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
+				syde_tween(EnchancedView.ViewFrame.ImageLabel, 0.3, Enum.EasingStyle.Exponential, {
 					ImageTransparency = 1
-				}):Play()
+				})
 			end
 
 			-- Determine center & size
@@ -9664,18 +9719,18 @@ function syde:Init(library)
 						lastPos = input.Position
 						dragStartPos = input.Position -- store where drag started
 
-						tweenservice:Create(icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
+						syde_tween(icon, 0.3, Enum.EasingStyle.Exponential, {
 							ImageColor3 = Color3.fromRGB(255, 255, 255)
-						}):Play()
+						})
 					end
 				end)
 
 				Viewport.InputEnded:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						dragging = false
-						tweenservice:Create(icon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
+						syde_tween(icon, 0.3, Enum.EasingStyle.Exponential, {
 							ImageColor3 = Color3.fromRGB(30, 30, 30)
-						}):Play()
+						})
 					end
 				end)
 
@@ -9731,11 +9786,11 @@ function syde:Init(library)
 				distance = math.clamp(distance, minZoomDistance, maxZoomDistance)
 				Camera.CFrame = CFrame.new(Vector3.new(0, 0, distance), Vector3.new(0, 0, 0))
 				if ZoomAmountLabel then
-					tweenservice:Create(ZoomAmountLabel, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Position = UDim2.new(1, 0,0.5, -20)}):Play()
+					syde_tween(ZoomAmountLabel, 0.8, Enum.EasingStyle.Elastic, {Position = UDim2.new(1, 0,0.5, -20)})
 					task.wait(0.045)
 					ZoomAmountLabel.Text = 'x'..string.format("%.2f", distance)
 					ZoomAmountLabel.Position = UDim2.new(1, 0,0.5, 20)
-					tweenservice:Create(ZoomAmountLabel, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Position = UDim2.new(1, 0,0.5, 0)}):Play()
+					syde_tween(ZoomAmountLabel, 0.8, Enum.EasingStyle.Elastic, {Position = UDim2.new(1, 0,0.5, 0)})
 				end
 			end
 
@@ -9944,7 +9999,7 @@ function syde:Init(library)
 			dropdown.Name = data.Title
 			dropdown.dropholder.drop.Container.Option.Visible = false
 			dropdown.dropholder.drop.Container.Visible = false
-			tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+			syde_tween(dropdown.dropholder.drop.Container, 1, Enum.EasingStyle.Quint, { Size = UDim2.new(0.33, -20,0.576, -75) })
 			dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
 			dropdown:SetAttribute("Searchable", true)
 
@@ -9988,7 +10043,7 @@ function syde:Init(library)
 				local yOffset = 0
 				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option.Visible then
-						tweenservice:Create(option, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+						syde_tween(option, 0.15, Enum.EasingStyle.Quint, {Position = UDim2.new(0, 0, 0, yOffset)})
 						yOffset = yOffset + option.Size.Y.Offset + 7
 					end
 				end
@@ -10002,31 +10057,31 @@ function syde:Init(library)
 				dropdown.dropholder.drop.Container.Visible = true
 				dropdown.dropholder.drop.search.Visible = true
 
-				tweenservice:Create(dropdown, TweenInfo.new(0.22, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.22, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.22, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+				syde_tween(dropdown, 0.22, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -35, 0, 300) })
+				syde_tween(dropdown.dropholder.drop.Container, 0.22, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -20, 1, -75) })
+				syde_tween(dropdown.dropholder.drop.v0, 0.22, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0 })
+				syde_tween(dropdown.dropholder.drop.down, 0.22, Enum.EasingStyle.Quint, { Rotation = 180 })
 
-				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+				syde_tween(dropdown.dropholder.drop.search, 0.22, Enum.EasingStyle.Exponential, { BackgroundTransparency = 0.65 })
+				syde_tween(dropdown.dropholder.drop.search.UIStroke, 0.22, Enum.EasingStyle.Exponential, { Transparency = 0.4 })
+				syde_tween(dropdown.dropholder.drop.search.TextBox, 0.22, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+				syde_tween(dropdown.dropholder.drop.search.ImageLabel, 0.22, Enum.EasingStyle.Exponential, { ImageTransparency = 0.9 })
+				syde_tween(dropdown.dropholder.drop.search.icon, 0.22, Enum.EasingStyle.Exponential, { ImageTransparency = 0.85 })
 
 			end
 
 			local function CloseDrop()
 				DropOpen = false
-				tweenservice:Create(dropdown, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+				syde_tween(dropdown, 0.2, Enum.EasingStyle.Quint, { Size = UDim2.new(1, -35, 0, 95) })
+				syde_tween(dropdown.dropholder.drop.Container, 0.2, Enum.EasingStyle.Quint, { Size = UDim2.new(0.33, -20, 0.576, -75) })
+				syde_tween(dropdown.dropholder.drop.v0, 0.2, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1 })
+				syde_tween(dropdown.dropholder.drop.down, 0.2, Enum.EasingStyle.Quint, { Rotation = 0 })
 
-				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				syde_tween(dropdown.dropholder.drop.search, 0.2, Enum.EasingStyle.Exponential, { BackgroundTransparency = 1 })
+				syde_tween(dropdown.dropholder.drop.search.UIStroke, 0.2, Enum.EasingStyle.Exponential, { Transparency = 1 })
+				syde_tween(dropdown.dropholder.drop.search.TextBox, 0.2, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
+				syde_tween(dropdown.dropholder.drop.search.ImageLabel, 0.2, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
+				syde_tween(dropdown.dropholder.drop.search.icon, 0.2, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
 
 				task.delay(0.2, function()
 					if not DropOpen and dropdown.Parent then
@@ -10131,52 +10186,97 @@ function syde:Init(library)
 					table.clear(playerPreviewRemoveButtons)
 					for _, child in ipairs(playerPreview:GetChildren()) do child:Destroy() end
 					local width = playerPreview.AbsoluteSize.X > 0 and playerPreview.AbsoluteSize.X or 260
-					local slots = math.max(1, math.floor(width / 76))
-					local hasOverflow = #SelectedOrder > slots
-					local visibleCount = math.min(#SelectedOrder, hasOverflow and math.max(0, slots - 1) or slots)
+					local currentXOffset = 0
+					local visibleCount = 0
+					
+					for index = 1, #SelectedOrder do
+						local name = SelectedOrder[index]
+						local displayName = OptionLabels[name] or name
+						local textSize = textservice:GetTextSize(displayName, 12, Enum.Font.Gotham, Vector2.new(999, 20))
+						local textWidth = math.min(textSize.X, 100)
+						local playerData = OptionDataByName[name]
+						local hasAvatar = playerData and playerData.Image and playerData.Image ~= ""
+						local cardWidth = (hasAvatar and 22 or 6) + textWidth + 20
+						
+						if index < #SelectedOrder and currentXOffset + cardWidth + 36 > width then
+							break
+						elseif index == #SelectedOrder and currentXOffset + cardWidth > width then
+							break
+						end
+						
+						visibleCount = visibleCount + 1
+						currentXOffset = currentXOffset + cardWidth + 6
+					end
+					
+					local hasOverflow = #SelectedOrder > visibleCount
+					
+					currentXOffset = 0
 					for index = 1, visibleCount do
 						local name = SelectedOrder[index]
 						local playerData = OptionDataByName[name]
+						
+						local displayName = OptionLabels[name] or name
+						local textSize = textservice:GetTextSize(displayName, 12, Enum.Font.Gotham, Vector2.new(999, 20))
+						local textWidth = math.min(textSize.X, 100)
+						local hasAvatar = playerData and playerData.Image and playerData.Image ~= ""
+						local cardWidth = (hasAvatar and 22 or 6) + textWidth + 20
+						
 						local card = Instance.new("Frame")
 						card.Name = name
-						card.BackgroundTransparency = 1
-						card.Size = UDim2.fromOffset(72, 30)
-						card.Position = UDim2.fromOffset((index - 1) * 76, 0)
+						card.BackgroundTransparency = 0
+						card.BackgroundColor3 = Color3.fromRGB(33, 33, 33)
+						card.Size = UDim2.fromOffset(cardWidth, 20)
+						card.Position = UDim2.fromOffset(currentXOffset, 5)
 						card.ZIndex = playerPreview.ZIndex + 1
 						card.Parent = playerPreview
-						local avatar = Instance.new("ImageLabel")
-						avatar.Name = "Avatar"
-						avatar.BackgroundTransparency = 1
-						avatar.Image = playerData and playerData.Image or ""
-						avatar.Size = UDim2.fromOffset(20, 20)
-						avatar.Position = UDim2.fromOffset(25, 0)
-						avatar.ZIndex = card.ZIndex + 1
-						avatar.Parent = card
-						local corner = Instance.new("UICorner")
-						corner.CornerRadius = UDim.new(1, 0)
-						corner.Parent = avatar
+						
+						local cardCorner = Instance.new("UICorner")
+						cardCorner.CornerRadius = UDim.new(0, 4)
+						cardCorner.Parent = card
+						
+						local cardStroke = Instance.new("UIStroke")
+						cardStroke.Color = Color3.fromRGB(60, 60, 60)
+						cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+						cardStroke.Parent = card
+						
+						if hasAvatar then
+							local avatar = Instance.new("ImageLabel")
+							avatar.Name = "Avatar"
+							avatar.BackgroundTransparency = 1
+							avatar.Image = playerData.Image
+							avatar.Size = UDim2.fromOffset(14, 14)
+							avatar.Position = UDim2.fromOffset(4, 3)
+							avatar.ZIndex = card.ZIndex + 1
+							avatar.Parent = card
+							local corner = Instance.new("UICorner")
+							corner.CornerRadius = UDim.new(1, 0)
+							corner.Parent = avatar
+						end
+						
 						local nameLabel = Instance.new("TextLabel")
 						nameLabel.Name = "PlayerName"
 						nameLabel.BackgroundTransparency = 1
-						nameLabel.Text = OptionLabels[name] or name
-						nameLabel.TextColor3 = Color3.fromRGB(235, 235, 238)
+						nameLabel.Text = displayName
+						nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 						nameLabel.Font = Enum.Font.Gotham
-						nameLabel.TextSize = 9
+						nameLabel.TextSize = 12
 						nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-						nameLabel.Size = UDim2.fromOffset(72, 10)
-						nameLabel.Position = UDim2.fromOffset(0, 20)
+						nameLabel.Size = UDim2.fromOffset(textWidth, 20)
+						nameLabel.Position = UDim2.fromOffset(hasAvatar and 22 or 6, 0)
 						nameLabel.ZIndex = card.ZIndex + 1
 						nameLabel.Parent = card
+						
 						local remove = Instance.new("TextButton")
 						remove.Name = "Remove"
 						remove.BackgroundTransparency = 1
 						remove.Text = "×"
-						remove.TextColor3 = Color3.fromRGB(205, 205, 210)
-						remove.TextSize = 16
+						remove.TextColor3 = Color3.fromRGB(150, 150, 150)
+						remove.TextSize = 14
 						remove.Size = UDim2.fromOffset(20, 20)
-						remove.Position = UDim2.fromOffset(52, 0)
+						remove.Position = UDim2.fromOffset((hasAvatar and 22 or 6) + textWidth, 0)
 						remove.ZIndex = card.ZIndex + 2
 						remove.Parent = card
+						
 						local function removeSelected()
 							RemoveFromSelected(name)
 							UpdateSelectedText()
@@ -10185,17 +10285,20 @@ function syde:Init(library)
 						end
 						playerPreviewRemoveButtons[remove] = removeSelected
 						remove.Activated:Connect(removeSelected)
+						
+						currentXOffset = currentXOffset + cardWidth + 6
 					end
+					
 					if hasOverflow then
 						local more = Instance.new("TextLabel")
 						more.Name = "MorePlayers"
 						more.BackgroundTransparency = 1
 						more.Text = "+" .. tostring(#SelectedOrder - visibleCount)
-						more.TextColor3 = Color3.fromRGB(195, 195, 202)
-						more.Font = Enum.Font.GothamMedium
+						more.TextColor3 = Color3.fromRGB(150, 150, 150)
+						more.Font = Enum.Font.Gotham
 						more.TextSize = 12
-						more.Size = UDim2.fromOffset(72, 30)
-						more.Position = UDim2.fromOffset(visibleCount * 76, 0)
+						more.Size = UDim2.fromOffset(30, 20)
+						more.Position = UDim2.fromOffset(currentXOffset, 5)
 						more.ZIndex = playerPreview.ZIndex + 1
 						more.Parent = playerPreview
 					end
@@ -10230,11 +10333,11 @@ function syde:Init(library)
 								-- Visually update the dropdown list
 								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 									if opt:IsA("Frame") and opt.Name == option then
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-										tweenservice:Create(opt.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-										tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-										tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
+										syde_tween(opt, 1, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+										syde_tween(opt, 1, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+										syde_tween(opt.Title, 1, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+										syde_tween(opt.UIStroke, 1, Enum.EasingStyle.Exponential, {Transparency = 0.5})
+										syde_tween(opt.ImageLabel, 1, Enum.EasingStyle.Exponential, {ImageTransparency = 0.9})
 									end
 								end
 
@@ -10255,7 +10358,7 @@ function syde:Init(library)
 
 								optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
 
-								tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
+								syde_tween(optionGroup, 0.67, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, totalWidth, 0, 20)})
 							end)
 						end
 					end
@@ -10291,25 +10394,25 @@ function syde:Init(library)
 						if shouldShow then
 							option.Visible = true
 							if SelectedOptions[option.Name] then
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
+								syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+								syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+								syde_tween(option.Title, 0.7, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+								syde_tween(option.UIStroke, 0.7, Enum.EasingStyle.Exponential, {Transparency = 1})
+								syde_tween(option.ImageLabel, 0.7, Enum.EasingStyle.Exponential, {ImageTransparency = 0})
 							else
-								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-								tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
+								syde_tween(option, 1, Enum.EasingStyle.Exponential, {BackgroundTransparency = 0})
+								syde_tween(option, 1, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+								syde_tween(option.Title, 1, Enum.EasingStyle.Exponential, {TextTransparency = 0})
+								syde_tween(option.UIStroke, 1, Enum.EasingStyle.Exponential, {Transparency = 0.5})
+								syde_tween(option.ImageLabel, 1, Enum.EasingStyle.Exponential, {ImageTransparency = 0.9})
 							end
 						else
 							-- Hide with animation, but wait before setting Visible = false
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-							tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-							tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
+							syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundTransparency = 1})
+							syde_tween(option, 0.7, Enum.EasingStyle.Exponential, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+							syde_tween(option.Title, 0.7, Enum.EasingStyle.Exponential, {TextTransparency = 1})
+							syde_tween(option.UIStroke, 0.7, Enum.EasingStyle.Exponential, {Transparency = 1})
+							syde_tween(option.ImageLabel, 0.7, Enum.EasingStyle.Exponential, {ImageTransparency = 1})
 							option.Visible = false
 						end
 					end
@@ -10398,20 +10501,20 @@ function syde:Init(library)
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
-						tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-						tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+						syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+						syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
 					end
 
 					option.Interact.Activated:Connect(function()
 						if data.Multi then
 							if SelectedOptions[OptionText] then
 								RemoveFromSelected(OptionText)
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
+								syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+								syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0.9})
 							else
 								AddToSelected(OptionText)
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+								syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+								syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
 							end
 
 							if data.CallBack then
@@ -10426,13 +10529,13 @@ function syde:Init(library)
 
 							for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 								if opt:IsA("Frame") then
-									tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
+									syde_tween(opt, 0.3, {BackgroundColor3 = Color3.fromRGB(33, 33, 33)})
+									syde_tween(opt.ImageLabel, 0.3, {ImageTransparency = 0.9})
 								end
 							end
 
-							tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+							syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
+							syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
 
 
 							if data.CallBack then
@@ -10596,15 +10699,15 @@ function syde:Init(library)
 				}
 
 				local GAP = 8
-				local ITEM_HEIGHT = 30
-				local ITEM_WIDTH = 120
-				local HORIZONTAL_THRESHOLD = 260
+				local itemHeight = 30
+				local itemWidth = 120
+				local horizontalThreshold = 260
 
 				local function updateHueValuesLayout()
 					if not HueValues.Visible then return end
 
 					local width = HueValues.AbsoluteSize.X
-					local horizontal = width >= HORIZONTAL_THRESHOLD
+					local horizontal = width >= horizontalThreshold
 
 					local x, y = 0, 0
 					local totalHeight = 0
@@ -10613,14 +10716,14 @@ function syde:Init(library)
 						item.AnchorPoint = Vector2.new(1, 0)
 
 						if horizontal then
-							item.Size = UDim2.new(0, ITEM_WIDTH, 0, ITEM_HEIGHT)
+							item.Size = UDim2.new(0, itemWidth, 0, itemHeight)
 							item.Position = UDim2.new(1, -x, 0, 0)
-							x += ITEM_WIDTH + GAP
-							totalHeight = ITEM_HEIGHT
+							x += itemWidth + GAP
+							totalHeight = itemHeight
 						else
-							item.Size = UDim2.new(1, -4, 0, ITEM_HEIGHT)
+							item.Size = UDim2.new(1, -4, 0, itemHeight)
 							item.Position = UDim2.new(1, 0, 0, -y)
-							y += ITEM_HEIGHT + GAP
+							y += itemHeight + GAP
 							totalHeight = y
 						end
 					end
@@ -10630,17 +10733,9 @@ function syde:Init(library)
 
 					if Open then
 						if data.Type == "Gradient" then
-							tweenservice:Create(
-								colorpicker,
-								TweenInfo.new(0.35, Enum.EasingStyle.Quart),
-								{ Size = UDim2.new(1, -35, 0, 305 + totalHeight) }
-							):Play()
+							syde_tween(colorpicker, 0.35, Enum.EasingStyle.Quart, { Size = UDim2.new(1, -35, 0, 305 + totalHeight) })
 						else
-							tweenservice:Create(
-								colorpicker,
-								TweenInfo.new(0.35, Enum.EasingStyle.Quart),
-								{ Size = UDim2.new(1, -35, 0, 290 + totalHeight) }
-							):Play()
+							syde_tween(colorpicker, 0.35, Enum.EasingStyle.Quart, { Size = UDim2.new(1, -35, 0, 290 + totalHeight) })
 						end
 
 					end
@@ -10712,7 +10807,7 @@ function syde:Init(library)
 
 				for _, frame in ipairs(children) do
 					--	frame.Position = UDim2.new(0, startX, 0.5, -frame.Size.Y.Offset / 2)
-					tweenservice:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Position = UDim2.new(0, startX , 0.8, -frame.Size.Y.Offset / 2) }):Play()
+					syde_tween(frame, 0.5, Enum.EasingStyle.Quart, {Position = UDim2.new(0, startX , 0.8, -frame.Size.Y.Offset / 2) })
 					startX += frameSize + spacing
 				end
 			end
@@ -10807,17 +10902,17 @@ function syde:Init(library)
 				HueSat.Value = data.Color
 
 
-				tweenservice:Create(HUESlider.Pin, TweenInfo.new(0.1, Enum.EasingStyle.Exponential), {BackgroundColor3 = newColor2}):Play()
-				tweenservice:Create(SVPicker.Pin, TweenInfo.new(0.1, Enum.EasingStyle.Exponential), {BackgroundColor3 = newColor}):Play()
+				syde_tween(HUESlider.Pin, 0.1, Enum.EasingStyle.Exponential, {BackgroundColor3 = newColor2})
+				syde_tween(SVPicker.Pin, 0.1, Enum.EasingStyle.Exponential, {BackgroundColor3 = newColor})
 
 
-				tweenservice:Create(SVPicker.Pin, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				syde_tween(SVPicker.Pin, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
 					Position = UDim2.new(HSV[2], 0, 1 - HSV[3], 0)
-				}):Play()
+				})
 
-				tweenservice:Create(HUESlider.Pin, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				syde_tween(HUESlider.Pin, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
 					Position = UDim2.new(1 - HSV[1], 0, 0.5, 0)
-				}):Play()
+				})
 
 				local formattedHex = FormatColor(data.Color, 'Hex')
 				colorpicker.HueValues.HEX.V.HEXBox.PlaceholderText = formattedHex
@@ -10986,63 +11081,63 @@ function syde:Init(library)
 				colorpicker:SetAttribute("UpdateHueLayout", not colorpicker:GetAttribute("UpdateHueLayout"))
 
 
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 0.95, Enum.EasingStyle.Quart ), { Size = UDim2.new(0, 1,0, 1) }):Play()
-				tweenservice:Create(colorpicker, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(35, 35, 35) }):Play()
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { BackgroundColor3 = data.Color }):Play()
-				tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.color.glow, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 1}):Play()
+				syde_tween(colorpicker.color,  0.95, Enum.EasingStyle.Quart , { Size = UDim2.new(0, 1,0, 1) })
+				syde_tween(colorpicker,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(35, 35, 35) })
+				syde_tween(colorpicker.color,  1, Enum.EasingStyle.Exponential , { BackgroundColor3 = data.Color })
+				syde_tween(colorpicker.QuickClose,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+				syde_tween(colorpicker.color.glow,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 1})
 				task.wait(0.12)
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 0.9, Enum.EasingStyle.Quart ), { Size = UDim2.new(1, -40,0, 160) }):Play()
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 0.9, Enum.EasingStyle.Quart ), { Position = UDim2.new(0.5, 0,0, 40) }):Play()
+				syde_tween(colorpicker.color,  0.9, Enum.EasingStyle.Quart , { Size = UDim2.new(1, -40,0, 160) })
+				syde_tween(colorpicker.color,  0.9, Enum.EasingStyle.Quart , { Position = UDim2.new(0.5, 0,0, 40) })
 
-				tweenservice:Create(colorpicker, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(17, 17, 17) }):Play()
-				--	tweenservice:Create(colorpicker, TweenInfo.new( 0.8, Enum.EasingStyle.Quart ), { Size = UDim2.new(1, -35,0, 350) }):Play()
-				tweenservice:Create(colorpicker.color.UICorner, TweenInfo.new( 0.8, Enum.EasingStyle.Quart ), { CornerRadius = UDim.new(0, 10) }):Play()
+				syde_tween(colorpicker,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(17, 17, 17) })
+				--	syde_tween(colorpicker,  0.8, Enum.EasingStyle.Quart , { Size = UDim2.new(1, -35,0, 350) })
+				syde_tween(colorpicker.color.UICorner,  0.8, Enum.EasingStyle.Quart , { CornerRadius = UDim.new(0, 10) })
 
-				tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+				syde_tween(colorpicker.color.Values.Rainbow,  1, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 
 
 				task.wait(0.6)
 
-				tweenservice:Create(colorpicker.color.SVPicker.Brightness, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.color.SVPicker.Saturation, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.color.SVPicker.Pin, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.color.SVPicker.Pin.UIStroke, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
+				syde_tween(colorpicker.color.SVPicker.Brightness,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+				syde_tween(colorpicker.color.SVPicker.Saturation,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+				syde_tween(colorpicker.color.SVPicker.Pin,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+				syde_tween(colorpicker.color.SVPicker.Pin.UIStroke,  2, Enum.EasingStyle.Exponential , { Transparency = 0 })
 
 				task.wait(0.5)
-				tweenservice:Create(colorpicker.color.Values.Hue, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.color.Values.Hue.Pin, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.color.Values.Hue.Pin.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
+				syde_tween(colorpicker.color.Values.Hue,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+				syde_tween(colorpicker.color.Values.Hue.Pin,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+				syde_tween(colorpicker.color.Values.Hue.Pin.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0 })
 
 				if data.Type == "Gradient" then
-					tweenservice:Create(colorpicker.color.Values.Grad, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin1, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin1.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin2, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin2.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0 }):Play()
+					syde_tween(colorpicker.color.Values.Grad,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.Values.Grad.Pin1,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.Values.Grad.Pin1.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0 })
+					syde_tween(colorpicker.color.Values.Grad.Pin2,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+					syde_tween(colorpicker.color.Values.Grad.Pin2.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0 })
 				end
 
 
-				tweenservice:Create(colorpicker.HueValues.HEX, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0.9 }):Play()
-				tweenservice:Create(colorpicker.HueValues.HEX.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0.4 }):Play()
-				tweenservice:Create(colorpicker.HueValues.HEX.V.HEXBox, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { TextTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.HueValues.HEX.Copy, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+				syde_tween(colorpicker.HueValues.HEX,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0.9 })
+				syde_tween(colorpicker.HueValues.HEX.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0.4 })
+				syde_tween(colorpicker.HueValues.HEX.V.HEXBox,  0.8, Enum.EasingStyle.Exponential , { TextTransparency = 0 })
+				syde_tween(colorpicker.HueValues.HEX.Copy,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 
 				task.wait(0.09)
-				tweenservice:Create(colorpicker.HueValues.RGB, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0.9 }):Play()
-				tweenservice:Create(colorpicker.HueValues.RGB.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0.4 }):Play()
-				tweenservice:Create(colorpicker.HueValues.RGB.V.RGBBox, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { TextTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.HueValues.RGB.Copy, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+				syde_tween(colorpicker.HueValues.RGB,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0.9 })
+				syde_tween(colorpicker.HueValues.RGB.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0.4 })
+				syde_tween(colorpicker.HueValues.RGB.V.RGBBox,  0.8, Enum.EasingStyle.Exponential , { TextTransparency = 0 })
+				syde_tween(colorpicker.HueValues.RGB.Copy,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 				task.wait(0.09)
-				tweenservice:Create(colorpicker.HueValues.Link, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0.9 }):Play()
-				tweenservice:Create(colorpicker.HueValues.Link.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 0.4 }):Play()
-				tweenservice:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(colorpicker.HueValues.Link.Frame.ImageLabel, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { ImageTransparency = 0 }):Play()
+				syde_tween(colorpicker.HueValues.Link,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0.9 })
+				syde_tween(colorpicker.HueValues.Link.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 0.4 })
+				syde_tween(colorpicker.HueValues.Link.Frame,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
+				syde_tween(colorpicker.HueValues.Link.Frame.ImageLabel,  0.8, Enum.EasingStyle.Exponential , { ImageTransparency = 0 })
 
 				for _,v in ipairs(colorpicker.color.Values.Recent:GetChildren()) do
 					if v:IsA('Frame') then
 						task.wait(0.1)
-						tweenservice:Create(v, TweenInfo.new( 0.3, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 0 }):Play()
+						syde_tween(v,  0.3, Enum.EasingStyle.Exponential , { BackgroundTransparency = 0 })
 					end
 				end
 
@@ -11060,13 +11155,13 @@ function syde:Init(library)
 			end)
 
 			colorpicker.QuickClose.hitbox.MouseEnter:Connect(function()
-				tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Quint ), { Size = UDim2.new(0, 70,0, 3) }):Play()
-				tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+				syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Quint , { Size = UDim2.new(0, 70,0, 3) })
+				syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(255, 255, 255) })
 			end)
 
 			colorpicker.QuickClose.hitbox.MouseLeave:Connect(function()
-				tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Quint ), { Size = UDim2.new(0, 60,0, 3) }):Play()
-				tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+				syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Quint , { Size = UDim2.new(0, 60,0, 3) })
+				syde_tween(colorpicker.QuickClose,  0.8, Enum.EasingStyle.Exponential , { BackgroundColor3 = Color3.fromRGB(33, 33, 33) })
 			end)
 
 			local displayGrad = colorpicker.color:FindFirstChildOfClass("UIGradient")
@@ -11075,37 +11170,37 @@ function syde:Init(library)
 				displayGrad.Enabled = true
 				displayGrad.Color = ColorSequence.new(Keys)
 				-- Set to White so the gradient isn't "multiplied" or tinted by a background color
-				tweenservice:Create(colorpicker.color, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.new(1, 1, 1) }):Play()
+				syde_tween(colorpicker.color, 0.5, Enum.EasingStyle.Exponential, { BackgroundColor3 = Color3.new(1, 1, 1) })
 			else
 				if displayGrad then displayGrad.Enabled = false end
-				tweenservice:Create(colorpicker.color, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundColor3 = data.Color }):Play()
+				syde_tween(colorpicker.color, 0.5, Enum.EasingStyle.Exponential, { BackgroundColor3 = data.Color })
 			end
 
 			local function ClosePicker()
 				Open = false
 				DeBounce = true
-				tweenservice:Create(colorpicker, TweenInfo.new( 0.55, Enum.EasingStyle.Quint ), { Size = UDim2.new(1, -35,0, 40) }):Play()
-				--	tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 0.7, Enum.EasingStyle.Quart ), { Position = UDim2.new(1, -30,0, 10)}):Play()
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 0.55, Enum.EasingStyle.Quint ), { Size = UDim2.new(0, 20,0, 20) }):Play()
-				tweenservice:Create(colorpicker.color, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundColor3 = data.Color }):Play()
-				tweenservice:Create(colorpicker.QuickClose, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.color.glow, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { ImageTransparency = 0.7}):Play()
+				syde_tween(colorpicker,  0.55, Enum.EasingStyle.Quint , { Size = UDim2.new(1, -35,0, 40) })
+				--	syde_tween(colorpicker.QuickClose,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.color,  0.7, Enum.EasingStyle.Quart , { Position = UDim2.new(1, -30,0, 10)})
+				syde_tween(colorpicker.color,  0.55, Enum.EasingStyle.Quint , { Size = UDim2.new(0, 20,0, 20) })
+				syde_tween(colorpicker.color,  0.5, Enum.EasingStyle.Exponential , { BackgroundColor3 = data.Color })
+				syde_tween(colorpicker.QuickClose,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.color.glow,  0.5, Enum.EasingStyle.Exponential , { ImageTransparency = 0.7})
 				colorpicker.interact.Interactable = true
 				colorpicker.QuickClose.Interactable = false
 
 				--	task.wait(0.6)
 
-				tweenservice:Create(colorpicker.color.SVPicker.Brightness, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.color.SVPicker.Saturation, TweenInfo.new( 2, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.color.SVPicker.Pin, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.color.SVPicker.Pin.UIStroke, TweenInfo.new( 0.4, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
+				syde_tween(colorpicker.color.SVPicker.Brightness,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.color.SVPicker.Saturation,  2, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.color.SVPicker.Pin,  1, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.color.SVPicker.Pin.UIStroke,  0.4, Enum.EasingStyle.Exponential , { Transparency = 1 })
 
-				tweenservice:Create(colorpicker.color.Values.Hue, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.color.Values.Hue.Pin, TweenInfo.new( 1, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.color.Values.Hue.Pin.UIStroke, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
+				syde_tween(colorpicker.color.Values.Hue,  0.5, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.color.Values.Hue.Pin,  1, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.color.Values.Hue.Pin.UIStroke,  0.5, Enum.EasingStyle.Exponential , { Transparency = 1 })
 
-				tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+				syde_tween(colorpicker.color.Values.Rainbow,  0.5, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 
 				local displayGrad = colorpicker.color:FindFirstChildOfClass("UIGradient")
 
@@ -11113,38 +11208,38 @@ function syde:Init(library)
 					displayGrad.Enabled = true
 					displayGrad.Color = ColorSequence.new(Keys)
 					-- Set to White so the gradient isn't "multiplied" or tinted by a background color
-					tweenservice:Create(colorpicker.color, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.new(1, 1, 1) }):Play()
+					syde_tween(colorpicker.color, 0.5, Enum.EasingStyle.Exponential, { BackgroundColor3 = Color3.new(1, 1, 1) })
 				else
 					if displayGrad then displayGrad.Enabled = false end
-					tweenservice:Create(colorpicker.color, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundColor3 = data.Color }):Play()
+					syde_tween(colorpicker.color, 0.5, Enum.EasingStyle.Exponential, { BackgroundColor3 = data.Color })
 				end
 
 				if data.Type == "Gradient" then
-					tweenservice:Create(colorpicker.color.Values.Grad, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin1, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin1.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin2, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(colorpicker.color.Values.Grad.Pin2.UIStroke, TweenInfo.new( 0.8, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
+					syde_tween(colorpicker.color.Values.Grad,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.Values.Grad.Pin1,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.Values.Grad.Pin1.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 1 })
+					syde_tween(colorpicker.color.Values.Grad.Pin2,  0.8, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+					syde_tween(colorpicker.color.Values.Grad.Pin2.UIStroke,  0.8, Enum.EasingStyle.Exponential , { Transparency = 1 })
 				end
 
-				tweenservice:Create(colorpicker.HueValues.RGB, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.RGB.UIStroke, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.RGB.V.RGBBox, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { TextTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.RGB.Copy, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+				syde_tween(colorpicker.HueValues.RGB,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.HueValues.RGB.UIStroke,  0.6, Enum.EasingStyle.Exponential , { Transparency = 1 })
+				syde_tween(colorpicker.HueValues.RGB.V.RGBBox,  0.6, Enum.EasingStyle.Exponential , { TextTransparency = 1 })
+				syde_tween(colorpicker.HueValues.RGB.Copy,  0.6, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 
-				tweenservice:Create(colorpicker.HueValues.HEX, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.HEX.UIStroke, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.HEX.V.HEXBox, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { TextTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.HEX.Copy, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+				syde_tween(colorpicker.HueValues.HEX,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.HueValues.HEX.UIStroke,  0.6, Enum.EasingStyle.Exponential , { Transparency = 1 })
+				syde_tween(colorpicker.HueValues.HEX.V.HEXBox,  0.6, Enum.EasingStyle.Exponential , { TextTransparency = 1 })
+				syde_tween(colorpicker.HueValues.HEX.Copy,  0.6, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 
-				tweenservice:Create(colorpicker.HueValues.Link, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.Link.UIStroke, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { Transparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(colorpicker.HueValues.Link.Frame.ImageLabel, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { ImageTransparency = 1 }):Play()
+				syde_tween(colorpicker.HueValues.Link,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.HueValues.Link.UIStroke,  0.6, Enum.EasingStyle.Exponential , { Transparency = 1 })
+				syde_tween(colorpicker.HueValues.Link.Frame,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
+				syde_tween(colorpicker.HueValues.Link.Frame.ImageLabel,  0.6, Enum.EasingStyle.Exponential , { ImageTransparency = 1 })
 				colorpicker.HueValues.Visible = false
 				for _,v in ipairs(colorpicker.color.Values.Recent:GetChildren()) do
 					if v:IsA('Frame') then
-						tweenservice:Create(v, TweenInfo.new( 0.6, Enum.EasingStyle.Exponential ), { BackgroundTransparency = 1 }):Play()
+						syde_tween(v,  0.6, Enum.EasingStyle.Exponential , { BackgroundTransparency = 1 })
 					end
 				end
 				task.wait(1)
@@ -11168,10 +11263,10 @@ function syde:Init(library)
 					for _,v2 in ipairs(v:GetChildren()) do
 						if v2:IsA("ImageLabel") then
 							v2.MouseEnter:Connect(function()
-								tweenservice:Create(v2, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+								syde_tween(v2, 0.3, Enum.EasingStyle.Exponential, {ImageColor3 = Color3.fromRGB(255, 255, 255) })
 							end)
 							v2.MouseLeave:Connect(function()
-								tweenservice:Create(v2, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {ImageColor3 = Color3.fromRGB(66, 66, 66) }):Play()
+								syde_tween(v2, 0.3, Enum.EasingStyle.Exponential, {ImageColor3 = Color3.fromRGB(66, 66, 66) })
 							end)
 						end
 					end
@@ -11193,9 +11288,9 @@ function syde:Init(library)
 				recentFrame.BackgroundColor3 = newColor
 
 				recentFrame.interact.MouseButton1Click:Connect(function()
-				--[[	tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 5,0, 5) }):Play()
+				--[[	syde_tween(recentFrame, 0.3, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, 5,0, 5) })
 					task.wait(0.09)
-					tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 12,0, 12) }):Play() ]]
+					syde_tween(recentFrame, 0.3, Enum.EasingStyle.Exponential, {Size = UDim2.new(0, 12,0, 12) }) ]]
 
 					local h, s, v = newColor:ToHSV()
 					if s > 0.02 then
@@ -11208,11 +11303,11 @@ function syde:Init(library)
 				end)
 
 				recentFrame.interact.MouseEnter:Connect(function()
-					tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 20,0, 20) }):Play()
+					syde_tween(recentFrame, 0.3, Enum.EasingStyle.Quint, {Size = UDim2.new(0, 20,0, 20) })
 				end)
 
 				recentFrame.interact.MouseLeave:Connect(function()
-					tweenservice:Create(recentFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 12,0, 12) }):Play()
+					syde_tween(recentFrame, 0.3, Enum.EasingStyle.Quint, {Size = UDim2.new(0, 12,0, 12) })
 				end)
 
 				local maxRecentColors = 10
@@ -11454,14 +11549,14 @@ function syde:Init(library)
 							syde._rainbowUpdating = false
 							if not ok then warn("[Syde RGB] " .. tostring(failure)) end
 						end)
-						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+						syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(255, 255, 255)})
 					end
 				else
 					if huerender then
 						huerender:Disconnect()
 						huerender = nil
 					end
-					tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
+					syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(62, 62, 62)})
 				end
 				if not skipSave then SaveConfig(game and game.GameId) end
 			end
@@ -11516,6 +11611,9 @@ function syde:Init(library)
 			return syde:Modal(ModalConfig)
 		end
 
+--------------------------------------------------------------------------------
+-- [ UI ELEMENTS CONTROLLERS ]
+--------------------------------------------------------------------------------
 		function initelement:AddToggle(ToggleConfig)
 			ToggleConfig = ToggleConfig or {}
 			local initializing = true
@@ -11554,7 +11652,11 @@ function syde:Init(library)
 			return data
 		end
 
-		function initelement:AddSlider(SliderConfig)
+		
+--------------------------------------------------------------------------------
+-- [ ELEMENT: SLIDERS (LEGACY) ]
+--------------------------------------------------------------------------------
+function initelement:AddSlider(SliderConfig)
 			SliderConfig = SliderConfig or {}
 			local flagName = SliderConfig.Flag or SliderConfig.Name or SliderConfig.Title or SliderConfig.ValueName or "Slider"
 
@@ -11744,7 +11846,11 @@ function syde:Init(library)
 			return performanceToggle
 		end
 
-		function initelement:AddButton(ButtonConfig)
+		
+--------------------------------------------------------------------------------
+-- [ ELEMENT: BUTTONS & TOGGLES (LEGACY) ]
+--------------------------------------------------------------------------------
+function initelement:AddButton(ButtonConfig)
 			ButtonConfig = ButtonConfig or {}
 			return self:Button({
 				Title = ButtonConfig.Name or ButtonConfig.Title or "Button",
