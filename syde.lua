@@ -1151,7 +1151,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	previewCorner.CornerRadius = UDim.new(0, 18)
 	previewCorner.Parent = preview
 	local previewStroke = Instance.new("UIStroke")
-	previewStroke.Color = Color3.fromRGB(94, 130, 255)
+	previewStroke.Color = Color3.fromRGB(145, 145, 150)
 	previewStroke.Thickness = 2
 	previewStroke.Transparency = 1
 	previewStroke.Parent = preview
@@ -1222,7 +1222,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			applyPendingSize()
 			if renderConnection then renderConnection:Disconnect() renderConnection = nil end
 			if pendingSize and Object.Size ~= pendingSize then
-				Object.Size = pendingSize
+				tweenservice:Create(Object, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = pendingSize}):Play()
 				if Callback then Callback(Vector2.new(pendingSize.X.Offset, pendingSize.Y.Offset)) end
 			end
 			isResizing = false
@@ -2454,6 +2454,11 @@ function syde:SetPerformanceOverlay(enabled)
 		if performanceOverlay.elapsed < 0.25 then return end
 
 		local fps = math.floor(performanceOverlay.frameCount / performanceOverlay.elapsed + 0.5)
+		syde._currentFPS = fps
+		local miniInfo = ui.minihome and ui.minihome:FindFirstChild("info")
+		if miniInfo and miniInfo:FindFirstChild("fps") then
+			miniInfo.fps.Text = fps .. " FPS"
+		end
 		local ping = getNetworkPingMs()
 		if performanceOverlay.label and performanceOverlay.label.Parent then
 			performanceOverlay.label.Text = string.format("%d FPS  ·  %s ms", fps, ping and tostring(ping) or "--")
@@ -3616,7 +3621,9 @@ function syde:Init(library)
 				lastTime = now
 				frames = 0
 
-				info.fps.Text = fps .. " FPS"
+				if not performanceOverlay.enabled then
+					info.fps.Text = fps .. " FPS"
+				end
 			end
 
 			-- Time → 8:45
@@ -11266,6 +11273,7 @@ function syde:Init(library)
 				Description = ToggleConfig.Description or ToggleConfig.Desc or "",
 				Value = defVal,
 				Flag = flagName,
+				Config = ToggleConfig.Config == true,
 				Save = ToggleConfig.Save ~= false,
 				CallBack = function(v)
 					if userCb then userCb(v) end
