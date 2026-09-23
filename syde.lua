@@ -2972,9 +2972,117 @@ function syde:UnlockMouse(Value)
 	end
 end
 
+local function normalizeWindowRichText(value)
+	return tostring(value or ""):gsub("<font%s+color='([^']+)'>", '<font color="%1">')
+end
+
+local function showWindowIntro(config)
+	local existing = ui:FindFirstChild("SydeIntroOverlay")
+	if existing then existing:Destroy() end
+
+	local overlay = Instance.new("Frame")
+	overlay.Name = "SydeIntroOverlay"
+	overlay.Size = UDim2.fromScale(1, 1)
+	overlay.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+	overlay.BorderSizePixel = 0
+	overlay.Active = true
+	overlay.ZIndex = 1000
+	overlay.Parent = ui
+
+	local iconId = config.IntroIcon or config.Icon
+	local icon
+	if type(iconId) == "string" and iconId ~= "" then
+		icon = Instance.new("ImageLabel")
+		icon.Name = "Icon"
+		icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.Position = UDim2.fromScale(0.5, 0.42)
+		icon.Size = UDim2.fromOffset(48, 48)
+		icon.BackgroundTransparency = 1
+		icon.Image = iconId:match("^%d+$") and ("rbxassetid://" .. iconId) or iconId
+		icon.ImageTransparency = 1
+		icon.ZIndex = 1001
+		icon.Parent = overlay
+	end
+
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.AnchorPoint = Vector2.new(0.5, 0.5)
+	title.Position = UDim2.fromScale(0.5, 0.52)
+	title.Size = UDim2.new(1, -32, 0, 60)
+	title.BackgroundTransparency = 1
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = isMobile and 20 or 24
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.TextWrapped = true
+	title.RichText = true
+	title.Text = normalizeWindowRichText(config.IntroTitle or config.IntroText or config.Name)
+	title.TextTransparency = 1
+	title.ZIndex = 1001
+	title.Parent = overlay
+
+	local subtitle
+	if type(config.IntroSubtitle) == "string" and config.IntroSubtitle ~= "" then
+		subtitle = Instance.new("TextLabel")
+		subtitle.Name = "Subtitle"
+		subtitle.AnchorPoint = Vector2.new(0.5, 0.5)
+		subtitle.Position = UDim2.fromScale(0.5, 0.59)
+		subtitle.Size = UDim2.new(1, -32, 0, 34)
+		subtitle.BackgroundTransparency = 1
+		subtitle.Font = Enum.Font.Gotham
+		subtitle.TextSize = isMobile and 12 or 14
+		subtitle.TextColor3 = Color3.fromRGB(180, 180, 185)
+		subtitle.TextWrapped = true
+		subtitle.RichText = true
+		subtitle.Text = normalizeWindowRichText(config.IntroSubtitle)
+		subtitle.TextTransparency = 1
+		subtitle.ZIndex = 1001
+		subtitle.Parent = overlay
+	end
+
+	local bar = Instance.new("Frame")
+	bar.Name = "Progress"
+	bar.AnchorPoint = Vector2.new(0.5, 0.5)
+	bar.Position = UDim2.fromScale(0.5, 0.66)
+	bar.Size = UDim2.fromOffset(190, 3)
+	bar.BackgroundColor3 = Color3.fromRGB(52, 52, 56)
+	bar.BorderSizePixel = 0
+	bar.ZIndex = 1001
+	bar.Parent = overlay
+
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = syde.theme.Accent
+	fill.BorderSizePixel = 0
+	fill.ZIndex = 1002
+	fill.Parent = bar
+
+	return function()
+		task.spawn(function()
+		local enterInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		tweenservice:Create(title, enterInfo, {TextTransparency = 0}):Play()
+		if subtitle then tweenservice:Create(subtitle, enterInfo, {TextTransparency = 0.2}):Play() end
+		if icon then tweenservice:Create(icon, enterInfo, {ImageTransparency = 0}):Play() end
+		local progress = tweenservice:Create(fill, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromScale(1, 1)})
+		progress:Play()
+		progress.Completed:Wait()
+		if not overlay.Parent then return end
+		local exitInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		tweenservice:Create(overlay, exitInfo, {BackgroundTransparency = 1}):Play()
+		tweenservice:Create(title, exitInfo, {TextTransparency = 1}):Play()
+		if subtitle then tweenservice:Create(subtitle, exitInfo, {TextTransparency = 1}):Play() end
+		if icon then tweenservice:Create(icon, exitInfo, {ImageTransparency = 1}):Play() end
+		tweenservice:Create(bar, exitInfo, {BackgroundTransparency = 1}):Play()
+		tweenservice:Create(fill, exitInfo, {BackgroundTransparency = 1}):Play()
+		task.wait(0.2)
+		if overlay.Parent then overlay:Destroy() end
+		end)
+	end
+end
+
 function syde:MakeWindow(WindowConfig)
 	WindowConfig = WindowConfig or {}
-	WindowConfig.Name = WindowConfig.Name or "Fire Hub"
+	WindowConfig.Name = WindowConfig.Name or WindowConfig.Title or "Fire Hub"
 	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name:gsub("<.->", "")
 	WindowConfig.SaveConfig = true
 	syde.CornerImageDefault = WindowConfig.CornerImageId or ""
@@ -3016,7 +3124,8 @@ function syde:MakeWindow(WindowConfig)
 
 	local libConfig = {
 		Title = WindowConfig.Name or WindowConfig.Title or "Syde",
-		SubText = WindowConfig.TagText or WindowConfig.SubText or "Hub",
+		SubText = WindowConfig.TagText or WindowConfig.Subtitle or WindowConfig.SubText or "Hub",
+		MultiTitle = WindowConfig.MultiTitle,
 		Home = WindowConfig.Home or {
 			Enabled = WindowConfig.HomeEnabled ~= false,
 			profileImage = WindowConfig.ProfileImage,
@@ -3033,7 +3142,17 @@ function syde:MakeWindow(WindowConfig)
 		end)
 	end
 
+	local startIntro
+	if WindowConfig.IntroEnabled == true then
+		startIntro = showWindowIntro(WindowConfig)
+	end
 	local windowObj = syde:Init(libConfig)
+	if windowObj and startIntro then
+		startIntro()
+	elseif startIntro then
+		local overlay = ui:FindFirstChild("SydeIntroOverlay")
+		if overlay then overlay:Destroy() end
+	end
 	local watermarkEnabled = WindowConfig.Watermark ~= false
 	if syde.LoadedConfig and type(syde.LoadedConfig.WTRMK) == "boolean" then
 		watermarkEnabled = syde.LoadedConfig.WTRMK
@@ -3459,7 +3578,8 @@ function syde:Init(library)
 	local Data = {
 		Title = library.Title or "Syde";
 		SubText = library.SubText or "Google";
-		Home = library.Home or {} 
+		MultiTitle = library.MultiTitle;
+		Home = library.Home or {}
 	}
 
 	-- Now we fill in the missing pieces if they weren't provided
@@ -3525,8 +3645,17 @@ function syde:Init(library)
 	--ui elements
 	top.title.RichText = true
 	top.title.sub.RichText = true
-	top.title.Text = Data.Title
-	top.title.sub.Text = Data.SubText
+	local function setHeaderTitle(value)
+		local richTitle = normalizeWindowRichText(value)
+		top.title.Text = richTitle
+		task.defer(function()
+			if top.title.Parent and top.title.Text == richTitle then
+				top.title.Size = UDim2.new(0, top.title.TextBounds.X + 3, 0, 20)
+			end
+		end)
+	end
+	setHeaderTitle(Data.Title)
+	top.title.sub.Text = normalizeWindowRichText(Data.SubText)
 
 	--dragging
 	syde:AddDrag(top, window, true)
@@ -3570,6 +3699,37 @@ function syde:Init(library)
 			Size = UDim2.new(0, textSize, 0, 20)
 		}):Play()
 	end)
+
+	local titleVariants = {Data.Title}
+	if type(Data.MultiTitle) == "table" then
+		for _, title in ipairs(Data.MultiTitle) do
+			if type(title) == "string" and title ~= "" then
+				table.insert(titleVariants, title)
+			end
+		end
+	end
+	syde._titleRotationToken = (syde._titleRotationToken or 0) + 1
+	local titleRotationToken = syde._titleRotationToken
+	if #titleVariants > 1 then
+		task.spawn(function()
+			local titleIndex = 1
+			while ui.Parent and top.title.Parent and syde._titleRotationToken == titleRotationToken do
+				task.wait(4)
+				if not ui.Parent or not top.title.Parent or syde._titleRotationToken ~= titleRotationToken then break end
+				titleIndex = titleIndex % #titleVariants + 1
+				if not uiclosed then
+					local fadeOut = tweenservice:Create(top.title, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 1})
+					fadeOut:Play()
+					fadeOut.Completed:Wait()
+					if not top.title.Parent or syde._titleRotationToken ~= titleRotationToken then break end
+				end
+				setHeaderTitle(titleVariants[titleIndex])
+				if not uiclosed then
+					tweenservice:Create(top.title, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+				end
+			end
+		end)
+	end
 
 	local RunService = game:GetService("RunService")
 	local TweenService = game:GetService("TweenService")
@@ -3715,8 +3875,12 @@ function syde:Init(library)
 
 	if Data.Home.Enabled then
 
-		window.pages.home.general.presence.Profile.ImageLabel.Text.Header.Text = Data.Home.hTitle
-		window.pages.home.general.presence.Profile.ImageLabel.Text.Sub.Text = Data.Home.hSubText
+		local homeHeader = window.pages.home.general.presence.Profile.ImageLabel.Text.Header
+		local homeSubtitle = window.pages.home.general.presence.Profile.ImageLabel.Text.Sub
+		homeHeader.RichText = true
+		homeSubtitle.RichText = true
+		homeHeader.Text = normalizeWindowRichText(Data.Home.hTitle)
+		homeSubtitle.Text = normalizeWindowRichText(Data.Home.hSubText)
 
 		window.pages.home.general.presence.Profile.ImageLabel.Image = 'rbxassetid://'..Data.Home.profileImage
 		window.pages.home.general.presence.wallpaper.Image = 'rbxassetid://'..Data.Home.profileImage
@@ -7506,6 +7670,7 @@ function syde:Init(library)
 
 	function tbdata:SetName(NameConfig)
 		pcall(function()
+			syde._titleRotationToken = (syde._titleRotationToken or 0) + 1
 			local titleText = "Syde"
 			local titleColor = nil
 			if type(NameConfig) == "table" then
@@ -7521,14 +7686,10 @@ function syde:Init(library)
 				titleText = tostring(NameConfig or "")
 			end
 			if top and top:FindFirstChild("title") then
-				top.title.Text = titleText
+				setHeaderTitle(titleText)
 				if titleColor then
 					top.title.TextColor3 = titleColor
 				end
-				local textSize = top.title.TextBounds.X + 3
-				tweenservice:Create(top.title, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
-					Size = UDim2.new(0, textSize, 0, 20)
-				}):Play()
 			end
 		end)
 	end
