@@ -122,6 +122,7 @@ local syde = {
 	Comms = Instance.new('BindableEvent');
 	ParentOverride = nil;
 	Build = 'Sv0';
+	ApiVersion = 2;
 	plugins = {};
 	ConfigEnabled = true;
 	ConfigFolder = 'FireHub';
@@ -131,7 +132,7 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	LoadedConfig = nil;
-	UMouseMode = "ThirdPerson";
+	UMouseMode = "PreserveCamera";
 	maxds = 500;
 	minds = 10;
 	FreeMouse = true;
@@ -230,6 +231,24 @@ end
 function syde:RoundTo(num, decimals)
 	local mult = 10 ^ (decimals or 0)
 	return math.floor(num * mult + 0.5) / mult
+end
+
+function syde:SetSliderGradient(fill, accent)
+	if typeof(fill) ~= "Instance" or not fill:IsA("GuiObject") then return false end
+	accent = accent or (self.theme and self.theme.Accent) or Color3.fromRGB(0, 170, 255)
+	local gradient = fill:FindFirstChild("SydeSliderGradient")
+	if not gradient then
+		gradient = Instance.new("UIGradient")
+		gradient.Name = "SydeSliderGradient"
+		gradient.Rotation = 0
+		gradient.Parent = fill
+	end
+	fill.BackgroundColor3 = Color3.new(1, 1, 1)
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, accent:Lerp(Color3.new(1, 1, 1), 0.1)),
+		ColorSequenceKeypoint.new(1, accent),
+	})
+	return true
 end
 
 -- Copy text to the clipboard across common executor globals. Returns true on success.
@@ -1977,8 +1996,14 @@ function syde:GenTheme(mainColor)
 	return t
 end
 
+local function normalizeConfigName(name)
+	name = tostring(name or "default")
+	name = name:gsub("[^%w_%-]", "_"):gsub("_+", "_"):sub(1, 64)
+	return name ~= "" and name or "default"
+end
+
 local function SaveCfg(Name)
-	Name = Name or (game and game.GameId) or "default"
+	Name = normalizeConfigName(Name or (game and game.GameId) or "default")
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
 	if makefolder and isfolder and not isfolder(folder) then
 		pcall(makefolder, folder)
@@ -2033,18 +2058,17 @@ local function SaveCfg(Name)
 		end	
 	end
 
-	if writefile then
-		pcall(function()
-			writefile(folder .. "/" .. tostring(Name) .. ".txt", tostring(HttpService:JSONEncode(Data)))
-		end)
-	end
+	if not writefile then return false end
+	local ok, encoded = pcall(HttpService.JSONEncode, HttpService, Data)
+	if not ok then return false end
+	return pcall(writefile, folder .. "/" .. Name .. ".txt", encoded)
 end
 
 local function LoadCfg(Config)
 	local ok, Data = pcall(function()
 		return HttpService:JSONDecode(Config)
 	end)
-	if not ok or type(Data) ~= "table" then return end
+	if not ok or type(Data) ~= "table" then return false end
 
 	syde.LoadedConfig = Data
 
@@ -2099,6 +2123,7 @@ local function LoadCfg(Config)
 			end
 		end
 	end
+	return true
 end
 
 local saveDebounce = nil
@@ -2113,17 +2138,16 @@ function SaveConfig(Name)
 end
 
 function LoadConfig(Configuration)
-	LoadCfg(Configuration)
-	return true
+	return LoadCfg(Configuration) == true
 end
 
 function syde:AutoSave()
-	SaveCfg(game and game.GameId)
+	return SaveCfg(game and game.GameId)
 end
 
 function syde:LoadSaveConfig(targetFile)
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
-	local fileName = targetFile or (game and game.GameId) or "default"
+	local fileName = normalizeConfigName(targetFile or (game and game.GameId) or "default")
 	local filePath = string.format("%s/%s.txt", folder, fileName)
 
 	if not isfile or not isfile(filePath) then
@@ -2135,11 +2159,11 @@ function syde:LoadSaveConfig(targetFile)
 
 	local ok, content = pcall(readfile, filePath)
 	if ok and content then
-		LoadCfg(content)
-		if syde.Toast then
+		local loaded = LoadCfg(content)
+		if loaded and syde.Toast then
 			syde:Toast({ Content = 'Loaded config ' .. fileName, Duration = 3 })
 		end
-		return true
+		return loaded == true
 	end
 	return false
 end
@@ -2153,7 +2177,7 @@ function syde:ListConfigs()
 	if not ok or type(files) ~= "table" then return list end
 
 	for _, full in ipairs(files) do
-		local name = tostring(full):match("([^/\]+)%.txt$")
+		local name = tostring(full):match("([^/\\]+)%.txt$")
 		if name and name ~= "SettingsConfig" then
 			table.insert(list, name)
 		end
@@ -2164,9 +2188,10 @@ end
 
 function syde:SaveConfigAs(name)
 	if type(name) ~= "string" or name == "" then return false end
-	SaveCfg(name)
+	local saved = SaveCfg(name)
+	if not saved then return false end
 	if syde.Toast then
-		syde:Toast({ Content = 'Saved config as ' .. name, Duration = 3 })
+		syde:Toast({ Content = 'Saved config as ' .. normalizeConfigName(name), Duration = 3 })
 	end
 	return true
 end
@@ -2174,7 +2199,7 @@ end
 function syde:DeleteConfig(name)
 	if type(name) ~= "string" or name == "" then return false end
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
-	local filePath = string.format("%s/%s.txt", folder, name)
+	local filePath = string.format("%s/%s.txt", folder, normalizeConfigName(name))
 	if isfile and isfile(filePath) and delfile then
 		return pcall(delfile, filePath)
 	end
@@ -2231,9 +2256,116 @@ local glow = false
 local uitoggle = Enum.KeyCode.RightShift
 --
 
+local performanceOverlay = {
+	enabled = false,
+	connection = nil,
+	frame = nil,
+	label = nil,
+	frameCount = 0,
+	elapsed = 0,
+}
+
+local function createPerformanceOverlay()
+	if performanceOverlay.frame and performanceOverlay.frame.Parent then return end
+	local header = window and window:FindFirstChild("top")
+	local controls = header and header:FindFirstChild("functions")
+	if not header or not controls then return end
+
+	local frame = Instance.new("Frame")
+	frame.Name = "PerformanceOverlay"
+	frame.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+	frame.BackgroundTransparency = 0.15
+	frame.BorderSizePixel = 0
+	frame.Size = UDim2.fromOffset(142, 20)
+	frame.Visible = false
+	frame.ZIndex = 50
+	frame.Active = false
+	frame.Parent = header
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamSemibold
+	label.Size = UDim2.fromScale(1, 1)
+	label.Text = "-- FPS  ·  -- ms"
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextSize = 10
+	label.ZIndex = 51
+	label.Active = false
+	label.Parent = frame
+
+	local function align()
+		if not frame.Parent or not controls.Parent then return end
+		local controlsLeft = controls.AbsolutePosition.X - header.AbsolutePosition.X
+		local controlsTop = controls.AbsolutePosition.Y - header.AbsolutePosition.Y
+		local title = header:FindFirstChild("title")
+		local titleRight = title and (title.Position.X.Offset + title.AbsoluteSize.X) or 110
+		local left = math.max(112, titleRight + 10)
+		local availableWidth = controlsLeft - left - 8
+		if availableWidth < 100 then
+			left = math.max(112, controlsLeft - 108)
+			availableWidth = math.max(0, controlsLeft - left - 8)
+		end
+		frame.Position = UDim2.fromOffset(left, math.max(0, controlsTop + (controls.AbsoluteSize.Y - frame.AbsoluteSize.Y) / 2))
+		frame.Size = UDim2.fromOffset(math.max(0, math.min(142, availableWidth)), 20)
+	end
+
+	syde:AddConnection(header:GetPropertyChangedSignal("AbsoluteSize"), align)
+	syde:AddConnection(controls:GetPropertyChangedSignal("AbsoluteSize"), align)
+	syde:AddConnection(controls:GetPropertyChangedSignal("AbsolutePosition"), align)
+	performanceOverlay.frame = frame
+	performanceOverlay.label = label
+	task.defer(align)
+end
+
+function syde:SetPerformanceOverlay(enabled)
+	if enabled == nil then enabled = true end
+	performanceOverlay.enabled = enabled == true
+	createPerformanceOverlay()
+	if not performanceOverlay.frame then return false end
+	performanceOverlay.frame.Visible = performanceOverlay.enabled
+	if performanceOverlay.connection then
+		performanceOverlay.connection:Disconnect()
+		performanceOverlay.connection = nil
+	end
+	if not performanceOverlay.enabled then return true end
+
+	performanceOverlay.frameCount = 0
+	performanceOverlay.elapsed = 0
+	performanceOverlay.connection = runservice.Heartbeat:Connect(function(deltaTime)
+		performanceOverlay.frameCount += 1
+		performanceOverlay.elapsed += deltaTime
+		if performanceOverlay.elapsed < 0.25 then return end
+
+		local fps = math.floor(performanceOverlay.frameCount / performanceOverlay.elapsed + 0.5)
+		local ping
+		local localPlayer = player.LocalPlayer
+		local pingOk, pingSeconds = pcall(function()
+			return localPlayer and localPlayer:GetNetworkPing()
+		end)
+		if pingOk and type(pingSeconds) == "number" then
+			ping = math.floor(math.max(0, pingSeconds) * 1000 + 0.5)
+		end
+		if performanceOverlay.label and performanceOverlay.label.Parent then
+			performanceOverlay.label.Text = string.format("%d FPS  ·  %s ms", fps, ping and tostring(ping) or "--")
+		end
+		performanceOverlay.frameCount = 0
+		performanceOverlay.elapsed = 0
+	end)
+	return true
+end
+
+function syde:SetWatermarkEnabled(enabled)
+	self.WatermarkEnabled = enabled == true
+	local watermark = ui and ui:FindFirstChild("minihome")
+	if watermark then watermark.Visible = self.WatermarkEnabled end
+	return watermark ~= nil
+end
+
 function applyLayout(isMobile)
-	--	Library.lib.Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)
-	tweenservice:Create(Library.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
+	local viewport = camera.ViewportSize
+	local width = math.min(isMobile and 543 or 715, math.max(1, viewport.X - 24))
+	local height = math.min(isMobile and 321 or 575, math.max(1, viewport.Y - 24))
+	tweenservice:Create(Library.main, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Size = UDim2.fromOffset(width, height)}):Play()
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then
 		shadow.Visible = not isMobile 
@@ -2242,7 +2374,7 @@ end
 
 
 local function updateLayout()
-	local screenSize = camera.ViewportSize
+	if uiclosed then return end
 	local mobile = userinput.TouchEnabled
 	applyLayout(mobile)
 end
@@ -2548,7 +2680,7 @@ local toasts = {}
 local toastSpacing = 8
 
 local tweenInfo = TweenInfo.new(
-	0.55,
+	0.18,
 	Enum.EasingStyle.Exponential,
 	Enum.EasingDirection.Out
 )
@@ -2664,6 +2796,8 @@ function syde:MakeNotification(NotificationConfig)
 end
 
 local freeMouseBtn = nil
+local previousMouseBehavior = nil
+local previousMouseIconEnabled = nil
 local function getFreeMouseBtn()
 	if freeMouseBtn and freeMouseBtn.Parent then return freeMouseBtn end
 	pcall(function()
@@ -2689,31 +2823,18 @@ function syde:UnlockMouse(Value)
 	end
 
 	local uis = game:GetService("UserInputService")
-	local lp = game:GetService("Players").LocalPlayer
-
-	if syde.UMouseMode == "ThirdPerson" then
-		if Value then
-			if lp then
-				lp.CameraMode = Enum.CameraMode.LockFirstPerson
-				task.wait()
-				lp.CameraMode = Enum.CameraMode.Classic
-				lp.CameraMaxZoomDistance = syde.maxds or 500
-				lp.CameraMinZoomDistance = syde.minds or 10
-			end
-			uis.MouseBehavior = Enum.MouseBehavior.Default
-			uis.MouseIconEnabled = true
-		else
-			uis.MouseIconEnabled = false
-			uis.MouseBehavior = Enum.MouseBehavior.LockCenter
-			if lp then
-				lp.CameraMaxZoomDistance = 0.5
-				lp.CameraMinZoomDistance = 0.5
-				lp.CameraMode = Enum.CameraMode.LockFirstPerson
-			end
+	if Value then
+		if previousMouseBehavior == nil then
+			previousMouseBehavior = uis.MouseBehavior
+			previousMouseIconEnabled = uis.MouseIconEnabled
 		end
-	else
-		uis.MouseBehavior = Value and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCenter
-		uis.MouseIconEnabled = Value and true or false
+		uis.MouseBehavior = Enum.MouseBehavior.Default
+		uis.MouseIconEnabled = true
+	elseif previousMouseBehavior ~= nil then
+		uis.MouseBehavior = previousMouseBehavior
+		uis.MouseIconEnabled = previousMouseIconEnabled
+		previousMouseBehavior = nil
+		previousMouseIconEnabled = nil
 	end
 end
 
@@ -2761,9 +2882,12 @@ function syde:MakeWindow(WindowConfig)
 	local libConfig = {
 		Title = WindowConfig.Name or WindowConfig.Title or "Syde",
 		SubText = WindowConfig.TagText or WindowConfig.SubText or "Hub",
-		Home = {
-			Enabled = false
-		}
+		Home = WindowConfig.Home or {
+			Enabled = WindowConfig.HomeEnabled ~= false,
+			profileImage = WindowConfig.ProfileImage,
+			hTitle = WindowConfig.HomeTitle,
+			hSubText = WindowConfig.HomeSubText,
+		},
 	}
 
 	if WindowConfig.FreeMouse ~= false then
@@ -2775,6 +2899,12 @@ function syde:MakeWindow(WindowConfig)
 	end
 
 	local windowObj = syde:Init(libConfig)
+	local watermarkEnabled = WindowConfig.Watermark ~= false
+	if syde.LoadedConfig and type(syde.LoadedConfig.WTRMK) == "boolean" then
+		watermarkEnabled = syde.LoadedConfig.WTRMK
+	end
+	syde:SetWatermarkEnabled(watermarkEnabled)
+	syde:SetPerformanceOverlay(WindowConfig.PerformanceOverlay ~= false)
 
 	if WindowConfig.KeyToOpenWindow or WindowConfig.Openkey then
 		local key = WindowConfig.KeyToOpenWindow or WindowConfig.Openkey
@@ -2788,7 +2918,24 @@ function syde:MakeWindow(WindowConfig)
 	return windowObj
 end
 
+function syde:CreateWindow(WindowConfig)
+	return self:MakeWindow(WindowConfig)
+end
+
 function syde:Destroy()
+	if performanceOverlay.connection then
+		performanceOverlay.connection:Disconnect()
+		performanceOverlay.connection = nil
+	end
+	for index = #syde.Connections, 1, -1 do
+		local connectionData = syde.Connections[index]
+		local connection = connectionData and (connectionData.Connection or connectionData)
+		if connection and connection.Connected then connection:Disconnect() end
+		table.remove(syde.Connections, index)
+	end
+	performanceOverlay.frame = nil
+	performanceOverlay.label = nil
+	performanceOverlay.enabled = false
 	syde:UnlockMouse(false)
 	pcall(function()
 		if Library and Library.Parent then
@@ -2873,6 +3020,8 @@ end
 
 --@ ToggleUI
 
+local sizeBeforeMinimize = nil
+
 function openui()
 	pages.Visible = true
 	window.tabs.Visible = true
@@ -2895,7 +3044,7 @@ function openui()
 	else
 		tweenservice:Create(window, fastTween, {BackgroundTransparency = 0 }):Play()
 	end
-	tweenservice:Create(window, fastTween, {Size = UDim2.new(0, 700, 0, 560) }):Play()
+	tweenservice:Create(window, fastTween, {Size = sizeBeforeMinimize or UDim2.fromOffset(700, 560) }):Play()
 
 	tweenservice:Create(window.top.separator, fastTween, {BackgroundTransparency = 0 }):Play()
 	tweenservice:Create(window.top.title, fastTween, {TextTransparency = 0 }):Play()
@@ -2937,6 +3086,9 @@ function openui()
 end
 
 function closeui()
+	-- Mark closed before starting any animations so the reopen path is immediate.
+	sizeBeforeMinimize = window.Size
+	uiclosed = true
 	local fastTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	pages.Visible = false
@@ -2972,9 +3124,16 @@ function closeui()
 	tweenservice:Create(window.shadow.ImageLabel, fastTween, {ImageTransparency = 1 }):Play()
 	tweenservice:Create(window.resize, fastTween, {ImageTransparency = 1 }):Play()
 
-	closesettings()
-	closesearch()
+	-- These helpers wait for their closing animations. Hiding these transient
+	-- panels directly avoids blocking the minimize notification and next reopen.
 	settingsOpen = false
+	searchopen = false
+	window.settings.Visible = false
+	window.settings.pages.Visible = false
+	window.settings.tabs.Visible = false
+	window.search.Container.Visible = false
+	window.search.Visible = false
+	window.dim.Visible = false
 
 	if syde.FreeMouse ~= false then
 		syde:UnlockMouse(false)
@@ -2986,7 +3145,6 @@ function closeui()
 		end
 	end)
 
-	uiclosed = true
 	syde:Toast({
 		Content = 'UI Hidden, Use '.. uitoggle.Name ..' To Open Back.',
 		Duration = 2,
@@ -3000,24 +3158,12 @@ function ToggleUI()
 	bounce = true
 
 	if uiclosed then
-		--	task.wait(0.2)
 		openui()
-
-		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-			screenSize = workspace.CurrentCamera.ViewportSize
-			isMobile = userinput.TouchEnabled
-			updateLayout()
-		end)
-
-		updateLayout()
-
-		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayout)
-		userinput:GetPropertyChangedSignal("TouchEnabled"):Connect(updateLayout)
 	else
 		closeui()
 	end
 
-	task.delay(0.2, function()
+	task.delay(0.08, function()
 		bounce = false
 	end)
 end
@@ -3139,7 +3285,7 @@ function syde:Init(library)
 	Data.Home.Enabled = (Data.Home.Enabled == true) -- Forces true/false
 	Data.Home.hTitle = Data.Home.hTitle or Data.Title
 	Data.Home.hSubText = Data.Home.hSubText or Data.SubText
-	Data.Home.profileImage = Data.Home.profileImage or Data.profileImage
+	Data.Home.profileImage = Data.Home.profileImage or Data.profileImage or ""
 	
 	local Minihome = ui.minihome
 
@@ -6223,7 +6369,7 @@ function syde:Init(library)
 						end
 					end)
 
-					Slider.slide.slideframe.BackgroundColor3 = syde.theme.HitBox
+					syde:SetSliderGradient(Slider.slide.slideframe, syde.theme.HitBox)
 					Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = syde.theme.HitBox
 					Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = syde.theme.HitBox
 					Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = syde.theme.HitBox
@@ -6233,7 +6379,7 @@ function syde:Init(library)
 
 					syde:AddConnection(syde.Comms.Event, function(p, color)
 						if p == 'HitBox' then
-							Slider.slide.slideframe.BackgroundColor3 = color
+							syde:SetSliderGradient(Slider.slide.slideframe, color)
 							Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
 							Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = color
 							Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = color
@@ -6841,15 +6987,16 @@ function syde:Init(library)
 			SFlag = 'LS'
 		})
 
+		local watermarkValue = syde.WatermarkEnabled ~= false
+		if syde.LoadedConfig and type(syde.LoadedConfig.WTRMK) == "boolean" then
+			watermarkValue = syde.LoadedConfig.WTRMK
+		end
 		a:Toggle({
 			Title = 'Watermark',
 			Description = 'Toggles the draggable watermark display.',
-			Value = true,
-			CallBack = function (v)
-				local wm = ui:FindFirstChild('minihome')
-				if wm then
-					wm.Visible = v
-				end
+			Value = watermarkValue,
+			CallBack = function(v)
+				syde:SetWatermarkEnabled(v)
 			end,
 			SFlag = 'WTRMK'
 		})
@@ -8475,7 +8622,7 @@ function syde:Init(library)
 					end
 				end)
 
-				Slider.slide.slideframe.BackgroundColor3 = syde.theme.HitBox
+				syde:SetSliderGradient(Slider.slide.slideframe, syde.theme.HitBox)
 				Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = syde.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = syde.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = syde.theme.HitBox
@@ -8485,7 +8632,7 @@ function syde:Init(library)
 
 				syde:AddConnection(syde.Comms.Event, function(p, color)
 					if p == 'HitBox' then
-						Slider.slide.slideframe.BackgroundColor3 = color
+						syde:SetSliderGradient(Slider.slide.slideframe, color)
 						Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
 						Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = color
 						Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = color
@@ -9282,6 +9429,7 @@ function syde:Init(library)
 				Multi = Dropdown.Multi or false;
 				CallBack = Dropdown.Callback or Dropdown.CallBack;
 				Flag = Dropdown.Flag;
+				Save = Dropdown.Save ~= false;
 			}
 
 			local dropdown = pages.page.Dropdown:Clone()
@@ -9300,6 +9448,25 @@ function syde:Init(library)
 			local OptionButton = dropdown.dropholder.drop.Container.Option
 			local SelectedOptions = {}
 			local SelectedOrder = {}
+			local OptionLabels = {}
+			local OptionDataByName = {}
+
+			local function normalizeOption(option)
+				if type(option) == "table" then
+					local name = option.Name or option.Value or option.Label or option.DisplayName
+					return tostring(name or "Option"), option
+				end
+				local name = tostring(option)
+				return name, {Name = name}
+			end
+
+			local function optionIndex(name)
+				for index, entry in ipairs(data.Options) do
+					local entryName = normalizeOption(entry)
+					if entryName == name then return index end
+				end
+				return math.huge
+			end
 
 			local function UpdateCustomLayout()
 				local yOffset = 0
@@ -9367,17 +9534,11 @@ function syde:Init(library)
 				if not SelectedOptions[option] then
 					SelectedOptions[option] = true
 
-					local originalIndex
-					for i, opt in ipairs(data.Options) do
-						if opt == option then
-							originalIndex = i
-							break
-						end
-					end
+					local originalIndex = optionIndex(option)
 
 					local insertIndex = 1
 					for i, selected in ipairs(SelectedOrder) do
-						local selectedIndex = table.find(data.Options, selected)
+						local selectedIndex = optionIndex(selected)
 						if selectedIndex and selectedIndex < originalIndex then
 							insertIndex = i + 1
 						else
@@ -9431,7 +9592,7 @@ function syde:Init(library)
 							local optionGroup = selectedContainer.result:Clone()
 							optionGroup.Visible = true
 							optionGroup.Name = option
-							optionGroup.TextLabel.Text = option
+							optionGroup.TextLabel.Text = OptionLabels[option] or option
 
 							-- Set up remove button
 							optionGroup.X.MouseButton1Click:Connect(function()
@@ -9452,6 +9613,7 @@ function syde:Init(library)
 								if data.CallBack then
 									data.CallBack(SelectedOrder)
 								end
+								data.Value = table.clone(SelectedOrder)
 							end)
 
 							optionGroup.Parent = selectedContainer
@@ -9486,13 +9648,17 @@ function syde:Init(library)
 
 				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option:FindFirstChild("Title") then
-						local optionText = option.Title.Text:lower()
-						local isTemplate = option.Name == "Option"
-						local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
+								local optionText = option.Title.Text:lower()
+								local subtitle = option:FindFirstChild("OptionSubtitle")
+								if subtitle and subtitle:IsA("TextLabel") then
+									optionText ..= " " .. subtitle.Text:lower()
+								end
+									local isTemplate = option.Name == "Option"
+									local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Name])
 
 						if shouldShow then
 							option.Visible = true
-							if SelectedOptions[option.Title.Text] then
+							if SelectedOptions[option.Name] then
 								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
 								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
@@ -9532,17 +9698,62 @@ function syde:Init(library)
 
 			local function SetDropdownOptions()
 				ClearDropdownOptions()
+				table.clear(OptionLabels)
+				table.clear(OptionDataByName)
 				local starterSet = false
-				for _, OptionText in ipairs(data.Options) do
+				for _, optionEntry in ipairs(data.Options) do
+					local OptionText, optionData = normalizeOption(optionEntry)
+					local displayText = tostring(optionData.Label or optionData.DisplayName or OptionText)
+					local isPlayerOption = optionData.Player == true or optionData.UserId ~= nil
+					local username = tostring(optionData.Username or OptionText)
+					if optionData.Offline then displayText ..= " × Left" end
+					OptionLabels[OptionText] = displayText
+					OptionDataByName[OptionText] = optionData
+
 					local option = OptionButton:Clone()
-					option.Title.Text = OptionText
+					option.Title.Text = displayText .. (isPlayerOption and (" @" .. username) or "")
 					option.Parent = dropdown.dropholder.drop.Container
 					option.Visible = true
 					option.Name = OptionText
 
-					if OptionText == data.StarterOption and not starterSet then
+					local image = tostring(optionData.Image or optionData.Icon or optionData.ImageId or optionData.Decal or "")
+					if image ~= "" then
+						if not image:find("://", 1, true) then image = "rbxassetid://" .. image end
+						local thumbnail = Instance.new("ImageLabel")
+						thumbnail.Name = "OptionImage"
+						thumbnail.BackgroundTransparency = 1
+						thumbnail.Image = image
+						thumbnail.Size = UDim2.fromOffset(isPlayerOption and 30 or 22, isPlayerOption and 30 or 22)
+						thumbnail.Position = UDim2.new(0, 8, 0.5, isPlayerOption and -15 or -11)
+						thumbnail.ZIndex = option.ZIndex + 2
+						thumbnail.Parent = option
+						local corner = Instance.new("UICorner")
+						corner.CornerRadius = UDim.new(1, 0)
+						corner.Parent = thumbnail
+						option.Title.Position = UDim2.new(0, isPlayerOption and 44 or 38, 0, isPlayerOption and 3 or 0)
+						option.Title.Size = UDim2.new(1, isPlayerOption and -52 or -46, 0, isPlayerOption and 18 or option.Title.Size.Y.Offset)
+					end
+					if isPlayerOption then
+						option.Size = UDim2.new(option.Size.X.Scale, option.Size.X.Offset, 0, 42)
+						option.Title.Position = UDim2.new(0, image ~= "" and 44 or 10, 0, 3)
+						option.Title.Size = UDim2.new(1, image ~= "" and -52 or -18, 0, 18)
+						local subtitle = Instance.new("TextLabel")
+						subtitle.Name = "OptionSubtitle"
+						subtitle.BackgroundTransparency = 1
+						subtitle.Font = Enum.Font.Gotham
+						subtitle.Text = (optionData.Offline and "× Left · @" or "@") .. username
+						subtitle.TextColor3 = optionData.Offline and Color3.fromRGB(235, 115, 115) or Color3.fromRGB(170, 170, 176)
+						subtitle.TextSize = 10
+						subtitle.TextXAlignment = Enum.TextXAlignment.Left
+						subtitle.Position = UDim2.new(0, 44, 0, 21)
+						subtitle.Size = UDim2.new(1, -52, 0, 15)
+						subtitle.ZIndex = option.Title.ZIndex
+						subtitle.Parent = option
+					end
+
+					if OptionText == data.StarterOption and not starterSet and #SelectedOrder == 0 then
 						starterSet = true
-						dropdown.dropholder.drop.Selected.Text = OptionText
+						dropdown.dropholder.drop.selected.Text = displayText
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
@@ -9565,8 +9776,9 @@ function syde:Init(library)
 							if data.CallBack then
 								data.CallBack(SelectedOrder)
 							end
+							data.Value = table.clone(SelectedOrder)
 						else
-							dropdown.dropholder.drop.selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = displayText
 
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
@@ -9585,6 +9797,7 @@ function syde:Init(library)
 							if data.CallBack then
 								data.CallBack(OptionText)
 							end
+							data.Value = OptionText
 
 
 							CloseDrop()
@@ -9595,17 +9808,24 @@ function syde:Init(library)
 					end)
 				end
 
-				if not starterSet then
+				if not starterSet and #SelectedOrder == 0 then
 					dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 				end
 
+				UpdateSelectedText()
 				UpdateCustomLayout()
 			end
 
+			if data.Multi and type(data.StarterOption) == "table" then
+				for _, value in ipairs(data.StarterOption) do AddToSelected(tostring(value)) end
+			end
 			SetDropdownOptions()
+			data.Value = data.Multi and table.clone(SelectedOrder) or SelectedOrder[1] or data.StarterOption
 
 			function data:Refresh(newOptions, clearCurrent)
 				data.Options = newOptions or {}
+				table.clear(OptionLabels)
+				table.clear(OptionDataByName)
 				if clearCurrent then
 					SelectedOptions = {}
 					SelectedOrder = {}
@@ -9619,26 +9839,45 @@ function syde:Init(library)
 					end
 				end
 				SetDropdownOptions()
+				if clearCurrent and data.Save and data.Flag then SaveConfig(game and game.GameId) end
+				return data
+			end
+
+			function data:SetOptions(newOptions, starter)
+				data.StarterOption = starter
+				data:Refresh(newOptions, false)
+				if starter ~= nil then data:Set(starter) end
+				return data
+			end
+
+			function data:GetSelected()
+				return data.Multi and table.clone(SelectedOrder) or SelectedOrder[1]
 			end
 
 			function data:Set(value, state)
 				if data.Multi then
-					if state == nil or state == true then
-						AddToSelected(value)
+					if type(value) == "table" then
+						SelectedOptions = {}
+						SelectedOrder = {}
+						for _, selected in ipairs(value) do AddToSelected(tostring(selected)) end
+					elseif state == nil or state == true then
+						AddToSelected(tostring(value))
 					else
-						RemoveFromSelected(value)
+						RemoveFromSelected(tostring(value))
 					end
 					UpdateSelectedText()
+					data.Value = table.clone(SelectedOrder)
 					if data.CallBack then
 						data.CallBack(SelectedOrder)
 					end
 				else
+					value = tostring(value)
 					SelectedOptions = {[value] = true}
 					SelectedOrder = {value}
-					dropdown.dropholder.drop.selected.Text = tostring(value)
+					dropdown.dropholder.drop.selected.Text = OptionLabels[value] or value
 					for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 						if opt:IsA("Frame") and opt:FindFirstChild("Title") then
-							local isMatch = (opt.Title.Text == value)
+							local isMatch = (opt.Name == value)
 							opt.BackgroundColor3 = isMatch and Color3.fromRGB(39, 39, 39) or Color3.fromRGB(33, 33, 33)
 							if opt:FindFirstChild("ImageLabel") then
 								opt.ImageLabel.ImageTransparency = isMatch and 0 or 0.9
@@ -9648,6 +9887,7 @@ function syde:Init(library)
 					if data.CallBack then
 						data.CallBack(value)
 					end
+					data.Value = value
 				end
 			end
 
@@ -9655,7 +9895,7 @@ function syde:Init(library)
 			data.toggle = function(self) dropdown.Visible = not dropdown.Visible end
 			data.remove = function(self) dropdown:Destroy() end
 			data.tg = nil
-			data.Value = data.Multi and SelectedOrder or data.StarterOption
+			data.Value = data.Multi and table.clone(SelectedOrder) or SelectedOrder[1] or data.StarterOption
 
 			return data
 
@@ -10693,9 +10933,148 @@ function syde:Init(library)
 			dropObj.Type = "Dropdown"
 			dropObj.Save = DropdownConfig.Save ~= false
 			dropObj.Flag = flagName
-			dropObj.Value = DropdownConfig.Default
+			dropObj.Value = dropObj.Value ~= nil and dropObj.Value or DropdownConfig.Default
 			syde.Flags[flagName] = dropObj
 			return dropObj
+		end
+
+		function initelement:AddPlayerDropdown(PlayerDropdownConfig)
+			local config = table.clone(PlayerDropdownConfig or {})
+			local playerService = player
+			local selectedNames = {}
+			local departedPlayers = {}
+			local callback = config.Callback or config.CallBack
+			local control
+
+			local function playerOption(target, offline)
+				local userId = tonumber(target.UserId) or 0
+				return {
+					Name = tostring(target.Name),
+					Value = tostring(target.Name),
+					Label = tostring(target.DisplayName or target.Name),
+					DisplayName = tostring(target.DisplayName or target.Name),
+					Username = tostring(target.Name),
+					Player = true,
+					Image = userId > 0 and string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48", userId) or "",
+					UserId = userId,
+					Offline = offline == true,
+				}
+			end
+
+			local function getOptions()
+				local options, onlineNames = {}, {}
+				for _, target in ipairs(playerService:GetPlayers()) do
+					if not departedPlayers[target.Name] then
+						onlineNames[target.Name] = true
+						table.insert(options, playerOption(target, false))
+					end
+				end
+			for name, target in pairs(departedPlayers) do
+				if selectedNames[name] and not onlineNames[name] then
+					table.insert(options, playerOption(target, true))
+				end
+			end
+			return options
+			end
+
+			local flagName = config.Flag or config.Name or config.Title or "PlayerDropdown"
+			local saved = syde.LoadedConfig and syde.LoadedConfig[flagName]
+			if type(saved) == "table" then
+				for _, name in ipairs(saved) do selectedNames[tostring(name)] = true end
+			elseif type(saved) == "string" then
+				selectedNames[saved] = true
+			end
+			local onlineNames = {}
+			for _, target in ipairs(playerService:GetPlayers()) do onlineNames[target.Name] = true end
+			for name in pairs(selectedNames) do
+				if not onlineNames[name] then
+					departedPlayers[name] = {Name = name, DisplayName = name, UserId = 0}
+				end
+			end
+
+			config.Flag = flagName
+			config.Options = getOptions()
+			config.Multi = config.Multi == true or config.MultipleSelection == true
+			config.Placeholder = config.Placeholder or config.PlaceHolder or "Select players..."
+			config.Callback = function(value)
+				table.clear(selectedNames)
+				if type(value) == "table" then
+					for _, name in ipairs(value) do selectedNames[tostring(name)] = true end
+				elseif value ~= nil and value ~= "" then
+					selectedNames[tostring(value)] = true
+				end
+				local activeNames = {}
+				for _, target in ipairs(playerService:GetPlayers()) do activeNames[target.Name] = true end
+				local departedChanged = false
+				for name in pairs(selectedNames) do
+					if not activeNames[name] and not departedPlayers[name] then
+						departedPlayers[name] = {Name = name, DisplayName = name, UserId = 0}
+						departedChanged = true
+					end
+				end
+				for name in pairs(departedPlayers) do
+					if not selectedNames[name] then
+						departedPlayers[name] = nil
+						departedChanged = true
+					end
+				end
+				if departedChanged and control then task.defer(function() control:Refresh(getOptions(), false) end) end
+				if callback then callback(value) end
+			end
+
+			control = self:AddDropdown(config)
+			local function refreshPlayers()
+				if control and control.Refresh then control:Refresh(getOptions(), false) end
+			end
+
+			local addedConnection, disconnectAdded = syde:AddConnection(playerService.PlayerAdded, function(joining)
+				departedPlayers[joining.Name] = nil
+				task.defer(refreshPlayers)
+			end)
+			local removingConnection, disconnectRemoving = syde:AddConnection(playerService.PlayerRemoving, function(leaving)
+				departedPlayers[leaving.Name] = leaving
+				task.defer(refreshPlayers)
+			end)
+			local removeControl = control.remove
+			control.remove = function(self)
+				if disconnectAdded then disconnectAdded() elseif addedConnection.Connected then addedConnection:Disconnect() end
+				if disconnectRemoving then disconnectRemoving() elseif removingConnection.Connected then removingConnection:Disconnect() end
+				if removeControl then removeControl(self) end
+			end
+			return control
+		end
+
+		function initelement:AddPlayerMultiDropdown(PlayerDropdownConfig)
+			PlayerDropdownConfig = PlayerDropdownConfig or {}
+			PlayerDropdownConfig.Multi = true
+			return self:AddPlayerDropdown(PlayerDropdownConfig)
+		end
+
+		function initelement:PlayerDropdown(PlayerDropdownConfig)
+			return self:AddPlayerDropdown(PlayerDropdownConfig)
+		end
+
+		function initelement:PlayerMultiDropdown(PlayerDropdownConfig)
+			PlayerDropdownConfig = table.clone(PlayerDropdownConfig or {})
+			PlayerDropdownConfig.Multi = true
+			return self:AddPlayerDropdown(PlayerDropdownConfig)
+		end
+
+		function initelement:AddPerformanceOverlay(Options)
+			Options = Options or {}
+			local performanceToggle = self:AddToggle({
+				Name = Options.Name or "Performance Overlay",
+				Description = Options.Description or "Show FPS and ping in the top bar",
+				Flag = Options.Flag or "syde_performance_overlay",
+				Default = Options.Default ~= false,
+				Save = Options.Save ~= false,
+				Callback = function(enabled)
+					syde:SetPerformanceOverlay(enabled)
+					if Options.Callback then Options.Callback(enabled) end
+				end,
+			})
+			syde:SetPerformanceOverlay(performanceToggle.Value)
+			return performanceToggle
 		end
 
 		function initelement:AddButton(ButtonConfig)
