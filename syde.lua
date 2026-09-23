@@ -9444,7 +9444,6 @@ function syde:Init(library)
 			dropdown:SetAttribute("Searchable", true)
 
 			local DropOpen = false
-			local DeBounce = false
 			local OptionButton = dropdown.dropholder.drop.Container.Option
 			local SelectedOptions = {}
 			local SelectedOrder = {}
@@ -9472,9 +9471,12 @@ function syde:Init(library)
 				local yOffset = 0
 				for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option.Visible then
-						tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+						tweenservice:Create(option, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 						yOffset = yOffset + option.Size.Y.Offset + 7
 					end
+				end
+				if dropdown.dropholder.drop.Container:IsA("ScrollingFrame") then
+					dropdown.dropholder.drop.Container.CanvasSize = UDim2.fromOffset(0, yOffset)
 				end
 			end
 
@@ -9483,51 +9485,47 @@ function syde:Init(library)
 				dropdown.dropholder.drop.Container.Visible = true
 				dropdown.dropholder.drop.search.Visible = true
 
-				tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+				tweenservice:Create(dropdown, TweenInfo.new(0.22, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.22, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.22, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.22, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 			end
 
 			local function CloseDrop()
 				DropOpen = false
-				tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+				tweenservice:Create(dropdown, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.2, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
-				task.wait(0.6)
-				dropdown.dropholder.drop.Container.Visible = false
-				dropdown.dropholder.drop.search.Visible = false
+				task.delay(0.2, function()
+					if not DropOpen and dropdown.Parent then
+						dropdown.dropholder.drop.Container.Visible = false
+						dropdown.dropholder.drop.search.Visible = false
+					end
+				end)
 
 			end
 
 			dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
-				if DeBounce then return end
-				DeBounce = true
-
 				if DropOpen then
 					CloseDrop()
 				else
 					OpenDrop()
 				end
-
-				task.delay(1.2, function()
-					DeBounce = false
-				end)
 			end)
 
 			local function AddToSelected(option)
