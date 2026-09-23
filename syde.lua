@@ -2105,6 +2105,13 @@ local function SaveCfg(Name)
 	end
 
 	local Data = {}
+	-- Other controls can save while toggles are still being constructed.
+	-- Keep their keybinds until the corresponding toggle is registered.
+	for key, value in pairs(syde.LoadedConfig or {}) do
+		if type(key) == "string" and key:sub(-8) == "_Keybind" then
+			Data[key] = value
+		end
+	end
 	for i, v in pairs(syde.Flags) do
 		if v and v.Save ~= false then
 			if v.Type == "MultiColorpicker" then
@@ -2150,8 +2157,8 @@ local function SaveCfg(Name)
 				elseif v._textBox and v._textBox.Text then
 					Data[i] = v._textBox.Text
 				end
-				if v.Type == "Toggle" and v.Config and typeof(v.Keybind) == "EnumItem" then
-					Data[i .. "_Keybind"] = v.Keybind.Name
+				if v.Type == "Toggle" and v.Config then
+					Data[i .. "_Keybind"] = typeof(v.Keybind) == "EnumItem" and v.Keybind.Name or nil
 				end
 			end
 		end	
@@ -2160,7 +2167,9 @@ local function SaveCfg(Name)
 	if not writefile then return false end
 	local ok, encoded = pcall(HttpService.JSONEncode, HttpService, Data)
 	if not ok then return false end
-	return pcall(writefile, folder .. "/" .. Name .. ".txt", encoded)
+	local saved = pcall(writefile, folder .. "/" .. Name .. ".txt", encoded)
+	if saved then syde.LoadedConfig = Data end
+	return saved
 end
 
 local function LoadCfg(Config)
@@ -3009,7 +3018,8 @@ function syde:UnlockMouse(Value)
 	Value = Value == true or syde.ForceFreeMouse == true
 	local btn = getFreeMouseBtn()
 	if btn then
-		btn.Modal = Value and true or false
+		-- Modal frees the pointer but intercepts the camera's right-click drag.
+		btn.Modal = Value and syde.AllowCameraDrag ~= true or false
 		btn.Visible = Value and true or false
 	end
 
@@ -8766,7 +8776,9 @@ function syde:Init(library)
 				end
 				data.SetKeybind = function(_, key, skipSave) setKeybind(key, skipSave) end
 
+				local captureConnection
 				toggleConfiguration.Container.KeyBind.Interact.MouseButton1Click:Connect(function()
+					if captureConnection then captureConnection:Disconnect() end
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 					task.wait(0.2)
 					toggleConfiguration.Container.KeyBind.Bind.v.Text = "..."
@@ -8774,31 +8786,19 @@ function syde:Init(library)
 					ResizeBindFrame()
 
 
-					local connection
-					connection = userinput.InputBegan:Connect(function(input, processed)
-						if not userinput:GetFocusedTextBox() and syde:IsBindableInput(input) then
+					captureConnection = syde:AddConnection(userinput.InputBegan, function(input)
+						if not userinput:GetFocusedTextBox() and syde:IsBindableInput(input)
+							and input.KeyCode ~= Enum.KeyCode.Unknown then
 							setKeybind(input.KeyCode)
-							connection:Disconnect()
+							captureConnection:Disconnect()
+							captureConnection = nil
 						end
 					end)
 				end)
 
-				userinput.InputBegan:Connect(function(input, processed)
+				syde:AddConnection(userinput.InputBegan, function(input)
 					if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
-						data.V = not data.V
-						data.Value = data.V
-						UpdateToggleUI(data.V)
-
-						if data.CallBack then
-							local success, errorMsg = pcall(function()
-								data.CallBack(data.V)
-							end)
-							if not success then
-								syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
-							end
-						end
-
-
+						data:Set(not data.V)
 					end
 				end)
 
@@ -11514,6 +11514,7 @@ function syde:Init(library)
 
 		function initelement:AddToggle(ToggleConfig)
 			ToggleConfig = ToggleConfig or {}
+			local initializing = true
 			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
 			local defVal = ToggleConfig.Default ~= nil and ToggleConfig.Default or (ToggleConfig.Value ~= nil and ToggleConfig.Value or false)
 
@@ -11531,7 +11532,7 @@ function syde:Init(library)
 				Save = ToggleConfig.Save ~= false,
 				CallBack = function(v)
 					if userCb then userCb(v) end
-					SaveCfg(game and game.GameId)
+					if not initializing then SaveConfig(game and game.GameId) end
 				end
 			})
 			local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[flagName .. "_Keybind"]
@@ -11545,6 +11546,7 @@ function syde:Init(library)
 			data.Flag = flagName
 			data.Value = defVal
 			syde.Flags[flagName] = data
+			initializing = false
 			return data
 		end
 
