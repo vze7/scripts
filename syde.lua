@@ -8661,6 +8661,7 @@ function syde:Init(library)
 			if data.Config then
 
 				local State = false
+				local captureConnection
 
 				local enterTween = TweenInfo.new(0.5, Enum.EasingStyle.Exponential)
 
@@ -8690,6 +8691,11 @@ function syde:Init(library)
 
 				local function ToggleConfigClose()
 					State = false
+					if captureConnection then
+						captureConnection:Disconnect()
+						captureConnection = nil
+						toggleConfiguration.Container.KeyBind.Bind.v.Text = data.Keybind and data.Keybind.Name or "None"
+					end
 
 					tweenservice:Create(toggleConfiguration, enterTween, { BackgroundTransparency = 1 }):Play()
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Title, enterTween, { TextTransparency = 1 }):Play()
@@ -8776,11 +8782,9 @@ function syde:Init(library)
 				end
 				data.SetKeybind = function(_, key, skipSave) setKeybind(key, skipSave) end
 
-				local captureConnection
 				toggleConfiguration.Container.KeyBind.Interact.MouseButton1Click:Connect(function()
 					if captureConnection then captureConnection:Disconnect() end
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					task.wait(0.2)
 					toggleConfiguration.Container.KeyBind.Bind.v.Text = "..."
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 					ResizeBindFrame()
