@@ -105,6 +105,26 @@ local dragOffset =        255
 local dragOffsetMobile =  150
 local camera =          workspace.CurrentCamera
 
+local function selectedChipAtPosition(scroller, input)
+	if not scroller.Visible or not input or not input.Position then return nil end
+	local point = input.Position
+	local padding = isMobile and 9 or 3
+	for _, chip in ipairs(scroller:GetChildren()) do
+		if chip:IsA("Frame") and chip.Visible then
+			local removeButton = chip:FindFirstChild("X")
+			if removeButton and removeButton.Visible then
+				local position = removeButton.AbsolutePosition
+				local size = removeButton.AbsoluteSize
+				if point.X >= position.X - padding and point.X <= position.X + size.X + padding
+					and point.Y >= position.Y - padding and point.Y <= position.Y + size.Y + padding then
+					return chip.Name
+				end
+			end
+		end
+	end
+	return nil
+end
+
 Library.Enabled = false
 Loader.Enabled = false
 
@@ -6031,6 +6051,7 @@ function syde:Init(library)
 
 				end
 
+				local removeChipCallbacks = {}
 				local headerHitbox = Instance.new("TextButton")
 				headerHitbox.Name = "HeaderHitbox"
 				headerHitbox.Text = ""
@@ -6039,7 +6060,12 @@ function syde:Init(library)
 				headerHitbox.Size = UDim2.new(1, 0, 0, 42)
 				headerHitbox.ZIndex = dropdown.dropholder.drop.down.ZIndex + 2
 				headerHitbox.Parent = dropdown.dropholder.drop
-				headerHitbox.Activated:Connect(function()
+				headerHitbox.Activated:Connect(function(input)
+					local chip = selectedChipAtPosition(dropdown.dropholder.drop.selectContainer.ScrollingFrame, input)
+					if chip and removeChipCallbacks[chip] then
+						removeChipCallbacks[chip]()
+						return
+					end
 					if DeBounce then return end
 					DeBounce = true
 
@@ -6125,7 +6151,8 @@ function syde:Init(library)
 								optionGroup.TextLabel.Text = option
 
 								-- Set up remove button
-								optionGroup.X.MouseButton1Click:Connect(function()
+								removeChipCallbacks[option] = function()
+									if not SelectedOptions[option] then return end
 									RemoveFromSelected(option)
 									UpdateSelectedText()
 
@@ -6143,7 +6170,8 @@ function syde:Init(library)
 									if data.CallBack then
 										data.CallBack(SelectedOrder)
 									end
-								end)
+								end
+								optionGroup.X.Activated:Connect(removeChipCallbacks[option])
 
 								optionGroup.Parent = selectedContainer
 
@@ -6227,7 +6255,7 @@ function syde:Init(library)
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							dropdown.dropholder.drop.Selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = OptionText
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -6235,7 +6263,7 @@ function syde:Init(library)
 							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 						end
 
-						option.Interact.MouseButton1Click:Connect(function()
+						option.Interact.Activated:Connect(function()
 							if data.Multi then
 								if SelectedOptions[OptionText] then
 									RemoveFromSelected(OptionText)
@@ -9703,6 +9731,7 @@ function syde:Init(library)
 
 			end
 
+			local removeChipCallbacks = {}
 			local headerHitbox = Instance.new("TextButton")
 			headerHitbox.Name = "HeaderHitbox"
 			headerHitbox.Text = ""
@@ -9711,7 +9740,12 @@ function syde:Init(library)
 			headerHitbox.Size = UDim2.new(1, 0, 0, 42)
 			headerHitbox.ZIndex = dropdown.dropholder.drop.down.ZIndex + 2
 			headerHitbox.Parent = dropdown.dropholder.drop
-			headerHitbox.Activated:Connect(function()
+			headerHitbox.Activated:Connect(function(input)
+				local chip = selectedChipAtPosition(dropdown.dropholder.drop.selectContainer.ScrollingFrame, input)
+				if chip and removeChipCallbacks[chip] then
+					removeChipCallbacks[chip]()
+					return
+				end
 				if DropOpen then
 					CloseDrop()
 				else
@@ -9790,7 +9824,8 @@ function syde:Init(library)
 							optionGroup.TextLabel.Text = OptionLabels[option] or option
 
 							-- Set up remove button
-							optionGroup.X.MouseButton1Click:Connect(function()
+							removeChipCallbacks[option] = function()
+								if not SelectedOptions[option] then return end
 								RemoveFromSelected(option)
 								UpdateSelectedText()
 
@@ -9809,7 +9844,8 @@ function syde:Init(library)
 									data.CallBack(SelectedOrder)
 								end
 								data.Value = table.clone(SelectedOrder)
-							end)
+							end
+							optionGroup.X.Activated:Connect(removeChipCallbacks[option])
 
 							optionGroup.Parent = selectedContainer
 
@@ -9959,7 +9995,7 @@ function syde:Init(library)
 						tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 					end
 
-					option.Interact.MouseButton1Click:Connect(function()
+					option.Interact.Activated:Connect(function()
 						if data.Multi then
 							if SelectedOptions[OptionText] then
 								RemoveFromSelected(OptionText)
