@@ -10339,7 +10339,7 @@ function syde:Init(library)
 					OptionDataByName[OptionText] = optionData
 
 					local option = OptionButton:Clone()
-					option.Title.Text = displayText .. (isPlayerOption and (" @" .. username) or "")
+					option.Title.Text = displayText
 					option.Parent = dropdown.dropholder.drop.Container
 					option.Visible = true
 					option.Name = OptionText
@@ -10366,6 +10366,12 @@ function syde:Init(library)
 					end
 					if isPlayerOption then
 						option.Size = UDim2.new(option.Size.X.Scale, option.Size.X.Offset, 0, 42)
+						option.BackgroundTransparency = 0
+						option.BackgroundColor3 = Color3.fromRGB(33, 33, 33)
+						option.Interact.BackgroundTransparency = 1
+						option.Title.TextTransparency = 0
+						option.Title.TextColor3 = Color3.fromRGB(235, 235, 238)
+						option.Title.ZIndex = option.Interact.ZIndex + 1
 						option.Title.Position = UDim2.new(0, image ~= "" and 44 or 10, 0, 3)
 						option.Title.Size = UDim2.new(1, image ~= "" and -52 or -18, 0, 18)
 						local subtitle = Instance.new("TextLabel")
