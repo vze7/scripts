@@ -8542,6 +8542,8 @@ function syde:Init(library)
 				Config = Toggle.Config or false;
 				CallBack = Toggle.Callback or Toggle.CallBack;
 				Flag = Toggle.Flag;
+				Type = "Toggle";
+				Save = Toggle.Save ~= false;
 			}
 
 			local toggle = pages.page.Toggle:Clone()
@@ -8866,6 +8868,11 @@ function syde:Init(library)
 				syde.Flags[data.Flag] = data
 				if syde.LoadedConfig and syde.LoadedConfig[data.Flag] ~= nil then
 					data:Set(syde.LoadedConfig[data.Flag], true)
+				end
+				local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[data.Flag .. "_Keybind"]
+				if data.Config and type(savedKeybind) == "string" and data.SetKeybind then
+					local key = Enum.KeyCode[savedKeybind]
+					if key then data:SetKeybind(key, true) end
 				end
 			end
 
