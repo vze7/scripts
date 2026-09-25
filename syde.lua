@@ -3667,11 +3667,9 @@ window.top.functions.close.interact.MouseButton1Click:Connect(function()
 		Content = 'Are You Sure You Want To Close This UI?',
 		ConfimCallBack = function()
 			mh = false
-			rs:Disconnect()
-			ss:Disconnect()
 			--	if not ui.Parent then return end
 			task.wait(1)
-			Library:Destroy()
+			syde:Destroy()
 		end,
 	})
 end)
