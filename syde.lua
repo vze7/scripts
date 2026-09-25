@@ -7271,6 +7271,21 @@ function telement:Slider(Slider)
 					Slider.Size = UDim2.new(Slider.Size.X.Scale, Slider.Size.X.Offset, Slider.Size.Y.Scale, Slider.Size.Y.Offset + 6)
 					local dragging = false
 					local activeTouch = nil
+					local sliderConnections = {}
+					local function trackSliderConnection(signal, callback)
+						local _, disconnect = syde:AddConnection(signal, callback)
+						table.insert(sliderConnections, disconnect)
+					end
+					local function cleanupSlider()
+						dragging = false
+						activeTouch = nil
+						for index = #sliderConnections, 1, -1 do
+							sliderConnections[index]()
+							sliderConnections[index] = nil
+						end
+						syde:removeLoadTween(Slider.slide.slideframe)
+					end
+					Slider.Destroying:Connect(cleanupSlider)
 					Slider.Visible = true
 					Slider.Parent = slider.slideholder
 
@@ -7452,7 +7467,7 @@ function telement:Slider(Slider)
 						dragging = false
 					end)
 
-					syde:AddConnection(userinput.InputEnded, function(input, processed)
+					trackSliderConnection(userinput.InputEnded, function(input, processed)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeTouch then
 							dragging = false
 							activeTouch = nil
@@ -7460,7 +7475,7 @@ function telement:Slider(Slider)
 						end
 					end)
 
-					syde:AddConnection(userinput.InputChanged, function(input)
+					trackSliderConnection(userinput.InputChanged, function(input)
 						if dragging and ((activeTouch and input == activeTouch)
 							or (not activeTouch and input.UserInputType == Enum.UserInputType.MouseMovement)) then
 							UpdateSlider(input.Position.X)
@@ -7475,7 +7490,7 @@ function telement:Slider(Slider)
 					local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
 					slider.Size = UDim2.new(1,-35,0, ss  + 20)
 
-					syde:AddConnection(syde.Comms.Event, function(p, color)
+					trackSliderConnection(syde.Comms.Event, function(p, color)
 						if p == 'HitBox' then
 							syde:SetSliderGradient(Slider.slide.slideframe, color)
 							Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
@@ -9705,6 +9720,21 @@ function telement:TextInput(TextInput)
 				Slider.Size = UDim2.new(Slider.Size.X.Scale, Slider.Size.X.Offset, Slider.Size.Y.Scale, Slider.Size.Y.Offset + 6)
 				local dragging = false
 				local activeTouch = nil
+				local sliderConnections = {}
+				local function trackSliderConnection(signal, callback)
+					local _, disconnect = syde:AddConnection(signal, callback)
+					table.insert(sliderConnections, disconnect)
+				end
+				local function cleanupSlider()
+					dragging = false
+					activeTouch = nil
+					for index = #sliderConnections, 1, -1 do
+						sliderConnections[index]()
+						sliderConnections[index] = nil
+					end
+					syde:removeLoadTween(Slider.slide.slideframe)
+				end
+				Slider.Destroying:Connect(cleanupSlider)
 				Slider.Visible = true
 				Slider.Parent = slider.slideholder
 
@@ -9868,7 +9898,7 @@ function telement:TextInput(TextInput)
 					dragging = false
 				end)
 
-				syde:AddConnection(userinput.InputEnded, function(input, processed)
+				trackSliderConnection(userinput.InputEnded, function(input, processed)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeTouch then
 						dragging = false
 						activeTouch = nil
@@ -9876,7 +9906,7 @@ function telement:TextInput(TextInput)
 					end
 				end)
 
-				syde:AddConnection(userinput.InputChanged, function(input)
+				trackSliderConnection(userinput.InputChanged, function(input)
 					if dragging and ((activeTouch and input == activeTouch)
 						or (not activeTouch and input.UserInputType == Enum.UserInputType.MouseMovement)) then
 						UpdateSlider(input.Position.X)
@@ -9891,7 +9921,7 @@ function telement:TextInput(TextInput)
 				local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
 				slider.Size = UDim2.new(1,-35,0, ss  + 20)
 
-				syde:AddConnection(syde.Comms.Event, function(p, color)
+				trackSliderConnection(syde.Comms.Event, function(p, color)
 					if p == 'HitBox' then
 						syde:SetSliderGradient(Slider.slide.slideframe, color)
 						Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
