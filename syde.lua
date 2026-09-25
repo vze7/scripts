@@ -3522,6 +3522,10 @@ end
 
 function syde:Destroy()
 	if self._destroyed then return false end
+	-- Flush before _destroyed makes SaveCfg reject the final pending write.
+	if saveDebounce and not self.IsLoadingConfig then
+		self:FlushConfig()
+	end
 	self._destroyed = true
 	configLoadGeneration += 1
 	syde.IsLoadingConfig = false
@@ -3529,9 +3533,6 @@ function syde:Destroy()
 		pcall(task.cancel, thread)
 	end
 	table.clear(configLoadTasks)
-	if saveDebounce then
-		self:FlushConfig()
-	end
 	if connectionCleanupTask then
 		task.cancel(connectionCleanupTask)
 		connectionCleanupTask = nil
