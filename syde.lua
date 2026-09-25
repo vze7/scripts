@@ -3509,30 +3509,37 @@ function syde:CreateWindow(WindowConfig)
 end
 
 function syde:Rejoin()
-	if self._rejoining then return false end
+	if self._destroyed or self._rejoining then return false end
 	local localPlayer = player.LocalPlayer
 	if not localPlayer then return false end
 
 	self._rejoining = true
 	local teleports = game:GetService("TeleportService")
-	local failureConnection
+	local state = { active = true, tasks = {} }
+	self._rejoinState = state
 	local fallbackStarted = false
 	local fallbackAttempt = 0
 	local retryScheduled = false
+	local function isActive()
+		return state.active and self._rejoinState == state and self._rejoining and not self._destroyed
+	end
+	local function schedule(delaySeconds, callback)
+		local thread
+		thread = task.delay(delaySeconds, function()
+			state.tasks[thread] = nil
+			if isActive() then callback() end
+		end)
+		state.tasks[thread] = true
+	end
 	local function finish()
-		if failureConnection then
-			failureConnection:Disconnect()
-			failureConnection = nil
-		end
-		self._rejoining = false
+		cancelRejoin(self, state)
 	end
 	local function tryFallback()
-		if not self._rejoining or retryScheduled then return end
+		if not isActive() or retryScheduled then return end
 		if fallbackAttempt >= 3 then finish() return end
 		fallbackStarted = true
 		retryScheduled = true
-		task.delay(fallbackAttempt == 0 and 0 or 1, function()
-			if not self._rejoining then return end
+		schedule(fallbackAttempt == 0 and 0 or 1, function()
 			retryScheduled = false
 			fallbackAttempt += 1
 			local thisAttempt = fallbackAttempt
@@ -3544,15 +3551,15 @@ function syde:Rejoin()
 				tryFallback()
 			else
 				-- A successful call may still report TeleportInitFailed later.
-				task.delay(10, function()
-					if self._rejoining and fallbackAttempt == thisAttempt then finish() end
+				schedule(10, function()
+					if fallbackAttempt == thisAttempt then finish() end
 				end)
 			end
 		end)
 	end
 
-	failureConnection = teleports.TeleportInitFailed:Connect(function(failedPlayer)
-		if failedPlayer == localPlayer then tryFallback() end
+	state.connection = teleports.TeleportInitFailed:Connect(function(failedPlayer)
+		if isActive() and failedPlayer == localPlayer then tryFallback() end
 	end)
 	if game.JobId == "" then
 		tryFallback()
@@ -3568,7 +3575,7 @@ function syde:Rejoin()
 	else
 		-- A successful call starts an asynchronous teleport. A reported failure
 		-- starts the normal-place fallback; the timeout just unlocks the button.
-		task.delay(10, function()
+		schedule(10, function()
 			if not fallbackStarted then finish() end
 		end)
 	end
