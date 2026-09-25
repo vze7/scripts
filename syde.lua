@@ -6186,8 +6186,10 @@ function telement:ColorPicker(ColorPicker)
 					end
 					followMouseConnection = RunService.RenderStepped:Connect(function()
 						if not linkDragging then
-							followMouseConnection:Disconnect()
-							followMouseConnection = nil
+							if followMouseConnection then
+								followMouseConnection:Disconnect()
+								followMouseConnection = nil
+							end
 							return
 						end
 						local mouse = game.Players.LocalPlayer:GetMouse()
@@ -11555,8 +11557,10 @@ function telement:TextInput(TextInput)
 				end
 				followMouseConnection = RunService.RenderStepped:Connect(function()
 					if not linkDragging then
-						followMouseConnection:Disconnect()
-						followMouseConnection = nil
+						if followMouseConnection then
+							followMouseConnection:Disconnect()
+							followMouseConnection = nil
+						end
 						return
 					end
 					local mouse = game.Players.LocalPlayer:GetMouse()
