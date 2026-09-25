@@ -10769,6 +10769,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 						break
 					end
 				end
+				removeChipCallbacks[option] = nil
 			end
 
 			local function UpdateSelectedText()
