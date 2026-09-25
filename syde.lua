@@ -2305,6 +2305,7 @@ local function SaveCfg(Name, preserveName)
 end
 
 local function LoadCfg(Config)
+	if syde._destroyed then return false end
 	local ok, Data = pcall(function()
 		return HttpService:JSONDecode(Config)
 	end)
@@ -2413,7 +2414,7 @@ local function LoadCfg(Config)
 end
 
 function SaveConfig(Name)
-	if syde.IsLoadingConfig then return false end
+	if syde._destroyed or syde.IsLoadingConfig then return false end
 	if saveDebounce then
 		task.cancel(saveDebounce)
 	end
