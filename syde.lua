@@ -13018,11 +13018,16 @@ function initelement:AddButton(ButtonConfig)
 				if not slot or not slot.Control then return false end
 				if type(color) == "table" then color = UnpackColor(color) end
 				if typeof(color) ~= "Color3" then return false end
+				local wasSuppressingCallback = suppressCallback
 				suppressCallback = true
-				slot.Control:Set(color, true)
+				local ok, failure = pcall(slot.Control.Set, slot.Control, color, true)
+				suppressCallback = wasSuppressingCallback
+				if not ok then
+					syde:Report("Multi colorpicker '" .. tostring(flagName) .. "' setter", failure)
+					return false
+				end
 				slot.Value = color
 				values[index] = color
-				suppressCallback = false
 				if pickerData.Save and not skipSave then SaveConfig(game and game.GameId) end
 				return true
 			end
