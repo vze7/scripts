@@ -286,6 +286,37 @@ end
 
 -- @ControllerSupport / numeric helpers
 
+local function getBindableKey(input)
+	if not input or not syde:IsBindableInput(input) then return nil end
+	if input.KeyCode ~= Enum.KeyCode.Unknown then return input.KeyCode end
+	if string.find(tostring(input.UserInputType), "MouseButton", 1, true) then
+		return input.UserInputType
+	end
+	return nil
+end
+
+local function encodeToggleKeybind(key)
+	if typeof(key) ~= "EnumItem" then return nil end
+	if key.EnumType == Enum.KeyCode then return key.Name end
+	if key.EnumType == Enum.UserInputType then return "UserInputType:" .. key.Name end
+	return nil
+end
+
+local function decodeToggleKeybind(value)
+	if type(value) ~= "string" then return nil end
+	local inputTypeName = value:match("^UserInputType:(.+)$")
+	if inputTypeName then return Enum.UserInputType[inputTypeName] end
+	-- Keep older configs working, including bare UserInputType names.
+	return Enum.KeyCode[value] or Enum.UserInputType[value]
+end
+
+local function matchesToggleKeybind(key, input)
+	if typeof(key) ~= "EnumItem" or not input then return false end
+	if key.EnumType == Enum.KeyCode then return input.KeyCode == key end
+	if key.EnumType == Enum.UserInputType then return input.UserInputType == key end
+	return false
+end
+
 -- True if an input can be used as a bind (keyboard key OR controller button)
 function syde:IsBindableInput(input)
 	local t = input.UserInputType
@@ -2393,7 +2424,7 @@ local function SaveCfg(Name, preserveName)
 					Data[i] = v._textBox.Text
 				end
 				if v.Type == "Toggle" and v.Config then
-					Data[i .. "_Keybind"] = typeof(v.Keybind) == "EnumItem" and v.Keybind.Name or nil
+				Data[i .. "_Keybind"] = encodeToggleKeybind(v.Keybind)
 				end
 			end
 		end	
@@ -2505,7 +2536,7 @@ local function LoadCfg(Config)
 			pcall(function()
 				local toggle = syde.Flags[a:sub(1, -9)]
 				if toggle and toggle.Type == "Toggle" and toggle.SetKeybind and type(b) == "string" then
-					local key = Enum.KeyCode[b]
+					local key = decodeToggleKeybind(b)
 					if key then toggle:SetKeybind(key, true) end
 				end
 			end)
@@ -5507,9 +5538,9 @@ function telement:Toggle(Toggle)
 
 
 						captureConnection = syde:AddConnection(userinput.InputBegan, function(input, processed)
-							if not userinput:GetFocusedTextBox() and syde:IsBindableInput(input)
-								and input.KeyCode ~= Enum.KeyCode.Unknown then
-								setKeybind(input.KeyCode)
+							local key = getBindableKey(input)
+							if not userinput:GetFocusedTextBox() and key then
+								setKeybind(key)
 								captureConnection:Disconnect()
 								captureConnection = nil
 							end
@@ -5517,7 +5548,8 @@ function telement:Toggle(Toggle)
 					end)
 
 					local _, disconnectToggleKeybind = syde:AddConnection(userinput.InputBegan, function(input, processed)
-						if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
+						if not processed and not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady
+							and matchesToggleKeybind(data.Keybind, input) then
 							data:Set(not data.V)
 						end
 					end)
@@ -5596,7 +5628,7 @@ function telement:Toggle(Toggle)
 				if flagKey then
 					syde.Flags[flagKey] = data
 					local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[flagKey .. "_Keybind"]
-					local key = type(savedKeybind) == "string" and Enum.KeyCode[savedKeybind]
+					local key = decodeToggleKeybind(savedKeybind)
 					if data.Config and key and data.SetKeybind then data:SetKeybind(key, true) end
 				end
 				if data.SFlag then
@@ -9514,18 +9546,19 @@ function telement:TextInput(TextInput)
 					ResizeBindFrame()
 
 
-					captureConnection = syde:AddConnection(userinput.InputBegan, function(input)
-						if not userinput:GetFocusedTextBox() and syde:IsBindableInput(input)
-							and input.KeyCode ~= Enum.KeyCode.Unknown then
-							setKeybind(input.KeyCode)
+					captureConnection = syde:AddConnection(userinput.InputBegan, function(input, processed)
+						local key = getBindableKey(input)
+						if not userinput:GetFocusedTextBox() and key then
+							setKeybind(key)
 							captureConnection:Disconnect()
 							captureConnection = nil
 						end
 					end)
 				end)
 
-				local _, disconnectToggleKeybind = syde:AddConnection(userinput.InputBegan, function(input)
-					if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
+				local _, disconnectToggleKeybind = syde:AddConnection(userinput.InputBegan, function(input, processed)
+					if not processed and not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady
+						and matchesToggleKeybind(data.Keybind, input) then
 						data:Set(not data.V)
 					end
 				end)
@@ -9603,7 +9636,7 @@ function telement:TextInput(TextInput)
 				end
 				local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[data.Flag .. "_Keybind"]
 				if data.Config and type(savedKeybind) == "string" and data.SetKeybind then
-					local key = Enum.KeyCode[savedKeybind]
+					local key = decodeToggleKeybind(savedKeybind)
 					if key then data:SetKeybind(key, true) end
 				end
 			end
@@ -12442,7 +12475,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 			})
 			local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[flagName .. "_Keybind"]
 			if type(savedKeybind) == "string" and data.SetKeybind then
-				local key = Enum.KeyCode[savedKeybind]
+				local key = decodeToggleKeybind(savedKeybind)
 				if key then data:SetKeybind(key, true) end
 			end
 
