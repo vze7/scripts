@@ -7258,7 +7258,9 @@ function telement:Slider(Slider)
 							syde_tween(Slider.Title, 0.55, Enum.EasingStyle.Exponential, {TextTransparency = 0})
 
 							local success, errorMsg = pcall(function()
-								Options.CallBack(newValue)
+								if type(Options.CallBack) == "function" then
+									Options.CallBack(newValue)
+								end
 							end)
 							if not success then
 								syde:Report("Slider '" .. Slider.Name .. "' callback", errorMsg)
@@ -7318,7 +7320,9 @@ function telement:Slider(Slider)
 
 					function Options:Set(NewVal, skipSave)
 						local range = Options.Range[2] - Options.Range[1]
-						NewVal = math.clamp(tonumber(NewVal) or Options.StarterValue, Options.Range[1], Options.Range[2])
+						NewVal = tonumber(NewVal)
+						if not isFiniteNumber(NewVal) then NewVal = Options.StarterValue end
+						NewVal = math.clamp(NewVal, Options.Range[1], Options.Range[2])
 
 						-- snap value to increment (same logic as UpdateSlider)
 						NewVal = math.floor((NewVal - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
@@ -7363,7 +7367,9 @@ function telement:Slider(Slider)
 
 						-- Callback
 						local success, result = pcall(function()
-							Options.CallBack(NewVal)
+							if type(Options.CallBack) == "function" then
+								Options.CallBack(NewVal)
+							end
 						end)
 
 						if not success then
@@ -9712,7 +9718,9 @@ function telement:TextInput(TextInput)
 
 				function Options:Set(NewVal, skipSave)
 					local range = Options.Range[2] - Options.Range[1]
-					NewVal = math.clamp(tonumber(NewVal) or Options.StarterValue, Options.Range[1], Options.Range[2])
+					NewVal = tonumber(NewVal)
+					if not isFiniteNumber(NewVal) then NewVal = Options.StarterValue end
+					NewVal = math.clamp(NewVal, Options.Range[1], Options.Range[2])
 					NewVal = math.floor((NewVal - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
 					NewVal = math.clamp(syde:RoundTo(NewVal, syde:DecimalPlaces(Options.Increment)), Options.Range[1], Options.Range[2])
 					local sliderPosition = (NewVal - Options.Range[1]) / range
@@ -9747,7 +9755,9 @@ function telement:TextInput(TextInput)
 
 					-- Callback
 					local success, result = pcall(function()
-						Options.CallBack(NewVal)
+						if type(Options.CallBack) == "function" then
+							Options.CallBack(NewVal)
+						end
 					end)
 					if not success then
 						syde:Report("Slider '" .. slider.Name .. "' callback", result)
