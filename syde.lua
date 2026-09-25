@@ -1468,9 +1468,10 @@ function syde:WiggleText(label)
 	local chars = {}
 	local xOffset = 0
 
-	-- Create a label for each character
-	for i = 1, #baseText do
-		local char = baseText:sub(i, i)
+	-- Iterate visible Unicode graphemes instead of bytes so accents and emoji
+	-- remain intact when each glyph is rendered in its own label.
+	for firstByte, lastByte in utf8.graphemes(baseText) do
+		local char = baseText:sub(firstByte, lastByte)
 		local charLabel = Instance.new("TextLabel")
 		charLabel.BackgroundTransparency = 1
 		charLabel.Text = char
