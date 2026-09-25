@@ -5211,18 +5211,7 @@ function telement:Toggle(Toggle)
 				UpdateToggleUI(data.V)
 
 				toggle.interact.MouseButton1Click:Connect(function()
-					data.V = not data.V
-					UpdateToggleUI(data.V)
-
-					local success, errorMsg = pcall(function()
-						if data.CallBack then
-							data.CallBack(data.V)
-						end
-					end)
-
-					if not success then
-						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
-					end
+					data:Set(not data.V)
 				end)
 
 				--[DESC]
@@ -5408,17 +5397,7 @@ function telement:Toggle(Toggle)
 
 					userinput.InputBegan:Connect(function(input, processed)
 						if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
-							data.V = not data.V
-							UpdateToggleUI(data.V)
-
-							if data.CallBack then
-								local success, errorMsg = pcall(function()
-									data.CallBack(data.V)
-								end)
-								if not success then
-									syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
-								end
-							end
+							data:Set(not data.V)
 						end
 					end)
 
@@ -5465,7 +5444,8 @@ function telement:Toggle(Toggle)
 					end
 				end)
 
-				function data:Set(NewValue)
+				function data:Set(NewValue, skipSave)
+					if type(NewValue) ~= "boolean" then return false end
 					data.V = NewValue
 					data.Value = NewValue
 					UpdateToggleUI(NewValue)
@@ -5479,6 +5459,11 @@ function telement:Toggle(Toggle)
 					if not success then
 						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
 					end
+
+					if not skipSave and data.Save and data.Flag then
+						SaveConfig(game and game.GameId)
+					end
+					return true
 				end
 
 				data.Type = "Toggle"
