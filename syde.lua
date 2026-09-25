@@ -6292,17 +6292,20 @@ function telement:ColorPicker(ColorPicker)
 				HueSat.Changed:Connect(updateColorPicker)
 
 				local isRainbowEnabled = false
+				local rainbowGeneration = 0
 
 				local function SetRainbowEffect(enabled, skipSave)
 					enabled = enabled == true
 					if isRainbowEnabled == enabled then return end
 					isRainbowEnabled = enabled
+					rainbowGeneration += 1
+					local generation = rainbowGeneration
 					data.Rainbow = enabled
 					if isRainbowEnabled then
-						syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(255, 255, 255)})
+						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 						task.spawn(function()
 							local lastUpdate = os.clock()
-							while isRainbowEnabled and colorpicker.Parent do
+							while isRainbowEnabled and rainbowGeneration == generation and colorpicker.Parent do
 								local now = os.clock()
 								HueValue = (HueValue + math.min(now - lastUpdate, 0.2) * 0.12) % 1
 								lastUpdate = now
@@ -6315,7 +6318,7 @@ function telement:ColorPicker(ColorPicker)
 							end
 						end)
 					else
-						syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(62, 62, 62)})
+						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
 						syde:SaveThemeCfg()
 					end
 					if not skipSave then
@@ -6330,6 +6333,10 @@ function telement:ColorPicker(ColorPicker)
 				end
 				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(function()
 					data:SetRainbow(not data.Rainbow)
+				end)
+				colorpicker.Destroying:Connect(function()
+					isRainbowEnabled = false
+					rainbowGeneration += 1
 				end)
 
 				function data:Set(RGBColor)
@@ -11667,6 +11674,7 @@ function telement:TextInput(TextInput)
 			HueSat.Changed:Connect(updateColorPicker)
 
 			local isRainbowEnabled = false
+			local huerender
 
 			local function SetRainbowEffect(enabled, skipSave)
 				enabled = enabled == true
@@ -11692,14 +11700,14 @@ function telement:TextInput(TextInput)
 							syde._rainbowUpdating = false
 							if not ok then warn("[Syde RGB] " .. tostring(failure)) end
 						end)
-						syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(255, 255, 255)})
+						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 					end
 				else
 					if huerender then
 						huerender:Disconnect()
 						huerender = nil
 					end
-					syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(62, 62, 62)})
+					tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(62, 62, 62)}):Play()
 				end
 				if not skipSave then
 					syde.LoadedConfig = syde.LoadedConfig or {}
@@ -11713,6 +11721,13 @@ function telement:TextInput(TextInput)
 			end
 			colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(function()
 				data:SetRainbow(not data.Rainbow)
+			end)
+			colorpicker.Destroying:Connect(function()
+				isRainbowEnabled = false
+				if huerender then
+					huerender:Disconnect()
+					huerender = nil
+				end
 			end)
 
 			function data:Set(RGBColor, skipSave)
