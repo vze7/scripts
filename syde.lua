@@ -136,13 +136,14 @@ local layoutCamera =    workspace.CurrentCamera
 local function selectedChipAtPosition(scroller, input)
 	if not scroller.Visible or not input or not input.Position then return nil end
 	local point = input.Position
-	local padding = isMobile and 9 or 3
+	-- Make the whole selected chip a removal target, not only the tiny X icon.
+	local padding = isMobile and 2 or 1
 	for _, chip in ipairs(scroller:GetChildren()) do
 		if chip:IsA("Frame") and chip.Visible then
 			local removeButton = chip:FindFirstChild("X")
 			if removeButton and removeButton.Visible then
-				local position = removeButton.AbsolutePosition
-				local size = removeButton.AbsoluteSize
+				local position = chip.AbsolutePosition
+				local size = chip.AbsoluteSize
 				if point.X >= position.X - padding and point.X <= position.X + size.X + padding
 					and point.Y >= position.Y - padding and point.Y <= position.Y + size.Y + padding then
 					return chip.Name
