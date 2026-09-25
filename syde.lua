@@ -6042,9 +6042,21 @@ function telement:ColorPicker(ColorPicker)
 				end
 
 				local SV, HUE = nil, nil
+				local function stopColorDrag(recordRecent)
+					local wasDragging = SV ~= nil or HUE ~= nil
+					if SV then SV:Disconnect() SV = nil end
+					if HUE then HUE:Disconnect() HUE = nil end
+					if recordRecent and wasDragging then AddRecentColor(data.Color) end
+				end
+				local colorDragInputConnection = userinput.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						stopColorDrag(true)
+					end
+				end)
 
 				syde:AddConnection(SVPicker.InputBegan, function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						stopColorDrag(false)
 						SV = runservice.RenderStepped:Connect(function()
 							local mouse = game.Players.LocalPlayer:GetMouse()
 							local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
@@ -6060,14 +6072,13 @@ function telement:ColorPicker(ColorPicker)
 
 				syde:AddConnection(SVPicker.InputEnded, function(i)
 					if i.UserInputType == Enum.UserInputType.MouseButton1 and SV then
-						SV:Disconnect()
-						SV = nil
-						AddRecentColor(data.Color)
+						stopColorDrag(true)
 					end
 				end)
 
 				syde:AddConnection(HUESlider.InputBegan, function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						stopColorDrag(false)
 						HUE = runservice.RenderStepped:Connect(function()
 							local mouse = game.Players.LocalPlayer:GetMouse()
 							local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
@@ -6081,9 +6092,7 @@ function telement:ColorPicker(ColorPicker)
 
 				syde:AddConnection(HUESlider.InputEnded, function(i)
 					if i.UserInputType == Enum.UserInputType.MouseButton1 and HUE then
-						HUE:Disconnect()
-						HUE = nil
-						AddRecentColor(data.Color)
+						stopColorDrag(true)
 					end
 				end)
 
@@ -6248,6 +6257,10 @@ function telement:ColorPicker(ColorPicker)
 					end
 				end)
 				colorpicker.Destroying:Connect(function()
+					stopColorDrag(false)
+					if colorDragInputConnection and colorDragInputConnection.Connected then
+						colorDragInputConnection:Disconnect()
+					end
 					linkDragging = false
 					if followMouseConnection then
 						followMouseConnection:Disconnect()
@@ -11398,9 +11411,21 @@ function telement:TextInput(TextInput)
 			end
 
 			local SV, HUE = nil, nil
+			local function stopColorDrag(recordRecent)
+				local wasDragging = SV ~= nil or HUE ~= nil
+				if SV then SV:Disconnect() SV = nil end
+				if HUE then HUE:Disconnect() HUE = nil end
+				if recordRecent and wasDragging then AddRecentColor(data.Color) end
+			end
+			local colorDragInputConnection = userinput.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					stopColorDrag(true)
+				end
+			end)
 
 			syde:AddConnection(SVPicker.InputBegan, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					stopColorDrag(false)
 					SV = runservice.RenderStepped:Connect(function()
 						local mouse = game.Players.LocalPlayer:GetMouse()
 						local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
@@ -11416,14 +11441,13 @@ function telement:TextInput(TextInput)
 
 			syde:AddConnection(SVPicker.InputEnded, function(i)
 				if i.UserInputType == Enum.UserInputType.MouseButton1 and SV then
-					SV:Disconnect()
-					SV = nil
-					AddRecentColor(data.Color)
+					stopColorDrag(true)
 				end
 			end)
 
 			syde:AddConnection(HUESlider.InputBegan, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					stopColorDrag(false)
 					HUE = runservice.RenderStepped:Connect(function()
 						local mouse = game.Players.LocalPlayer:GetMouse()
 						local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
@@ -11437,9 +11461,7 @@ function telement:TextInput(TextInput)
 
 			syde:AddConnection(HUESlider.InputEnded, function(i)
 				if i.UserInputType == Enum.UserInputType.MouseButton1 and HUE then
-					HUE:Disconnect()
-					HUE = nil
-					AddRecentColor(data.Color)
+					stopColorDrag(true)
 				end
 			end)
 
@@ -11608,6 +11630,10 @@ function telement:TextInput(TextInput)
 				end
 			end)
 			colorpicker.Destroying:Connect(function()
+				stopColorDrag(false)
+				if colorDragInputConnection and colorDragInputConnection.Connected then
+					colorDragInputConnection:Disconnect()
+				end
 				linkDragging = false
 				if followMouseConnection then
 					followMouseConnection:Disconnect()
