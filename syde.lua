@@ -2173,7 +2173,15 @@ end
 local function SaveCfg(Name)
 	Name = normalizeConfigName(Name or (game and game.GameId) or "default")
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
-	if makefolder and isfolder and not isfolder(folder) then
+	if type(folder) ~= "string" or folder == "" then
+		folder = "FireHub"
+	end
+	local folderExists = false
+	if isfolder then
+		local checkOk, exists = pcall(isfolder, folder)
+		folderExists = checkOk and exists == true
+	end
+	if makefolder and not folderExists then
 		pcall(makefolder, folder)
 	end
 
@@ -2245,9 +2253,10 @@ local function SaveCfg(Name)
 	if not writefile then return false end
 	local ok, encoded = pcall(HttpService.JSONEncode, HttpService, Data)
 	if not ok then return false end
-	local saved = pcall(writefile, folder .. "/" .. Name .. ".txt", encoded)
-	if saved then syde.LoadedConfig = Data end
-	return saved
+	local writeOk, writeResult = pcall(writefile, folder .. "/" .. Name .. ".txt", encoded)
+	if not writeOk or writeResult == false then return false end
+	syde.LoadedConfig = Data
+	return true
 end
 
 local function LoadCfg(Config)
