@@ -157,6 +157,9 @@ Library.Enabled = false
 Loader.Enabled = false
 
 local loaded = false
+local normalizeConfigName
+local ensureConfigFolder
+local resolveConfigPath
 
 local syde = {
 
@@ -174,7 +177,9 @@ local syde = {
 	plugins = {};
 	ConfigEnabled = true;
 	ConfigFolder = 'FireHub';
+	ConfigFolderExplicit = false;
 	ConfigFile = 'Config';
+	ConfigFileExplicit = false;
 	Folder = 'FireHub';
 	SaveCfg = true;
 	Flags = {};
@@ -1832,30 +1837,37 @@ do
 
 				syde.ConfigEnabled = true
 				syde.ConfigFolder = folderName
-				syde.ConfigFile = fileName
+				syde.ConfigFolderExplicit = true
+				syde.ConfigFile = normalizeConfigName and normalizeConfigName(fileName) or fileName
+				syde.ConfigFileExplicit = true
 
-				if isfolder and not isfolder(folderName) then
-					local success, err = pcall(function()
-						makefolder(folderName)
-					end)
-					if not success then
-						warn("[SYDE] Failed to create folder:", err)
-					end
+				if not ensureConfigFolder(folderName) then
+					warn("[SYDE] Could not access configuration folder:", folderName)
 				end
 
 				-- Only preload the saved config if AutoLoad was explicitly enabled
 				local autoloadPath = string.format("%s/_autoload.txt", folderName)
 				local autoload = false
-				if isfile and isfile(autoloadPath) then
+				local autoloadProfile
+				if isfile then
 					local ok, content = pcall(readfile, autoloadPath)
 					if ok and content then
-						autoload = tostring(content):match("^%s*(.-)%s*$") == "1"
+						local savedProfile = tostring(content):match("^%s*(.-)%s*$")
+						if savedProfile == "1" then
+							autoload = true
+						elseif savedProfile:sub(1, 2) == "2:" then
+							autoloadProfile = normalizeConfigName(savedProfile:sub(3))
+							syde.ConfigFile = autoloadProfile
+							syde.ConfigFileExplicit = true
+							autoload = true
+						end
 					end
 				end
 
 				if autoload then
-					local configPath = string.format("%s/%s.json", folderName, fileName)
-					if isfile and isfile(configPath) then
+					local legacyName = not autoloadProfile and tostring(game and game.GameId or "default") or nil
+					local configPath, configExists = resolveConfigPath(folderName, syde.ConfigFile, legacyName)
+					if configExists then
 						local ok, content = pcall(readfile, configPath)
 						if ok and content then
 							local decodeOk, decoded = pcall(function() return https:JSONDecode(content) end)
@@ -2164,26 +2176,53 @@ end
 --------------------------------------------------------------------------------
 -- [ CONFIGURATION & SAVING SYSTEM ]
 --------------------------------------------------------------------------------
-local function normalizeConfigName(name)
+normalizeConfigName = function(name)
 	name = tostring(name or "default")
 	name = name:gsub("[^%w_%-]", "_"):gsub("_+", "_"):sub(1, 64)
 	return name ~= "" and name or "default"
 end
 
-local function SaveCfg(Name)
-	Name = normalizeConfigName(Name or (game and game.GameId) or "default")
+ensureConfigFolder = function(folder)
+	if type(folder) ~= "string" or folder == "" then return false end
+	if isfolder then
+		local checkOk, exists = pcall(isfolder, folder)
+		if checkOk and exists == true then return true end
+	end
+	if not makefolder then return false end
+	local makeOk = pcall(makefolder, folder)
+	if isfolder then
+		local checkOk, exists = pcall(isfolder, folder)
+		if checkOk then return exists == true end
+	end
+	return makeOk
+end
+
+resolveConfigPath = function(folder, name, fallbackName)
+	local primaryPath = string.format("%s/%s.txt", folder, normalizeConfigName(name))
+	local function fileExists(path)
+		if not isfile then return false end
+		local checkOk, exists = pcall(isfile, path)
+		return checkOk and exists == true
+	end
+	if fileExists(primaryPath) then return primaryPath, true end
+	if fallbackName and tostring(fallbackName) ~= normalizeConfigName(name) then
+		local fallbackPath = string.format("%s/%s.txt", folder, normalizeConfigName(fallbackName))
+		if fileExists(fallbackPath) then return fallbackPath, true end
+	end
+	return primaryPath, false
+end
+
+local function SaveCfg(Name, preserveName)
+	local gameId = tostring(game and game.GameId or "default")
+	if not preserveName and (Name == nil or tostring(Name) == gameId) then
+		Name = syde.ConfigFile or gameId
+	end
+	Name = normalizeConfigName(Name or gameId)
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
 	if type(folder) ~= "string" or folder == "" then
 		folder = "FireHub"
 	end
-	local folderExists = false
-	if isfolder then
-		local checkOk, exists = pcall(isfolder, folder)
-		folderExists = checkOk and exists == true
-	end
-	if makefolder and not folderExists then
-		pcall(makefolder, folder)
-	end
+	ensureConfigFolder(folder)
 
 	local Data = {}
 	-- Other controls can save while toggles are still being constructed.
@@ -2373,10 +2412,11 @@ end
 
 function syde:LoadSaveConfig(targetFile)
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
-	local fileName = normalizeConfigName(targetFile or (game and game.GameId) or "default")
-	local filePath = string.format("%s/%s.txt", folder, fileName)
+	local fileName = normalizeConfigName(targetFile or syde.ConfigFile or (game and game.GameId) or "default")
+	local legacyName = targetFile == nil and tostring(game and game.GameId or "default") or nil
+	local filePath, fileExists = resolveConfigPath(folder, fileName, legacyName)
 
-	if not isfile or not isfile(filePath) then
+	if not fileExists then
 		if syde.Toast then
 			syde:Toast({ Content = 'No save file found at ' .. filePath, Duration = 3 })
 		end
@@ -2386,6 +2426,10 @@ function syde:LoadSaveConfig(targetFile)
 	local ok, content = pcall(readfile, filePath)
 	if ok and content then
 		local loaded = LoadCfg(content)
+		if loaded then
+			syde.ConfigFile = fileName
+			syde.ConfigFileExplicit = true
+		end
 		if loaded and syde.Toast then
 			syde:Toast({ Content = 'Loaded config ' .. fileName, Duration = 3 })
 		end
@@ -2414,8 +2458,10 @@ end
 
 function syde:SaveConfigAs(name)
 	if type(name) ~= "string" or name == "" then return false end
-	local saved = SaveCfg(name)
+	local saved = SaveCfg(name, true)
 	if not saved then return false end
+	syde.ConfigFile = normalizeConfigName(name)
+	syde.ConfigFileExplicit = true
 	if syde.Toast then
 		syde:Toast({ Content = 'Saved config as ' .. normalizeConfigName(name), Duration = 3 })
 	end
@@ -2435,10 +2481,13 @@ end
 function syde:GetAutoLoad()
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
 	local autoloadPath = string.format("%s/_autoload.txt", folder)
-	if isfile and isfile(autoloadPath) then
+	if not isfile then return false end
+	local existsOk, exists = pcall(isfile, autoloadPath)
+	if existsOk and exists then
 		local ok, content = pcall(readfile, autoloadPath)
 		if ok and content then
-			return tostring(content):match("^%s*(.-)%s*$") == "1"
+			local savedProfile = tostring(content):match("^%s*(.-)%s*$")
+			return savedProfile == "1" or savedProfile:match("^2:.+") ~= nil
 		end
 	end
 	return false
@@ -2447,12 +2496,10 @@ end
 function syde:SetAutoLoad(enabled)
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
 	local autoloadPath = string.format("%s/_autoload.txt", folder)
-	if isfolder and not isfolder(folder) then
-		pcall(makefolder, folder)
-	end
-	if writefile then
-		pcall(writefile, autoloadPath, enabled and "1" or "0")
-	end
+	if not ensureConfigFolder(folder) or not writefile then return false end
+	local value = enabled and ("2:" .. normalizeConfigName(syde.ConfigFile)) or "0"
+	local writeOk, writeResult = pcall(writefile, autoloadPath, value)
+	return writeOk and writeResult ~= false
 end
 
 syde.PackColor = PackColor
@@ -3267,7 +3314,9 @@ end
 function syde:MakeWindow(WindowConfig)
 	WindowConfig = WindowConfig or {}
 	WindowConfig.Name = WindowConfig.Name or WindowConfig.Title or "Fire Hub"
-	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name:gsub("<.->", "")
+	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder
+		or (syde.ConfigFolderExplicit and syde.ConfigFolder)
+		or WindowConfig.Name:gsub("<.->", "")
 	WindowConfig.SaveConfig = true
 	syde.CornerImageDefault = WindowConfig.CornerImageId or ""
 
@@ -3276,19 +3325,23 @@ function syde:MakeWindow(WindowConfig)
 	syde.Folder = cfgFolder
 	syde.SaveCfg = true
 	syde.ConfigEnabled = true
-	syde.ConfigFile = tostring(game and game.GameId or "default")
-
-	if makefolder and isfolder then
-		if not isfolder(cfgFolder) then pcall(makefolder, cfgFolder) end
-		if not isfolder(themeFolder) then pcall(makefolder, themeFolder) end
+	if WindowConfig.ConfigFile ~= nil then
+		syde.ConfigFile = normalizeConfigName(WindowConfig.ConfigFile)
+		syde.ConfigFileExplicit = true
+	elseif not syde.ConfigFileExplicit then
+		syde.ConfigFile = tostring(game and game.GameId or "default")
 	end
+
+	ensureConfigFolder(cfgFolder)
+	ensureConfigFolder(THEME_FOLDER)
 
 	-- Preload theme configuration
 	LoadThemeCfg(filePath)
 
 	-- Preload element configuration so defaults use saved values
-	local configFilePath = string.format("%s/%s.txt", cfgFolder, tostring(game and game.GameId or "default"))
-	if isfile and isfile(configFilePath) then
+	local legacyConfigName = syde.ConfigFileExplicit and tostring(game and game.GameId or "default") or nil
+	local configFilePath, configFileExists = resolveConfigPath(cfgFolder, syde.ConfigFile or game and game.GameId or "default", legacyConfigName)
+	if configFileExists then
 		local ok, rawData = pcall(readfile, configFilePath)
 		if ok and rawData and rawData ~= "" then
 			local decodeOk, decoded = pcall(function() return HttpService:JSONDecode(rawData) end)
@@ -7456,6 +7509,7 @@ function telement:TextInput(TextInput)
 		local a = settings:inittab({Title = 'Theme'})
 		local b = settings:inittab({Title = 'Privacy'})
 		local c = settings:inittab({Title = 'Info'})
+		local d = settings:inittab({Title = 'Config'})
 
 		a:Keybind({
 			Title = 'Toggle UI',
@@ -7930,44 +7984,43 @@ function telement:TextInput(TextInput)
 
 
 		function syde:SaveSettingsConfig()
-			SaveCfg(game and game.GameId)
+			local saved = SaveCfg()
 			syde:SaveThemeCfg()
 			syde:Toast({
-				Content = 'Saved settings config';
+				Content = saved and 'Saved settings config' or 'Could not save settings config';
 				Duration = 3
 			})
+			return saved
 		end
 
 		function syde:LoadSettingsConfig()
-			LoadThemeCfg(filePath)
+			LoadThemeCfg(FILE_PATH)
 			local folder = syde.Folder or syde.ConfigFolder or "FireHub"
-			local filePath = folder .. "/" .. tostring(game and game.GameId or "0") .. ".txt"
-			if isfile and isfile(filePath) then
-				LoadCfg(readfile(filePath))
+			local legacyName = syde.ConfigFileExplicit and tostring(game and game.GameId or "default") or nil
+			local filePath, fileExists = resolveConfigPath(folder, syde.ConfigFile or game and game.GameId or "default", legacyName)
+			local loaded = false
+			if fileExists then
+				local readOk, content = pcall(readfile, filePath)
+				if readOk and content then loaded = LoadCfg(content) == true end
 			end
 			syde:Toast({
-				Content = 'Loaded settings config';
+				Content = loaded and 'Loaded settings config' or 'Could not load settings config';
 				Duration = 3
 			})
+			return loaded
 		end
 
 		-- // Configurations
 		local currentConfigName = syde.ConfigFile or "Config"
 		local selectedConfig
 		local autoloadEnabled = syde:GetAutoLoad() and true or false
-		local autoloadButtonRef
 		local configDropdownData
+		local autoLoadToggle
+		local revertingAutoLoadToggle = false
 
 		local function refreshConfigList()
 			if configDropdownData and configDropdownData.SetOptions then
-				configDropdownData:SetOptions(syde:ListConfigs() or {})
-			end
-		end
-
-		local function updateAutoLoadLabel()
-			if autoloadButtonRef and autoloadButtonRef:FindFirstChild('title') then
-				autoloadButtonRef.title.Text = autoloadEnabled and 'AutoLoad: ON' or 'AutoLoad: OFF'
-				autoloadButtonRef.title.Size = UDim2.new(0, 120, 0, 35)
+				configDropdownData:SetOptions(syde:ListConfigs() or {}, currentConfigName)
 			end
 		end
 
@@ -7976,6 +8029,88 @@ function telement:TextInput(TextInput)
 			if currentConfigName and currentConfigName ~= "" then return currentConfigName end
 			return syde.ConfigFile
 		end
+
+		d:Paragraph({
+			Title = "Profiles",
+			Content = "Save and load UI settings profiles. The active profile is used for autosave and optional autoload.",
+		})
+
+		configDropdownData = d:Dropdown({
+			Title = "Saved profiles",
+			Options = syde:ListConfigs(),
+			StarterOption = currentConfigName,
+			PlaceHolder = "Select a profile...",
+			CallBack = function(value)
+				if type(value) == "string" and value ~= "" then selectedConfig = value end
+			end,
+		})
+
+		d:TextInput({
+			Title = "Profile name",
+			PlaceHolder = "Enter a profile name...",
+			Default = currentConfigName,
+			ClearOnLost = false,
+			CallBack = function(value)
+				local trimmed = tostring(value or ""):match("^%s*(.-)%s*$")
+				if trimmed and trimmed ~= "" then
+					currentConfigName = trimmed
+					selectedConfig = trimmed
+				end
+			end,
+		})
+
+		d:Button({
+			Title = "Save profile",
+			Description = "Save current controls to the selected profile.",
+			CallBack = function()
+				local name = resolveConfigName()
+				if not name or name == "" then return end
+				if syde:SaveConfigAs(name) then
+					currentConfigName = syde.ConfigFile
+					selectedConfig = syde.ConfigFile
+					refreshConfigList()
+				end
+			end,
+		})
+
+		d:Button({
+			Title = "Load profile",
+			Description = "Load controls from the selected profile.",
+			CallBack = function()
+				local name = resolveConfigName()
+				if not name or name == "" then return end
+				if syde:LoadSaveConfig(name) then
+					currentConfigName = syde.ConfigFile
+					selectedConfig = syde.ConfigFile
+					refreshConfigList()
+				end
+			end,
+		})
+
+		d:Button({
+			Title = "Refresh profiles",
+			CallBack = refreshConfigList,
+		})
+
+		autoLoadToggle = d:Toggle({
+			Title = "Autoload active profile",
+			Description = "Load this profile automatically on the next launch.",
+			Value = autoloadEnabled,
+			Flag = "SydeAutoLoadProfile",
+			Save = false,
+			CallBack = function(enabled)
+				if revertingAutoLoadToggle then return end
+				local saved = syde:SetAutoLoad(enabled)
+				if saved then
+					autoloadEnabled = enabled
+				else
+					revertingAutoLoadToggle = true
+					if autoLoadToggle and autoLoadToggle.Set then autoLoadToggle:Set(autoloadEnabled) end
+					revertingAutoLoadToggle = false
+					syde:Toast({ Content = "Could not update autoload setting", Duration = 3 })
+				end
+			end,
+		})
 
 		a:Paragraph({
 			Title = 'Auto-Save System',
