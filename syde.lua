@@ -587,6 +587,14 @@ end
 
 -- Create a part binding for a GuiObject.
 function syde:BindFrame(frame, properties)
+	if self._destroyed then
+		return nil
+	end
+	if typeof(frame) ~= "Instance" or not frame:IsA("GuiObject") then
+		warn("[BindFrame] Expected a live GuiObject")
+		return nil
+	end
+	properties = type(properties) == "table" and properties or {}
 	if binds[frame] then
 		return binds[frame].parts
 	end
@@ -648,11 +656,15 @@ function syde:BindFrame(frame, properties)
 
 	UpdateOrientation(true)
 	RunService:BindToRenderStep(uid, 2000, UpdateOrientation)
+	local _, disconnectDestroying = self:AddConnection(frame.Destroying, function()
+		self:UnbindFrame(frame)
+	end)
 
 	binds[frame] = {
 		uid = uid;
 		parts = parts;
 		folder = f;
+		disconnectDestroying = disconnectDestroying;
 	}
 	return binds[frame].parts
 end
@@ -675,6 +687,10 @@ end
 function syde:UnbindFrame(frame)
 	local cb = binds[frame]
 	if cb then
+		if cb.disconnectDestroying then
+			cb.disconnectDestroying()
+			cb.disconnectDestroying = nil
+		end
 		RunService:UnbindFromRenderStep(cb.uid)
 		for _, v in pairs(cb.parts) do
 			if v and v.Parent then v:Destroy() end
