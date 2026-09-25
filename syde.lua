@@ -11968,6 +11968,8 @@ function initelement:AddSlider(SliderConfig)
 			local departedPlayers = {}
 			local callback = config.Callback or config.CallBack
 			local control
+			local controlRemoved = false
+			local refreshPlayers
 
 			local function playerOption(target, offline)
 				local userId = tonumber(target.UserId) or 0
@@ -12042,13 +12044,15 @@ function initelement:AddSlider(SliderConfig)
 						departedChanged = true
 					end
 				end
-				if departedChanged and control then task.defer(function() control:Refresh(getOptions(), false) end) end
+				if departedChanged and refreshPlayers then task.defer(refreshPlayers) end
 				if callback then callback(value) end
 			end
 
 			control = self:AddDropdown(config)
-			local function refreshPlayers()
-				if control and control.Refresh then control:Refresh(getOptions(), false) end
+			refreshPlayers = function()
+				if not controlRemoved and control and control.Refresh then
+					control:Refresh(getOptions(), false)
+				end
 			end
 
 			local addedConnection, disconnectAdded = syde:AddConnection(playerService.PlayerAdded, function(joining)
@@ -12056,11 +12060,20 @@ function initelement:AddSlider(SliderConfig)
 				task.defer(refreshPlayers)
 			end)
 			local removingConnection, disconnectRemoving = syde:AddConnection(playerService.PlayerRemoving, function(leaving)
-				departedPlayers[leaving.Name] = leaving
+				if selectedNames[leaving.Name] then
+					departedPlayers[leaving.Name] = {
+						Name = leaving.Name,
+						DisplayName = leaving.DisplayName,
+						UserId = leaving.UserId,
+					}
+				else
+					departedPlayers[leaving.Name] = nil
+				end
 				task.defer(refreshPlayers)
 			end)
 			local removeControl = control.remove
 			control.remove = function(self)
+				controlRemoved = true
 				if disconnectAdded then disconnectAdded() elseif addedConnection.Connected then addedConnection:Disconnect() end
 				if disconnectRemoving then disconnectRemoving() elseif removingConnection.Connected then removingConnection:Disconnect() end
 				if removeControl then removeControl(self) end
