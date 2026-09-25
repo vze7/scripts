@@ -12894,21 +12894,46 @@ function initelement:AddButton(ButtonConfig)
 			end
 
 			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
-
+			local suppressSave = false
 			local pickerData = self:ColorPicker({
 				Title = name,
 				Color = defColor,
 				Flag = flagName,
 				Save = ColorpickerConfig.Save ~= false,
 				CallBack = function(col)
-					if cb then cb(col) end
-					if not syde._rainbowUpdating then SaveCfg(game and game.GameId) end
+					if cb then
+						local ok, failure = pcall(cb, col)
+						if not ok then syde:Report("Colorpicker '" .. tostring(flagName) .. "' callback", failure) end
+					end
+					if not suppressSave and not syde._rainbowUpdating and ColorpickerConfig.Save ~= false then
+						SaveConfig(game and game.GameId)
+					end
 				end
 			})
 			pickerData.Type = "Colorpicker"
 			pickerData.Save = ColorpickerConfig.Save ~= false
 			pickerData.Flag = flagName
-			pickerData.Value = defColor
+			pickerData.Value = pickerData.Color or defColor
+			local setColor = pickerData.Set
+			pickerData.Set = function(_, color, skipSave)
+				if typeof(color) ~= "Color3" then return false end
+				suppressSave = true
+				local ok, failure = pcall(setColor, pickerData, color, skipSave)
+				suppressSave = false
+				if not ok then
+					syde:Report("Colorpicker '" .. tostring(flagName) .. "' setter", failure)
+					return false
+				end
+				if not skipSave and pickerData.Save then SaveConfig(game and game.GameId) end
+				return true
+			end
+			local setRainbow = pickerData.SetRainbow
+			pickerData.SetRainbow = function(_, enabled, skipSave)
+				if type(setRainbow) ~= "function" then return false end
+				setRainbow(pickerData, enabled, true)
+				if not skipSave and pickerData.Save then SaveConfig(game and game.GameId) end
+				return true
+			end
 			syde.Flags[flagName] = pickerData
 			return pickerData
 		end
@@ -12965,11 +12990,19 @@ function initelement:AddButton(ButtonConfig)
 						slot.Value = color
 						values[index] = color
 						if not suppressCallback then
-							callback(index, color, snapshot())
-							if pickerData.Save and not syde._rainbowUpdating then SaveCfg(game and game.GameId) end
+							local ok, failure = pcall(callback, index, color, snapshot())
+							if not ok then syde:Report("Multi colorpicker '" .. tostring(flagName) .. "' callback", failure) end
+							if pickerData.Save and not syde._rainbowUpdating then SaveConfig(game and game.GameId) end
 						end
 					end,
 				})
+				local setPickerRainbow = control.SetRainbow
+				control.SetRainbow = function(_, enabled, skipSave)
+					if type(setPickerRainbow) ~= "function" then return false end
+					setPickerRainbow(control, enabled, true)
+					if not skipSave and pickerData.Save then SaveConfig(game and game.GameId) end
+					return true
+				end
 				slot.Control = control
 				slot.Value = control.Color or default
 				values[index] = slot.Value
@@ -12980,7 +13013,7 @@ function initelement:AddButton(ButtonConfig)
 			end
 
 			suppressCallback = false
-			pickerData.Set = function(_, index, color)
+			pickerData.Set = function(_, index, color, skipSave)
 				local slot = pickerData.Pickers[index]
 				if not slot or not slot.Control then return false end
 				if type(color) == "table" then color = UnpackColor(color) end
@@ -12990,14 +13023,14 @@ function initelement:AddButton(ButtonConfig)
 				slot.Value = color
 				values[index] = color
 				suppressCallback = false
-				if pickerData.Save then SaveCfg(game and game.GameId) end
+				if pickerData.Save and not skipSave then SaveConfig(game and game.GameId) end
 				return true
 			end
 			pickerData.SetRainbow = function(_, index, enabled, skipSave)
 				local slot = pickerData.Pickers[index]
 				if not slot or not slot.Control or not slot.Control.SetRainbow then return false end
 				slot.Control:SetRainbow(enabled == true, true)
-				if not skipSave and pickerData.Save then SaveCfg(game and game.GameId) end
+				if not skipSave and pickerData.Save then SaveConfig(game and game.GameId) end
 				return true
 			end
 			pickerData.GetValues = snapshot
