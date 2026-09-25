@@ -5876,17 +5876,12 @@ function telement:ColorPicker(ColorPicker)
 
 					HueSat.Value = data.Color
 
-					syde_tween(HUESlider.Pin, 0.1, Enum.EasingStyle.Exponential, {BackgroundColor3 = newColor2})
-					syde_tween(SVPicker.Pin, 0.1, Enum.EasingStyle.Exponential, {BackgroundColor3 = newColor})
-
-
-					syde_tween(SVPicker.Pin, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-						Position = UDim2.new(HSV[2], 0, 1 - HSV[3], 0)
-					})
-
-					syde_tween(HUESlider.Pin, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-						Position = UDim2.new(1 - HSV[1], 0, 0.5, 0)
-					})
+					-- Drag and rainbow updates can run continuously. Direct property writes avoid restarting
+					-- unfinished tweens on every update and keep the markers aligned with the color.
+					HUESlider.Pin.BackgroundColor3 = newColor2
+					SVPicker.Pin.BackgroundColor3 = newColor
+					SVPicker.Pin.Position = UDim2.new(HSV[2], 0, 1 - HSV[3], 0)
+					HUESlider.Pin.Position = UDim2.new(1 - HSV[1], 0, 0.5, 0)
 
 					local formattedHex = FormatColor(data.Color, 'Hex')
 					colorpicker.HueValues.HEX.V.HEXBox.PlaceholderText = formattedHex
