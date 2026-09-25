@@ -5722,6 +5722,7 @@ function telement:ColorPicker(ColorPicker)
 					GradientPath = ColorPicker.GradientPath;
 					CallBack = ColorPicker.CallBack;
 					SFlag = ColorPicker.SFlag;
+					RainbowUpdating = false;
 				}
 
 				ColorPicker.Linkable = ColorPicker.Linkable or true
@@ -6654,6 +6655,15 @@ function telement:ColorPicker(ColorPicker)
 
 				local isRainbowEnabled = false
 				local rainbowGeneration = 0
+				local rainbowUpdateDepth = 0
+				local function updateRainbowColor()
+					rainbowUpdateDepth += 1
+					data.RainbowUpdating = true
+					local ok, failure = pcall(updatestuff)
+					rainbowUpdateDepth -= 1
+					data.RainbowUpdating = rainbowUpdateDepth > 0
+					return ok, failure
+				end
 
 				local function SetRainbowEffect(enabled, skipSave)
 					enabled = enabled == true
@@ -6671,9 +6681,7 @@ function telement:ColorPicker(ColorPicker)
 								HueValue = (HueValue + math.min(now - lastUpdate, 0.2) * 0.12) % 1
 								lastUpdate = now
 								HSV[1] = HueValue
-								syde._rainbowUpdating = true
-								local ok, failure = pcall(updatestuff)
-								syde._rainbowUpdating = false
+								local ok, failure = updateRainbowColor()
 								if not ok then warn("[Syde RGB] " .. tostring(failure)) break end
 								task.wait(0.08)
 							end
@@ -7700,7 +7708,8 @@ function telement:TextInput(TextInput)
 			end,
 		})
 
-		a:ColorPicker({
+		local accentColorPicker
+		accentColorPicker = a:ColorPicker({
 			Title = 'Accent',
 			RD = false,
 			Linkable = true,
@@ -7712,14 +7721,15 @@ function telement:TextInput(TextInput)
 				syde:UpdateTheme({
 					['Accent'] = v
 				})
-				if not syde._rainbowUpdating then
+				if not (accentColorPicker and accentColorPicker.RainbowUpdating) then
 					syde:SaveThemeCfg()
 					SaveCfg(game and game.GameId)
 				end
 			end,
 		})
 
-		a:ColorPicker({
+		local hitboxColorPicker
+		hitboxColorPicker = a:ColorPicker({
 			Title = 'Hitbox',
 			RD = false,
 			Linkable = true,
@@ -7731,7 +7741,7 @@ function telement:TextInput(TextInput)
 				syde:UpdateTheme({
 					['HitBox'] = c
 				})
-				if not syde._rainbowUpdating then
+				if not (hitboxColorPicker and hitboxColorPicker.RainbowUpdating) then
 					syde:SaveThemeCfg()
 					SaveCfg(game and game.GameId)
 				end
@@ -7945,7 +7955,8 @@ function telement:TextInput(TextInput)
 			end
 		})
 
-		a:ColorPicker({
+		local titleColorPicker
+		titleColorPicker = a:ColorPicker({
 			Title = 'Hub title color',
 			Color = syde.HeaderTitleColor or top.title.TextColor3,
 			Flag = 'HeaderTitleColor',
@@ -7954,11 +7965,12 @@ function telement:TextInput(TextInput)
 			CallBack = function(color)
 				syde.HeaderTitleColor = color
 				top.title.TextColor3 = color
-				if not syde._rainbowUpdating then syde:SaveThemeCfg() end
+				if not (titleColorPicker and titleColorPicker.RainbowUpdating) then syde:SaveThemeCfg() end
 			end,
 		})
 
-		a:ColorPicker({
+		local subtitleColorPicker
+		subtitleColorPicker = a:ColorPicker({
 			Title = 'Hub subtitle color',
 			Color = syde.HeaderSubtitleColor or top.title.sub.TextColor3,
 			Flag = 'HeaderSubtitleColor',
@@ -7967,7 +7979,7 @@ function telement:TextInput(TextInput)
 			CallBack = function(color)
 				syde.HeaderSubtitleColor = color
 				top.title.sub.TextColor3 = color
-				if not syde._rainbowUpdating then syde:SaveThemeCfg() end
+				if not (subtitleColorPicker and subtitleColorPicker.RainbowUpdating) then syde:SaveThemeCfg() end
 			end,
 		})
 		local cornerImageId = syde.LoadedConfig and syde.LoadedConfig.CornerImageId or syde.CornerImageDefault or ""
@@ -11241,8 +11253,9 @@ end))
 				Linkable = ColorPicker.Linkable;
 				Type = ColorPicker.Type or 'ColorPicker';
 				GradientPath = ColorPicker.GradientPath;
-				CallBack = ColorPicker.CallBack;
-				Flag = ColorPicker.Flag;
+					CallBack = ColorPicker.CallBack;
+					Flag = ColorPicker.Flag;
+					RainbowUpdating = false;
 			}
 
 			ColorPicker.Linkable = ColorPicker.Linkable or true
@@ -12208,6 +12221,15 @@ end))
 
 			local isRainbowEnabled = false
 			local huerender
+			local rainbowUpdateDepth = 0
+			local function updateRainbowColor()
+				rainbowUpdateDepth += 1
+				data.RainbowUpdating = true
+				local ok, failure = pcall(updatestuff)
+				rainbowUpdateDepth -= 1
+				data.RainbowUpdating = rainbowUpdateDepth > 0
+				return ok, failure
+			end
 
 			local function SetRainbowEffect(enabled, skipSave)
 				enabled = enabled == true
@@ -12228,9 +12250,7 @@ end))
 							HueValue = (HueValue + math.min(now - lastUpdate, 0.2) * 0.12) % 1
 							lastUpdate = now
 							HSV[1] = HueValue
-							syde._rainbowUpdating = true
-							local ok, failure = pcall(updatestuff)
-							syde._rainbowUpdating = false
+							local ok, failure = updateRainbowColor()
 							if not ok then warn("[Syde RGB] " .. tostring(failure)) end
 						end)
 						tweenservice:Create(colorpicker.color.Values.Rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential ), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
@@ -12895,7 +12915,8 @@ function initelement:AddButton(ButtonConfig)
 
 			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
 			local suppressSave = false
-			local pickerData = self:ColorPicker({
+			local pickerData
+			pickerData = self:ColorPicker({
 				Title = name,
 				Color = defColor,
 				Flag = flagName,
@@ -12905,7 +12926,7 @@ function initelement:AddButton(ButtonConfig)
 						local ok, failure = pcall(cb, col)
 						if not ok then syde:Report("Colorpicker '" .. tostring(flagName) .. "' callback", failure) end
 					end
-					if not suppressSave and not syde._rainbowUpdating and ColorpickerConfig.Save ~= false then
+					if not suppressSave and not (pickerData and pickerData.RainbowUpdating) and ColorpickerConfig.Save ~= false then
 						SaveConfig(game and game.GameId)
 					end
 				end
@@ -12981,7 +13002,8 @@ function initelement:AddButton(ButtonConfig)
 				local slot = {Value = default}
 				pickerData.Pickers[index] = slot
 				local childFlag = flagName .. "__Color_" .. tostring(index)
-				local control = self:ColorPicker({
+				local control
+				control = self:ColorPicker({
 					Title = tostring(name) .. " · " .. tostring(entryName),
 					Color = default,
 					Flag = childFlag,
@@ -12992,7 +13014,7 @@ function initelement:AddButton(ButtonConfig)
 						if not suppressCallback then
 							local ok, failure = pcall(callback, index, color, snapshot())
 							if not ok then syde:Report("Multi colorpicker '" .. tostring(flagName) .. "' callback", failure) end
-							if pickerData.Save and not syde._rainbowUpdating then SaveConfig(game and game.GameId) end
+							if pickerData.Save and not (control and control.RainbowUpdating) then SaveConfig(game and game.GameId) end
 						end
 					end,
 				})
