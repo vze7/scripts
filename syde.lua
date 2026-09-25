@@ -2291,14 +2291,28 @@ local function LoadCfg(Config)
 end
 
 local saveDebounce = nil
+local pendingSaveName = nil
 function SaveConfig(Name)
 	if saveDebounce then
 		task.cancel(saveDebounce)
 	end
+	pendingSaveName = Name or (game and game.GameId) or "default"
+	local saveName = pendingSaveName
 	saveDebounce = task.delay(0.05, function()
 		saveDebounce = nil
-		SaveCfg(Name or (game and game.GameId))
+		pendingSaveName = nil
+		SaveCfg(saveName)
 	end)
+end
+
+function syde:FlushConfig()
+	if saveDebounce then
+		task.cancel(saveDebounce)
+		saveDebounce = nil
+	end
+	local saveName = pendingSaveName or (game and game.GameId) or "default"
+	pendingSaveName = nil
+	return SaveCfg(saveName)
 end
 
 function LoadConfig(Configuration)
@@ -3362,6 +3376,9 @@ function syde:Rejoin()
 end
 
 function syde:Destroy()
+	if saveDebounce then
+		self:FlushConfig()
+	end
 	setBackgroundBlur(false)
 	if rs and rs.Connected then rs:Disconnect() end
 	if ss and ss.Connected then ss:Disconnect() end
