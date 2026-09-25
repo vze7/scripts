@@ -4460,9 +4460,6 @@ function syde:Init(library)
 		layout:Update()
 
 
-		local Stats = game:GetService("Stats")
-		local TweenService = game:GetService("TweenService")
-
 		local graph = window.pages.home.general.Quick.Latency.Frame:WaitForChild("graph")
 
 		local pointTemplate = graph:WaitForChild("point")
@@ -4482,79 +4479,71 @@ function syde:Init(library)
 
 		local points = {}
 		local lines = {}
+		local gridLines = {}
+		local gridLabels = {}
 		local gridBuilt = false
 
-		repeat task.wait() until graph.AbsoluteSize.X > 0
+		while ui and ui.Parent and graph.Parent
+			and (graph.AbsoluteSize.X <= 0 or graph.AbsoluteSize.Y <= 0) do
+			task.wait()
+		end
+		if not (ui and ui.Parent and graph.Parent) then return end
 
 
 		local function getPing()
-			return getNetworkPingMs() or 0
+			return getNetworkPingMs()
 		end
 
-
-
-		local function clear()
-
-			for _,obj in ipairs(graph:GetChildren()) do
-
-				if obj ~= pointTemplate
-					and obj ~= lineTemplate then
-
-					obj:Destroy()
-
-				end
-
-			end
-
-		end
 
 
 		local function createGrid()
-
 			local w = graph.AbsoluteSize.X
 			local h = graph.AbsoluteSize.Y
-
 			local steps = 4
 
-			for i=0,steps do
+			if not gridBuilt then
+				for i = 0, steps do
+					local gridLine = Instance.new("Frame")
+					gridLine.Name = "LatencyGridLine" .. tostring(i)
+					gridLine.BackgroundTransparency = 0.85
+					gridLine.BorderSizePixel = 0
+					gridLine.Parent = graph
+					gridLines[i + 1] = gridLine
 
-				local percent = i/steps
-				local y = h - (percent*h)
-
-				local gridLine = Instance.new("Frame")
-				gridLine.Size = UDim2.fromOffset(w,1)
-				gridLine.Position = UDim2.fromOffset(34,y)
-				gridLine.BackgroundTransparency = 0.85
-				gridLine.BorderSizePixel = 0
-				gridLine.Parent = graph
-
-
-				local label = Instance.new("TextLabel")
-				label.Size = UDim2.fromOffset(40,14)
-				label.Position = UDim2.fromOffset(2,y-7)
-
-				label.BackgroundTransparency = 1
-				label.TextSize = 6
-				label.TextXAlignment = Enum.TextXAlignment.Left
-				label.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-				label.Text =
-					math.floor(percent*MAX_PING)
-					.." ms"
-
-				label.TextTransparency = 0
-
-				label.Parent = graph
-
+					local label = Instance.new("TextLabel")
+					label.Name = "LatencyGridLabel" .. tostring(i)
+					label.BackgroundTransparency = 1
+					label.TextSize = 6
+					label.TextXAlignment = Enum.TextXAlignment.Left
+					label.TextColor3 = Color3.fromRGB(255, 255, 255)
+					label.TextTransparency = 0
+					label.Parent = graph
+					gridLabels[i + 1] = label
+				end
+				gridBuilt = true
 			end
 
+			for i = 0, steps do
+				local percent = i / steps
+				local y = h - (percent * h)
+				local gridLine = gridLines[i + 1]
+				local label = gridLabels[i + 1]
+				if gridLine and gridLine.Parent then
+					gridLine.Size = UDim2.fromOffset(w, 1)
+					gridLine.Position = UDim2.fromOffset(34, y)
+				end
+				if label and label.Parent then
+					label.Size = UDim2.fromOffset(40, 14)
+					label.Position = UDim2.fromOffset(2, y - 7)
+					label.Text = tostring(math.floor(percent * MAX_PING)) .. " ms"
+				end
+			end
 		end
 
 
 
 		local function draw()
-
-			clear()
+			if not (graph.Parent and graph.AbsoluteSize.X > 0 and graph.AbsoluteSize.Y > 0) then return end
 			createGrid()
 
 			local w = graph.AbsoluteSize.X
@@ -4562,7 +4551,9 @@ function syde:Init(library)
 
 			local step = w/(maxPoints-1)
 
-			local lastX,lastY
+			local lastX, lastY
+			local pointCount = #smoothHistory
+			local lineCount = math.max(0, pointCount - 1)
 
 			for i,value in ipairs(smoothHistory) do
 
@@ -4573,12 +4564,16 @@ function syde:Init(library)
 				local y = h - (percent*h)
 
 
-				local point = pointTemplate:Clone()
-				point.Visible = false
+				local point = points[i]
+				if not point then
+					point = pointTemplate:Clone()
+					point.Name = "LatencyPoint" .. tostring(i)
+					point.Parent = graph
+					points[i] = point
+				end
+				point.Visible = pointTemplate.Visible
 				point.Position = UDim2.fromOffset(x,y)
 				point.AnchorPoint = Vector2.new(0.5,0.5)
-
-				point.Parent = graph
 
 
 				if lastX then
@@ -4595,8 +4590,14 @@ function syde:Init(library)
 					local midX = (lastX + x)/2
 					local midY = (lastY + y)/2
 
-					local line = lineTemplate:Clone()
-
+					local lineIndex = i - 1
+					local line = lines[lineIndex]
+					if not line then
+						line = lineTemplate:Clone()
+						line.Name = "LatencyLine" .. tostring(lineIndex)
+						line.Parent = graph
+						lines[lineIndex] = line
+					end
 					line.Visible = true
 					line.AnchorPoint = Vector2.new(0.5,0.5)
 
@@ -4608,8 +4609,6 @@ function syde:Init(library)
 
 					line.Rotation = angle
 
-					line.Parent = graph
-
 				end
 
 
@@ -4618,39 +4617,33 @@ function syde:Init(library)
 
 			end
 
+			for i = pointCount + 1, #points do
+				if points[i] then points[i].Visible = false end
+			end
+			for i = lineCount + 1, #lines do
+				if lines[i] then lines[i].Visible = false end
+			end
 		end
 
 
 
 		task.spawn(function()
 			while ui and ui.Parent and graph.Parent do
-
 				local ping = getPing()
-				-- replace with getPing() when ready
+				if type(ping) == "number" and ping >= 0 and ping < math.huge then
+					table.insert(history, ping)
+					if #history > maxPoints then
+						table.remove(history, 1)
+					end
 
-				table.insert(history,ping)
+					for i, value in ipairs(history) do
+						local current = smoothHistory[i] or value
+						smoothHistory[i] = current + (value - current) * smoothSpeed
+					end
 
-				if #history > maxPoints then
-					table.remove(history,1)
+					draw()
 				end
-
-
-				-- smooth values
-				for i,v in ipairs(history) do
-
-					local current =
-						smoothHistory[i] or v
-
-					smoothHistory[i] =
-						current + (v-current)*smoothSpeed
-
-				end
-
-
-				draw()
-
 				task.wait(updateInterval)
-
 			end
 		end)
 
