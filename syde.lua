@@ -6470,7 +6470,7 @@ function telement:ColorPicker(ColorPicker)
 					if HUE then HUE:Disconnect() HUE = nil end
 					if recordRecent and wasDragging then AddRecentColor(data.Color) end
 				end
-				local colorDragInputConnection = userinput.InputEnded:Connect(function(input)
+				local _, disconnectColorDragInput = syde:AddConnection(userinput.InputEnded, function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						stopColorDrag(true)
 					end
@@ -6689,10 +6689,8 @@ function telement:ColorPicker(ColorPicker)
 				end)
 				colorpicker.Destroying:Connect(function()
 					stopColorDrag(false)
-					if disconnectColorFocus then disconnectColorFocus() end
-					if colorDragInputConnection and colorDragInputConnection.Connected then
-						colorDragInputConnection:Disconnect()
-					end
+					disconnectColorDragInput()
+					disconnectColorFocus()
 					linkDragging = false
 					if followMouseConnection then
 						followMouseConnection:Disconnect()
@@ -12053,7 +12051,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 				if HUE then HUE:Disconnect() HUE = nil end
 				if recordRecent and wasDragging then AddRecentColor(data.Color) end
 			end
-			local colorDragInputConnection = userinput.InputEnded:Connect(function(input)
+			local _, disconnectColorDragInput = syde:AddConnection(userinput.InputEnded, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
 					stopColorDrag(true)
 				end
@@ -12276,10 +12274,8 @@ holdLoop = runservice.RenderStepped:Connect(function()
 			end)
 			colorpicker.Destroying:Connect(function()
 				stopColorDrag(false)
-				if disconnectColorFocus then disconnectColorFocus() end
-				if colorDragInputConnection and colorDragInputConnection.Connected then
-					colorDragInputConnection:Disconnect()
-				end
+				disconnectColorDragInput()
+				disconnectColorFocus()
 				linkDragging = false
 				if followMouseConnection then
 					followMouseConnection:Disconnect()
