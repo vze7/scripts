@@ -792,6 +792,9 @@ local function scheduleConnectionCleanup()
 end
 
 function syde:AddConnection(Type, Callback)
+	if syde._destroyed then
+		error("[AddConnection] Cannot connect after Syde has been destroyed")
+	end
 	if typeof(Type) ~= "RBXScriptSignal" then
 		error("[AddConnection] Invalid Type: Expected RBXScriptSignal, got " .. typeof(Type))
 	end
@@ -3416,6 +3419,8 @@ function syde:Rejoin()
 end
 
 function syde:Destroy()
+	if self._destroyed then return false end
+	self._destroyed = true
 	if saveDebounce then
 		self:FlushConfig()
 	end
@@ -3456,6 +3461,7 @@ function syde:Destroy()
 			Library:Destroy()
 		end
 	end)
+	return true
 end
 
 function syde:DestroyLib()
