@@ -2429,6 +2429,7 @@ function syde:LoadSaveConfig(targetFile)
 		if loaded then
 			syde.ConfigFile = fileName
 			syde.ConfigFileExplicit = true
+			if syde:GetAutoLoad() then syde:SetAutoLoad(true) end
 		end
 		if loaded and syde.Toast then
 			syde:Toast({ Content = 'Loaded config ' .. fileName, Duration = 3 })
@@ -2464,6 +2465,7 @@ function syde:SaveConfigAs(name)
 	if not saved then return false end
 	syde.ConfigFile = normalizeConfigName(name)
 	syde.ConfigFileExplicit = true
+	if syde:GetAutoLoad() then syde:SetAutoLoad(true) end
 	if syde.Toast then
 		syde:Toast({ Content = 'Saved config as ' .. normalizeConfigName(name), Duration = 3 })
 	end
