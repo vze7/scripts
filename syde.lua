@@ -153,6 +153,31 @@ local function selectedChipAtPosition(scroller, input)
 	return nil
 end
 
+local function isFiniteNumber(value)
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+local function normalizeSliderOptions(options)
+	local range = options.Range
+tlocal minimum = type(range) == "table" and tonumber(range[1]) or nil
+tlocal maximum = type(range) == "table" and tonumber(range[2]) or nil
+tif not isFiniteNumber(minimum) or not isFiniteNumber(maximum) or maximum <= minimum then
+t	minimum, maximum = 0, 100
+tend
+tlocal increment = tonumber(options.Increment)
+tif not isFiniteNumber(increment) or increment <= 0 then
+t	increment = 1
+tend
+tlocal value = tonumber(options.StarterValue)
+tif not isFiniteNumber(value) then
+t	value = math.clamp(16, minimum, maximum)
+tend
+toptions.Range = {minimum, maximum}
+toptions.Increment = increment
+toptions.StarterValue = math.clamp(value, minimum, maximum)
+treturn options
+end
+
 Library.Enabled = false
 Loader.Enabled = false
 
@@ -7067,6 +7092,8 @@ function telement:Slider(Slider)
 						SettingsConfig = true;
 					}
 
+					Options = normalizeSliderOptions(Options)
+
 					Slider.Name = Options.Title
 					Slider.Title.Text = Options.Title
 					Slider.slide.Ticks.Visible = Options.ShowTicks
@@ -9473,6 +9500,9 @@ function telement:TextInput(TextInput)
 					Flag = Options.Flag;
 					ShowTicks = Options.ShowTicks == true;
 				}
+
+
+				Options = normalizeSliderOptions(Options)
 
 				Slider.Name = Options.Title
 				Slider.Title.Text = Options.Title
