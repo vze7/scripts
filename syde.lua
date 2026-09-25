@@ -12495,11 +12495,27 @@ function initelement:AddSlider(SliderConfig)
 				task.defer(refreshPlayers)
 			end)
 			local removeControl = control.remove
-			control.remove = function(self)
+			local disconnectFrameDestroying
+			local function cleanupPlayerConnections()
+				if controlRemoved then return false end
 				controlRemoved = true
 				if disconnectAdded then disconnectAdded() elseif addedConnection.Connected then addedConnection:Disconnect() end
 				if disconnectRemoving then disconnectRemoving() elseif removingConnection.Connected then removingConnection:Disconnect() end
-				if removeControl then removeControl(self) end
+				if disconnectFrameDestroying then
+					local disconnect = disconnectFrameDestroying
+					disconnectFrameDestroying = nil
+					disconnect()
+				end
+				return true
+			end
+			if control._frame then
+				local _, disconnectDestroying = syde:AddConnection(control._frame.Destroying, cleanupPlayerConnections)
+				disconnectFrameDestroying = disconnectDestroying
+			end
+			control.remove = function(self)
+				if not cleanupPlayerConnections() then return false end
+				if removeControl then return removeControl(self) end
+				return true
 			end
 			return control
 		end
