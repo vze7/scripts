@@ -1192,6 +1192,7 @@ function Bento:Bind()
 end
 
 function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
+	if self._destroyed then return false end
 	assert(typeof(Dragger) == "Instance" and Dragger:IsA("GuiObject"), "[MakeResizable] Dragger must be a GuiObject")
 	assert(typeof(Object) == "Instance" and Object:IsA("GuiObject"), "[MakeResizable] Object must be a GuiObject")
 	assert(typeof(MinSize) == "Vector2", "[MakeResizable] MinSize must be a Vector2")
@@ -1204,6 +1205,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	local activeTouch
 	local pendingSize
 	local renderConnection
+	local resizeDisconnects = {}
 	local lastAppliedSize
 	local previewGeneration = 0
 	local preview = Instance.new("Frame")
@@ -1334,16 +1336,28 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 		end
 	end
 
-	syde:AddConnection(Dragger.InputBegan, onInputBegan)
-	syde:AddConnection(userInput.InputChanged, onInputChanged)
-	syde:AddConnection(userInput.InputEnded, onInputEnded)
-	syde:AddConnection(userInput.WindowFocusReleased, function()
+	local function trackResizeConnection(signal, callback)
+		local _, disconnect = self:AddConnection(signal, callback)
+		table.insert(resizeDisconnects, disconnect)
+	end
+
+	local function cleanupResize()
+		finishResize(false)
+		for index = #resizeDisconnects, 1, -1 do
+		 tresizeDisconnects[index]()
+		 tresizeDisconnects[index] = nil
+		end
+		if preview.Parent then preview:Destroy() end
+	end
+
+	trackResizeConnection(Dragger.InputBegan, onInputBegan)
+	trackResizeConnection(userInput.InputChanged, onInputChanged)
+	trackResizeConnection(userInput.InputEnded, onInputEnded)
+	trackResizeConnection(userInput.WindowFocusReleased, function()
 		finishResize(true)
 	end)
-	Dragger.Destroying:Connect(function()
-		finishResize(false)
-		preview:Destroy()
-	end)
+	trackResizeConnection(Dragger.Destroying, cleanupResize)
+	return true
 end
 
 
