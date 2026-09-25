@@ -1217,7 +1217,7 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			preview.Size = Object.Size
 			preview.Visible = true
 			previewStroke.Transparency = 1
-			syde_tween(previewStroke, 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {Transparency = 0.2})
+			tweenservice:Create(previewStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 0.2}):Play()
 			local arrow = Dragger:FindFirstChild("ResizeArrow")
 			if arrow then arrow.TextTransparency = 0.1 end
 			renderConnection = runservice.RenderStepped:Connect(applyPendingSize)
@@ -1249,29 +1249,42 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 		end
 	end
 
-	local function onInputEnded(input)
-		if isResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-			if activeTouch and input ~= activeTouch then return end
-			if not activeTouch and input.UserInputType == Enum.UserInputType.Touch then return end
-			applyPendingSize()
-			if renderConnection then renderConnection:Disconnect() renderConnection = nil end
-			if pendingSize and Object.Size ~= pendingSize then
-				Object.Size = pendingSize
-				if Callback then Callback(Vector2.new(pendingSize.X.Offset, pendingSize.Y.Offset)) end
-			end
-			isResizing = false
-			resizing = false
-			activeTouch = nil
-			startPosition, startSize, pendingSize, lastAppliedSize = nil, nil, nil, nil
-			local generation = previewGeneration
-			syde_tween(previewStroke, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {Transparency = 1})
+	local function finishResize(commit)
+		if not isResizing then return end
+
+		local sizeToApply = pendingSize
+		local shouldNotify = commit and sizeToApply ~= nil and Object.Parent and Object.Size ~= sizeToApply
+		if shouldNotify then
+			Object.Size = sizeToApply
+		end
+		if renderConnection then
+			renderConnection:Disconnect()
+			renderConnection = nil
+		end
+		isResizing = false
+		resizing = false
+		activeTouch = nil
+		startPosition, startSize, pendingSize, lastAppliedSize = nil, nil, nil, nil
+
+		local generation = previewGeneration
+		if preview.Parent then
+			tweenservice:Create(previewStroke, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 1}):Play()
 			task.delay(0.12, function()
 				if preview.Parent and previewGeneration == generation and not isResizing then preview.Visible = false end
 			end)
-			local arrow = Dragger:FindFirstChild("ResizeArrow")
-			if arrow then arrow.TextTransparency = 0.45 end
+		end
+		local arrow = Dragger:FindFirstChild("ResizeArrow")
+		if arrow then arrow.TextTransparency = 0.45 end
+
+		if shouldNotify and Callback then
+			local ok, err = pcall(Callback, Vector2.new(sizeToApply.X.Offset, sizeToApply.Y.Offset))
+			if not ok then syde:Report("Resize callback", err) end
+		end
+		if commit and Object.Parent then
 			task.defer(function()
-				for _, page in ipairs(Library.main.pages:GetChildren()) do
+				local pages = Library and Library.main and Library.main:FindFirstChild("pages")
+				if not pages then return end
+				for _, page in ipairs(pages:GetChildren()) do
 					if page:IsA("ScrollingFrame") and page.Visible then
 						syde:updateLayout(page, 7)
 					end
@@ -1280,11 +1293,22 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 		end
 	end
 
+	local function onInputEnded(input)
+		if isResizing and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			if activeTouch and input ~= activeTouch then return end
+			if not activeTouch and input.UserInputType == Enum.UserInputType.Touch then return end
+			finishResize(true)
+		end
+	end
+
 	syde:AddConnection(Dragger.InputBegan, onInputBegan)
 	syde:AddConnection(userInput.InputChanged, onInputChanged)
 	syde:AddConnection(userInput.InputEnded, onInputEnded)
+	syde:AddConnection(userInput.WindowFocusReleased, function()
+		finishResize(true)
+	end)
 	Dragger.Destroying:Connect(function()
-		if renderConnection then renderConnection:Disconnect() end
+		finishResize(false)
 		preview:Destroy()
 	end)
 end
