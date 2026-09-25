@@ -12119,10 +12119,11 @@ function telement:TextInput(TextInput)
 			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
 			local defVal = ToggleConfig.Default
 			if defVal == nil then defVal = ToggleConfig.Value end
-			if defVal == nil then defVal = false end
+			if type(defVal) ~= "boolean" then defVal = false end
 
-			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
-				defVal = syde.LoadedConfig[flagName]
+			local savedValue = syde.LoadedConfig and syde.LoadedConfig[flagName]
+			if type(savedValue) == "boolean" then
+				defVal = savedValue
 			end
 
 			local userCb = ToggleConfig.Callback or ToggleConfig.CallBack
