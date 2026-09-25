@@ -159,23 +159,23 @@ end
 
 local function normalizeSliderOptions(options)
 	local range = options.Range
-tlocal minimum = type(range) == "table" and tonumber(range[1]) or nil
-tlocal maximum = type(range) == "table" and tonumber(range[2]) or nil
-tif not isFiniteNumber(minimum) or not isFiniteNumber(maximum) or maximum <= minimum then
-t	minimum, maximum = 0, 100
-tend
-tlocal increment = tonumber(options.Increment)
-tif not isFiniteNumber(increment) or increment <= 0 then
-t	increment = 1
-tend
-tlocal value = tonumber(options.StarterValue)
-tif not isFiniteNumber(value) then
-t	value = math.clamp(16, minimum, maximum)
-tend
-toptions.Range = {minimum, maximum}
-toptions.Increment = increment
-toptions.StarterValue = math.clamp(value, minimum, maximum)
-treturn options
+	local minimum = type(range) == "table" and tonumber(range[1]) or nil
+	local maximum = type(range) == "table" and tonumber(range[2]) or nil
+	if not isFiniteNumber(minimum) or not isFiniteNumber(maximum) or maximum <= minimum then
+		minimum, maximum = 0, 100
+	end
+	local increment = tonumber(options.Increment)
+	if not isFiniteNumber(increment) or increment <= 0 then
+		increment = 1
+	end
+	local value = tonumber(options.StarterValue)
+	if not isFiniteNumber(value) then
+		value = math.clamp(16, minimum, maximum)
+	end
+	options.Range = {minimum, maximum}
+	options.Increment = increment
+	options.StarterValue = math.clamp(value, minimum, maximum)
+	return options
 end
 
 Library.Enabled = false
