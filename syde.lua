@@ -12277,8 +12277,7 @@ function initelement:AddSlider(SliderConfig)
 			SliderConfig.Save = SliderConfig.Save ~= false
 			local origCb = SliderConfig.Callback or SliderConfig.CallBack
 			SliderConfig.Callback = function(val)
-				if origCb then origCb(val) end
-				if SliderConfig.Save then SaveConfig(game and game.GameId) end
+				if origCb then 					local ok, failure = pcall(origCb, val) 					if not ok then syde:Report("Slider ''" .. tostring(flagName) .. "'' callback", failure) end 				end 				if SliderConfig.Save then SaveConfig(game and game.GameId) end
 			end
 
 			local sliderObj = self:Slider(SliderConfig)
@@ -12302,8 +12301,7 @@ function initelement:AddSlider(SliderConfig)
 			DropdownConfig.Flag = flagName
 			DropdownConfig.Save = DropdownConfig.Save ~= false
 			DropdownConfig.Callback = function(val)
-				if userCb then userCb(val) end
-				if DropdownConfig.Save then SaveCfg(game and game.GameId) end
+				if userCb then 					local ok, failure = pcall(userCb, val) 					if not ok then syde:Report("Dropdown ''" .. tostring(flagName) .. "'' callback", failure) end 				end 				if DropdownConfig.Save then SaveCfg(game and game.GameId) end
 			end
 
 			local dropObj = self:Dropdown(DropdownConfig)
