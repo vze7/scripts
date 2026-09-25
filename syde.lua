@@ -160,6 +160,10 @@ local loaded = false
 local normalizeConfigName
 local ensureConfigFolder
 local resolveConfigPath
+local saveDebounce
+local pendingSaveName
+local configLoadGeneration = 0
+local configLoadTasks = {}
 
 local syde = {
 
@@ -185,6 +189,7 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	LoadedConfig = nil;
+	IsLoadingConfig = false;
 	UMouseMode = "PreserveCamera";
 	maxds = 500;
 	minds = 10;
@@ -2213,6 +2218,7 @@ resolveConfigPath = function(folder, name, fallbackName)
 end
 
 local function SaveCfg(Name, preserveName)
+	if syde.IsLoadingConfig then return false end
 	local gameId = tostring(game and game.GameId or "default")
 	if not preserveName and (Name == nil or tostring(Name) == gameId) then
 		Name = syde.ConfigFile or gameId
@@ -2303,83 +2309,111 @@ local function LoadCfg(Config)
 		return HttpService:JSONDecode(Config)
 	end)
 	if not ok or type(Data) ~= "table" then return false end
+	if saveDebounce then
+		pcall(task.cancel, saveDebounce)
+		saveDebounce = nil
+	end
+	pendingSaveName = nil
+	for _, thread in ipairs(configLoadTasks) do
+		pcall(task.cancel, thread)
+	end
+	table.clear(configLoadTasks)
+	configLoadGeneration += 1
+	local loadGeneration = configLoadGeneration
+	syde.IsLoadingConfig = true
 
 	syde.LoadedConfig = Data
 
 	local flagsProcessed = 0
 	local totalFlags = 0
 	for _, _ in pairs(Data) do totalFlags += 1 end
+	if totalFlags == 0 then
+		pcall(function() syde:SetTheme() end)
+		syde.IsLoadingConfig = false
+		return true
+	end
+
+	local finalizeScheduled = false
+	local function finishLoadEntry()
+		flagsProcessed += 1
+		if flagsProcessed < totalFlags or finalizeScheduled then return end
+		finalizeScheduled = true
+		task.delay(0.05, function()
+			if configLoadGeneration ~= loadGeneration then return end
+			pcall(function() syde:SetTheme() end)
+			syde.IsLoadingConfig = false
+			table.clear(configLoadTasks)
+		end)
+	end
 
 	for a, b in pairs(Data) do
 		if syde.Flags[a] then
-			task.spawn(function()
+			local thread = task.spawn(function()
+				if configLoadGeneration ~= loadGeneration then return end
 				local flag = syde.Flags[a]
-				pcall(function()
-					if flag.Type == "MultiColorpicker" then
-						if type(b) == "table" and b.R == nil then
-							for index, colorData in ipairs(b) do
-								flag:Set(index, UnpackColor(colorData))
+				if flag then
+					pcall(function()
+						if flag.Type == "MultiColorpicker" then
+							if type(b) == "table" and b.R == nil then
+								for index, colorData in ipairs(b) do
+									flag:Set(index, UnpackColor(colorData))
+								end
+							else
+								flag:Set(1, UnpackColor(b))
+							end
+						elseif flag.Type == "Colorpicker" or flag.Type == "ColorPicker" then
+							flag:Set(UnpackColor(b))
+						elseif flag.Type == "Bind" or flag.Type == "Keybind" then
+							local success, keyEnum = pcall(function()
+								return Enum.KeyCode[b] or Enum.UserInputType[b]
+							end)
+							if success and keyEnum then
+								flag:Set(keyEnum)
+							else
+								flag:Set(b)
+							end
+						elseif flag.Type == "Pbind" or (type(b) == "table" and b._type == "Pbind") then
+							if flag.Set then
+								flag:Set(b.X, b.Y, b.Z)
 							end
 						else
-							flag:Set(1, UnpackColor(b))
-						end
-					elseif flag.Type == "Colorpicker" or flag.Type == "ColorPicker" then
-						flag:Set(UnpackColor(b))
-					elseif flag.Type == "Bind" or flag.Type == "Keybind" then
-						local success, keyEnum = pcall(function()
-							return Enum.KeyCode[b] or Enum.UserInputType[b]
-						end)
-						if success and keyEnum then
-							flag:Set(keyEnum)
-						else
 							flag:Set(b)
-						end
-					elseif flag.Type == "Pbind" or (type(b) == "table" and b._type == "Pbind") then
-						if flag.Set then
-							flag:Set(b.X, b.Y, b.Z)
-						end
+							end
+					end)
+				end
+				if configLoadGeneration == loadGeneration then finishLoadEntry() end
+			end)
+			table.insert(configLoadTasks, thread)
+		elseif type(a) == "string" and a:sub(-8) == "_Rainbow" then
+			pcall(function()
+				local picker = syde.Flags[a:sub(1, -9)]
+				if picker and picker.SetRainbow then
+					if picker.Type == "MultiColorpicker" and type(b) == "table" then
+						for index, enabled in ipairs(b) do picker:SetRainbow(index, enabled == true, true) end
 					else
-						flag:Set(b)
+						picker:SetRainbow(b == true, true)
 					end
-				end)
-
-				flagsProcessed += 1
-				if flagsProcessed >= totalFlags then
-					task.wait(0.05)
-					syde:SetTheme()
 				end
 			end)
-		elseif type(a) == "string" and a:sub(-8) == "_Rainbow" then
-			local picker = syde.Flags[a:sub(1, -9)]
-			if picker and picker.SetRainbow then
-				if picker.Type == "MultiColorpicker" and type(b) == "table" then
-					for index, enabled in ipairs(b) do picker:SetRainbow(index, enabled == true, true) end
-				else
-					picker:SetRainbow(b == true, true)
-				end
-			end
-			flagsProcessed += 1
+			finishLoadEntry()
 		elseif type(a) == "string" and a:sub(-8) == "_Keybind" then
-			local toggle = syde.Flags[a:sub(1, -9)]
-			if toggle and toggle.Type == "Toggle" and toggle.SetKeybind and type(b) == "string" then
-				local key = Enum.KeyCode[b]
-				if key then toggle:SetKeybind(key, true) end
-			end
-			flagsProcessed += 1
+			pcall(function()
+				local toggle = syde.Flags[a:sub(1, -9)]
+				if toggle and toggle.Type == "Toggle" and toggle.SetKeybind and type(b) == "string" then
+					local key = Enum.KeyCode[b]
+					if key then toggle:SetKeybind(key, true) end
+				end
+			end)
+			finishLoadEntry()
 		else
-			flagsProcessed += 1
-			if flagsProcessed >= totalFlags then
-				task.wait(0.05)
-				syde:SetTheme()
-			end
+			finishLoadEntry()
 		end
 	end
 	return true
 end
 
-local saveDebounce = nil
-local pendingSaveName = nil
 function SaveConfig(Name)
+	if syde.IsLoadingConfig then return false end
 	if saveDebounce then
 		task.cancel(saveDebounce)
 	end
@@ -2393,6 +2427,7 @@ function SaveConfig(Name)
 end
 
 function syde:FlushConfig()
+	if syde.IsLoadingConfig then return false end
 	if saveDebounce then
 		task.cancel(saveDebounce)
 		saveDebounce = nil
@@ -3487,6 +3522,12 @@ end
 function syde:Destroy()
 	if self._destroyed then return false end
 	self._destroyed = true
+	configLoadGeneration += 1
+	syde.IsLoadingConfig = false
+	for _, thread in ipairs(configLoadTasks) do
+		pcall(task.cancel, thread)
+	end
+	table.clear(configLoadTasks)
 	if saveDebounce then
 		self:FlushConfig()
 	end
