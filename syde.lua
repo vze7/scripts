@@ -2665,8 +2665,10 @@ end
 
 local function updateLayout()
 	if uiclosed then return end
-	local mobile = userinput.TouchEnabled
-	applyLayout(mobile)
+	if not camera then return end
+	screenSize = camera.ViewportSize
+	isMobile = userinput.TouchEnabled or (screenSize.X < 1024 and screenSize.Y < 768)
+	applyLayout(isMobile)
 end
 
 --@@Notification
@@ -4530,8 +4532,8 @@ function syde:Init(library)
 
 		update()
 
-		Players.PlayerAdded:Connect(update)
-		Players.PlayerRemoving:Connect(update)
+		syde:AddConnection(Players.PlayerAdded, update)
+		syde:AddConnection(Players.PlayerRemoving, update)
 		
 		local QuickPlay = window.pages.home.general.Quick.QuickPlay
 
@@ -7976,8 +7978,6 @@ function telement:TextInput(TextInput)
 		})
 
 
-		local startTime = tick()
-
 		local uptimeParagraph = c:Paragraph({
 			Title = 'Session UpTime',
 			Content = 'Calculating...'
@@ -8005,16 +8005,26 @@ function telement:TextInput(TextInput)
 	end
 
 
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-		screenSize = workspace.CurrentCamera.ViewportSize
-		isMobile = userinput.TouchEnabled
+	local cameraViewportDisconnect
+	local function attachCurrentCamera()
+		if cameraViewportDisconnect then
+			cameraViewportDisconnect()
+			cameraViewportDisconnect = nil
+		end
+		camera = workspace.CurrentCamera
+		if camera then
+			local _, disconnectViewport = syde:AddConnection(
+				camera:GetPropertyChangedSignal("ViewportSize"),
+				updateLayout
+			)
+			cameraViewportDisconnect = disconnectViewport
+		end
 		updateLayout()
-	end)
+	end
 
-	updateLayout()
-
-	camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayout)
-	userinput:GetPropertyChangedSignal("TouchEnabled"):Connect(updateLayout)
+	syde:AddConnection(workspace:GetPropertyChangedSignal("CurrentCamera"), attachCurrentCamera)
+	syde:AddConnection(userinput:GetPropertyChangedSignal("TouchEnabled"), updateLayout)
+	attachCurrentCamera()
 
 	--@@Tabs
 	local tbdata = {
