@@ -3508,6 +3508,25 @@ function syde:CreateWindow(WindowConfig)
 	return self:MakeWindow(WindowConfig)
 end
 
+local function cancelRejoin(self, expectedState)
+	local state = self._rejoinState
+	if expectedState and state ~= expectedState then return false end
+	if state then
+		state.active = false
+		if state.connection and state.connection.Connected then
+			state.connection:Disconnect()
+		end
+		state.connection = nil
+		for thread in pairs(state.tasks) do
+			pcall(task.cancel, thread)
+		end
+		table.clear(state.tasks)
+		self._rejoinState = nil
+	end
+	self._rejoining = false
+	return true
+end
+
 function syde:Rejoin()
 	if self._destroyed or self._rejoining then return false end
 	local localPlayer = player.LocalPlayer
@@ -3589,6 +3608,7 @@ function syde:Destroy()
 		self:FlushConfig()
 	end
 	self._destroyed = true
+	cancelRejoin(self)
 	configLoadGeneration += 1
 	syde.IsLoadingConfig = false
 	for _, thread in ipairs(configLoadTasks) do
