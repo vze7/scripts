@@ -9171,19 +9171,7 @@ function telement:TextInput(TextInput)
 			UpdateToggleUI(data.V)
 
 			toggle.interact.MouseButton1Click:Connect(function()
-				data.V = not data.V
-				data.Value = data.V
-				UpdateToggleUI(data.V)
-
-				local success, errorMsg = pcall(function()
-					if data.CallBack then
-						data.CallBack(data.V)
-					end
-				end)
-
-				if not success then
-					syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
-				end
+				data:Set(not data.V)
 			end)
 
 			--[DESC]
@@ -9425,22 +9413,7 @@ function telement:TextInput(TextInput)
 				end
 			end)
 
-			function data:Set(NewValue, skipSave)
-				data.V = NewValue
-				data.Value = NewValue
-				UpdateToggleUI(NewValue)
-
-				if data.CallBack then
-					local success, errorMsg = pcall(function()
-						data.CallBack(data.V)
-					end)
-					if not success then
-						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg)
-					end
-			end
-			end
-
-			data.Value = data.V
+			function data:Set(NewValue, skipSave) 				if type(NewValue) ~= "boolean" then return false end 				data.V = NewValue 				data.Value = NewValue 				UpdateToggleUI(NewValue)  				if data.CallBack then 					local success, errorMsg = pcall(function() 						data.CallBack(data.V) 					end) 					if not success then 						syde:Report("Toggle '" .. toggle.Name .. "' callback", errorMsg) 					end 				end 				if not skipSave and data.Save ~= false and data.Flag then 					SaveConfig(game and game.GameId) 				end 				return true 			end 			data.Value = data.V
 			data._frame = toggle
 			data.toggle = function(self) if self._frame and self._frame.Parent then self._frame.Visible = not self._frame.Visible end end
 			data.remove = function(self) if self._frame and self._frame.Parent then self._frame:Destroy() end end
