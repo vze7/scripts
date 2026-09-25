@@ -771,6 +771,22 @@ function syde:HidePH(instance, placeholder, recursive)
 	end
 end
 
+local connectionCleanupTask
+local function scheduleConnectionCleanup()
+	if connectionCleanupTask or #syde.Connections == 0 then return end
+	connectionCleanupTask = task.delay(10, function()
+		connectionCleanupTask = nil
+		for i = #syde.Connections, 1, -1 do
+			local connectionData = syde.Connections[i]
+			local connection = connectionData and (connectionData.Connection or connectionData)
+			if not connection or not connection.Connected then
+				table.remove(syde.Connections, i)
+			end
+		end
+		scheduleConnectionCleanup()
+	end)
+end
+
 function syde:AddConnection(Type, Callback)
 	if typeof(Type) ~= "RBXScriptSignal" then
 		error("[AddConnection] Invalid Type: Expected RBXScriptSignal, got " .. typeof(Type))
@@ -784,6 +800,7 @@ function syde:AddConnection(Type, Callback)
 
 	syde.Connections = syde.Connections or {}
 	table.insert(syde.Connections, ConnectionData)
+	scheduleConnectionCleanup()
 
 	local function Disconnect()
 		if Connection.Connected then
@@ -797,15 +814,6 @@ function syde:AddConnection(Type, Callback)
 			end
 		end
 	end
-
-	task.spawn(function()
-		task.wait(10)
-		for i = #syde.Connections, 1, -1 do
-			if not syde.Connections[i].Connection.Connected then
-				table.remove(syde.Connections, i)
-			end
-		end
-	end)
 
 	return Connection, Disconnect
 end
@@ -3378,6 +3386,10 @@ end
 function syde:Destroy()
 	if saveDebounce then
 		self:FlushConfig()
+	end
+	if connectionCleanupTask then
+		task.cancel(connectionCleanupTask)
+		connectionCleanupTask = nil
 	end
 	setBackgroundBlur(false)
 	if rs and rs.Connected then rs:Disconnect() end
