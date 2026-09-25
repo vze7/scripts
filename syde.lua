@@ -2151,10 +2151,15 @@ local function SaveCfg(Name)
 			if v.Type == "MultiColorpicker" then
 				if v.Pickers and #v.Pickers > 0 then
 					local colorList = {}
+					local rainbowList = {}
+					local hasRainbow = false
 					for index, picker in ipairs(v.Pickers) do
 						colorList[index] = PackColor(picker.Value)
+						rainbowList[index] = picker.Control and picker.Control.Rainbow == true or false
+						hasRainbow = hasRainbow or rainbowList[index]
 					end
 					Data[i] = colorList
+					if hasRainbow then Data[i .. "_Rainbow"] = rainbowList end
 				end
 			elseif v.Type == "Colorpicker" or v.Type == "ColorPicker" then
 				if v.SetRainbow then Data[i .. "_Rainbow"] = v.Rainbow == true end
@@ -2259,7 +2264,13 @@ local function LoadCfg(Config)
 			end)
 		elseif type(a) == "string" and a:sub(-8) == "_Rainbow" then
 			local picker = syde.Flags[a:sub(1, -9)]
-			if picker and picker.SetRainbow then picker:SetRainbow(b == true, true) end
+			if picker and picker.SetRainbow then
+				if picker.Type == "MultiColorpicker" and type(b) == "table" then
+					for index, enabled in ipairs(b) do picker:SetRainbow(index, enabled == true, true) end
+				else
+					picker:SetRainbow(b == true, true)
+				end
+			end
 			flagsProcessed += 1
 		elseif type(a) == "string" and a:sub(-8) == "_Keybind" then
 			local toggle = syde.Flags[a:sub(1, -9)]
@@ -6451,6 +6462,7 @@ function telement:Dropdown(Dropdown)
 				local function UpdateSelectedText()
 					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 					local placeholderText = dropdown.dropholder.drop.selected
+					data.Value = data.Multi and table.clone(SelectedOrder) or SelectedOrder[1] or data.StarterOption
 					selectedContainer.Visible = data.Multi
 					dropdown.dropholder.drop.selected.Visible = false
 
@@ -6472,6 +6484,11 @@ function telement:Dropdown(Dropdown)
 								optionGroup.Visible = true
 								optionGroup.Name = option
 								optionGroup.TextLabel.Text = option
+								local removeButton = optionGroup:FindFirstChild("X")
+								if removeButton and removeButton:IsA("GuiButton") then
+									removeButton.ZIndex = headerHitbox.ZIndex + 1
+									removeButton.Active = true
+								end
 
 								-- Set up remove button
 								removeChipCallbacks[option] = function()
@@ -6576,11 +6593,19 @@ function telement:Dropdown(Dropdown)
 						option.Interact.Position = UDim2.fromOffset(0, 0)
 						option.Interact.ZIndex = option.ZIndex + 2
 
-						if OptionText == data.StarterOption and not starterSet then
+						local isStarter = data.StarterOption == OptionText
+						if data.Multi and type(data.StarterOption) == "table" then
+							isStarter = table.find(data.StarterOption, OptionText) ~= nil
+						end
+						if isStarter and (data.Multi or not starterSet) then
 							starterSet = true
 							dropdown.dropholder.drop.selected.Text = OptionText
-							SelectedOptions = {[OptionText] = true}
-							SelectedOrder = {OptionText}
+							if data.Multi then
+								AddToSelected(OptionText)
+							else
+								SelectedOptions = {[OptionText] = true}
+								SelectedOrder = {OptionText}
+							end
 
 							syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
 							syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
@@ -6597,6 +6622,7 @@ function telement:Dropdown(Dropdown)
 									syde_tween(option, 0.3, {BackgroundColor3 = Color3.fromRGB(39, 39, 39)})
 									syde_tween(option.ImageLabel, 0.3, {ImageTransparency = 0})
 								end
+								data.Value = table.clone(SelectedOrder)
 
 								if data.CallBack then
 									data.CallBack(SelectedOrder)
@@ -6606,6 +6632,7 @@ function telement:Dropdown(Dropdown)
 
 								SelectedOptions = {[OptionText] = true}
 								SelectedOrder = {OptionText}
+								data.Value = OptionText
 
 								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
 									if opt:IsA("Frame") then
@@ -6635,13 +6662,14 @@ function telement:Dropdown(Dropdown)
 						dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 					end
 
+					UpdateSelectedText()
 					UpdateCustomLayout()
 				end
 
 				SetDropdownOptions()
 
 				function data:GetSelected()
-					return SelectedOrder[1]
+					return data.Multi and table.clone(SelectedOrder) or SelectedOrder[1]
 				end
 
 				function data:SetOptions(newOptions, starter)
@@ -12174,6 +12202,114 @@ function initelement:AddButton(ButtonConfig)
 			syde.Flags[flagName] = pickerData
 			return pickerData
 		end
+
+		initelement.AddColorPicker = initelement.AddColorpicker
+
+		function initelement:AddMultiColorpicker(config)
+			config = config or {}
+			local name = config.Name or config.Title or "Multi Color Picker"
+			local flagName = config.Flag or name
+			local entries = config.Pickers or config.Colors or {}
+			if type(entries) ~= "table" then entries = {} end
+			local callback = config.Callback or config.CallBack or function() end
+			local savedColors = syde.LoadedConfig and syde.LoadedConfig[flagName]
+			local savedRainbow = syde.LoadedConfig and syde.LoadedConfig[flagName .. "_Rainbow"]
+			local values = {}
+			local pickerData = {
+				Type = "MultiColorpicker",
+				Name = name,
+				Flag = flagName,
+				Pickers = {},
+				Value = values,
+				Save = config.Save ~= false,
+			}
+			local suppressCallback = true
+
+			local function snapshot()
+				local result = {}
+				for index, picker in ipairs(pickerData.Pickers) do
+					result[index] = picker.Value
+				end
+				return result
+			end
+
+			for index, entry in ipairs(entries) do
+				local entryConfig = type(entry) == "table" and entry or {Name = tostring(entry)}
+				local entryName = entryConfig.Name or entryConfig.Title or ("Color " .. tostring(index))
+				local default = entryConfig.Default or entryConfig.Color
+				if type(config.Default) == "table" then default = config.Default[index] or default end
+				if type(savedColors) == "table" and savedColors.R == nil and savedColors[index] ~= nil then
+					default = UnpackColor(savedColors[index])
+				end
+				default = default or Color3.fromRGB(255, 255, 255)
+
+				local slot = {Value = default}
+				pickerData.Pickers[index] = slot
+				local childFlag = flagName .. "__Color_" .. tostring(index)
+				local control = self:ColorPicker({
+					Title = tostring(name) .. " · " .. tostring(entryName),
+					Color = default,
+					Flag = childFlag,
+					Save = false,
+					CallBack = function(color)
+						slot.Value = color
+						values[index] = color
+						if not suppressCallback then
+							callback(index, color, snapshot())
+							if pickerData.Save and not syde._rainbowUpdating then SaveCfg(game and game.GameId) end
+						end
+					end,
+				})
+				slot.Control = control
+				slot.Value = control.Color or default
+				values[index] = slot.Value
+				if syde.Flags[childFlag] == control then syde.Flags[childFlag] = nil end
+				if type(savedRainbow) == "table" and savedRainbow[index] == true and control.SetRainbow then
+					control:SetRainbow(true, true)
+				end
+			end
+
+			suppressCallback = false
+			pickerData.Set = function(_, index, color)
+				local slot = pickerData.Pickers[index]
+				if not slot or not slot.Control then return false end
+				if type(color) == "table" then color = UnpackColor(color) end
+				if typeof(color) ~= "Color3" then return false end
+				suppressCallback = true
+				slot.Control:Set(color, true)
+				slot.Value = color
+				values[index] = color
+				suppressCallback = false
+				if pickerData.Save then SaveCfg(game and game.GameId) end
+				return true
+			end
+			pickerData.SetRainbow = function(_, index, enabled, skipSave)
+				local slot = pickerData.Pickers[index]
+				if not slot or not slot.Control or not slot.Control.SetRainbow then return false end
+				slot.Control:SetRainbow(enabled == true, true)
+				if not skipSave and pickerData.Save then SaveCfg(game and game.GameId) end
+				return true
+			end
+			pickerData.GetValues = snapshot
+			pickerData.remove = function()
+				for _, slot in ipairs(pickerData.Pickers) do
+					if slot.Control and slot.Control.remove then slot.Control:remove() end
+				end
+				if syde.Flags[flagName] == pickerData then syde.Flags[flagName] = nil end
+			end
+			pickerData.toggle = function()
+				local first = pickerData.Pickers[1] and pickerData.Pickers[1].Control
+				local visible = first and first._frame and first._frame.Visible or false
+				for _, slot in ipairs(pickerData.Pickers) do
+					local frame = slot.Control and slot.Control._frame
+					if frame then frame.Visible = not visible end
+				end
+			end
+			if pickerData.Save then syde.Flags[flagName] = pickerData end
+			return pickerData
+		end
+
+		initelement.AddMultiColorPicker = initelement.AddMultiColorpicker
 
 		function initelement:ColorLabel(Text, ToChangeColor, Position)
 			local Label = pages.page.Label:Clone()
