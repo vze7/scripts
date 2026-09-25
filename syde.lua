@@ -5347,6 +5347,9 @@ function telement:Toggle(Toggle)
 
 					local State = false
 					local captureConnection
+					local outsideClickDisconnect
+					local configPositionConnection
+					local toggleKeybindDisconnect
 
 					local enterTween = TweenInfo.new(0.5, Enum.EasingStyle.Exponential)
 
@@ -5376,6 +5379,14 @@ function telement:Toggle(Toggle)
 
 					local function ToggleConfigClose()
 						State = false
+						if configPositionConnection then
+							configPositionConnection:Disconnect()
+							configPositionConnection = nil
+						end
+						if outsideClickDisconnect then
+							outsideClickDisconnect()
+							outsideClickDisconnect = nil
+						end
 						if captureConnection then
 							captureConnection:Disconnect()
 							captureConnection = nil
@@ -5393,28 +5404,54 @@ function telement:Toggle(Toggle)
 						--	tweenservice:Create(toggleConfiguration.shadow.ImageLabel, enterTween, { ImageTransparency = 1 }):Play()
 						task.wait(0.5)
 
-						toggleConfiguration.Visible = false
+						if not State then toggleConfiguration.Visible = false end
 
 					end
 
-					local TogService
-					local heldKeys = {} 
 					local debounce1 = false
+					local function updateConfigPosition()
+						if not toggle.configure.Parent then return end
+						toggleConfiguration.Position = UDim2.new(
+							0, toggle.configure.AbsolutePosition.X - 190,
+							0, toggle.configure.AbsolutePosition.Y + toggle.configure.AbsoluteSize.Y + 65
+						)
+					end
+					toggle.Destroying:Connect(function()
+						if configPositionConnection and configPositionConnection.Connected then
+							configPositionConnection:Disconnect()
+						end
+						if captureConnection then captureConnection:Disconnect(); captureConnection = nil end
+						if outsideClickDisconnect then outsideClickDisconnect(); outsideClickDisconnect = nil end
+						if toggleKeybindDisconnect then toggleKeybindDisconnect(); toggleKeybindDisconnect = nil end
+						if toggleConfiguration.Parent then toggleConfiguration:Destroy() end
+					end)
 
 					local function ToggleConfig()
 						if debounce1 then return end
 						debounce1 = true
 
 						if not toggleConfiguration.Visible then
-							TogService = runservice.RenderStepped:Connect(function()
-								toggleConfiguration:TweenPosition(UDim2.new(0,toggle.configure.AbsolutePosition.X - 190,0,toggle.configure.AbsolutePosition.Y + toggle.configure.AbsoluteSize.Y + 65), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
-								if not toggleConfiguration.Visible then
-									TogService:Disconnect()
-								end
-							end)
+							updateConfigPosition()
+							configPositionConnection = toggle.configure:GetPropertyChangedSignal("AbsolutePosition"):Connect(updateConfigPosition)
 							ToggleConfigOpen()
+							local _, disconnect = syde:AddConnection(userinput.InputBegan, function(input)
+								if not State or (input.UserInputType ~= Enum.UserInputType.MouseButton1
+									and input.UserInputType ~= Enum.UserInputType.Touch) then return end
+								local position = Vector2.new(input.Position.X, input.Position.Y)
+								local function inside(gui)
+									local origin, size = gui.AbsolutePosition, gui.AbsoluteSize
+									return position.X >= origin.X and position.X <= origin.X + size.X
+										and position.Y >= origin.Y and position.Y <= origin.Y + size.Y
+								end
+								if inside(toggleConfiguration) or inside(toggle.configure) then return end
+								task.spawn(ToggleConfigClose)
+							end)
+							outsideClickDisconnect = disconnect
 						else
-							if TogService then TogService:Disconnect() end
+							if configPositionConnection then
+								configPositionConnection:Disconnect()
+								configPositionConnection = nil
+							end
 							ToggleConfigClose()
 						end
 
@@ -5479,11 +5516,12 @@ function telement:Toggle(Toggle)
 						end)
 					end)
 
-					syde:AddConnection(userinput.InputBegan, function(input, processed)
+					local _, disconnectToggleKeybind = syde:AddConnection(userinput.InputBegan, function(input, processed)
 						if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
 							data:Set(not data.V)
 						end
 					end)
+					toggleKeybindDisconnect = disconnectToggleKeybind
 
 					local debounce2 = false
 
@@ -9321,6 +9359,9 @@ function telement:TextInput(TextInput)
 
 				local State = false
 				local captureConnection
+				local outsideClickDisconnect
+				local configPositionConnection
+				local toggleKeybindDisconnect
 
 				local enterTween = TweenInfo.new(0.5, Enum.EasingStyle.Exponential)
 
@@ -9350,17 +9391,19 @@ function telement:TextInput(TextInput)
 
 				local function ToggleConfigClose()
 						State = false
+						if configPositionConnection then
+							configPositionConnection:Disconnect()
+							configPositionConnection = nil
+						end
+						if outsideClickDisconnect then
+							outsideClickDisconnect()
+							outsideClickDisconnect = nil
+						end
 						if captureConnection then
 							captureConnection:Disconnect()
 							captureConnection = nil
 							toggleConfiguration.Container.KeyBind.Bind.v.Text = data.Keybind and data.Keybind.Name or "None"
 						end
-					if captureConnection then
-						captureConnection:Disconnect()
-						captureConnection = nil
-						toggleConfiguration.Container.KeyBind.Bind.v.Text = data.Keybind and data.Keybind.Name or "None"
-					end
-
 					tweenservice:Create(toggleConfiguration, enterTween, { BackgroundTransparency = 1 }):Play()
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Title, enterTween, { TextTransparency = 1 }):Play()
 					tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind, enterTween, { BackgroundTransparency = 1 }):Play()
@@ -9376,24 +9419,50 @@ function telement:TextInput(TextInput)
 
 				end
 
-				local TogService
-				local heldKeys = {} 
 				local debounce1 = false
+				local function updateConfigPosition()
+					if not toggle.configure.Parent then return end
+					toggleConfiguration.Position = UDim2.new(
+						0, toggle.configure.AbsolutePosition.X - 190,
+						0, toggle.configure.AbsolutePosition.Y + toggle.configure.AbsoluteSize.Y + 65
+					)
+				end
+				toggle.Destroying:Connect(function()
+					if configPositionConnection and configPositionConnection.Connected then
+						configPositionConnection:Disconnect()
+					end
+					if captureConnection then captureConnection:Disconnect(); captureConnection = nil end
+					if outsideClickDisconnect then outsideClickDisconnect(); outsideClickDisconnect = nil end
+					if toggleKeybindDisconnect then toggleKeybindDisconnect(); toggleKeybindDisconnect = nil end
+					if toggleConfiguration.Parent then toggleConfiguration:Destroy() end
+				end)
 
 				local function ToggleConfig()
 					if debounce1 then return end
 					debounce1 = true
 
 					if not toggleConfiguration.Visible then
-						TogService = runservice.RenderStepped:Connect(function()
-							toggleConfiguration:TweenPosition(UDim2.new(0,toggle.configure.AbsolutePosition.X - 190,0,toggle.configure.AbsolutePosition.Y + toggle.configure.AbsoluteSize.Y + 65), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
-							if not toggleConfiguration.Visible then
-								TogService:Disconnect()
-							end
-						end)
+						updateConfigPosition()
+						configPositionConnection = toggle.configure:GetPropertyChangedSignal("AbsolutePosition"):Connect(updateConfigPosition)
 						ToggleConfigOpen()
+						local _, disconnect = syde:AddConnection(userinput.InputBegan, function(input)
+							if not State or (input.UserInputType ~= Enum.UserInputType.MouseButton1
+								and input.UserInputType ~= Enum.UserInputType.Touch) then return end
+							local position = Vector2.new(input.Position.X, input.Position.Y)
+							local function inside(gui)
+								local origin, size = gui.AbsolutePosition, gui.AbsoluteSize
+								return position.X >= origin.X and position.X <= origin.X + size.X
+									and position.Y >= origin.Y and position.Y <= origin.Y + size.Y
+							end
+							if inside(toggleConfiguration) or inside(toggle.configure) then return end
+							task.spawn(ToggleConfigClose)
+						end)
+						outsideClickDisconnect = disconnect
 					else
-						if TogService then TogService:Disconnect() end
+						if configPositionConnection then
+							configPositionConnection:Disconnect()
+							configPositionConnection = nil
+						end
 						ToggleConfigClose()
 					end
 
@@ -9404,20 +9473,6 @@ function telement:TextInput(TextInput)
 
 				toggle.configure.MouseButton1Click:Connect(function()
 					ToggleConfig()
-				end)
-
-				syde:AddConnection(userinput.InputBegan, function(input)
-					if not State or (input.UserInputType ~= Enum.UserInputType.MouseButton1
-						and input.UserInputType ~= Enum.UserInputType.Touch) then return end
-					local position = Vector2.new(input.Position.X, input.Position.Y)
-					local function inside(gui)
-						local origin, size = gui.AbsolutePosition, gui.AbsoluteSize
-						return position.X >= origin.X and position.X <= origin.X + size.X
-							and position.Y >= origin.Y and position.Y <= origin.Y + size.Y
-					end
-					if inside(toggleConfiguration) or inside(toggle.configure) then return end
-					if TogService then TogService:Disconnect() TogService = nil end
-					task.spawn(ToggleConfigClose)
 				end)
 
 				local function ResizeBindFrame()
@@ -9471,11 +9526,12 @@ function telement:TextInput(TextInput)
 					end)
 				end)
 
-				syde:AddConnection(userinput.InputBegan, function(input)
+				local _, disconnectToggleKeybind = syde:AddConnection(userinput.InputBegan, function(input)
 					if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
 						data:Set(not data.V)
 					end
 				end)
+				toggleKeybindDisconnect = disconnectToggleKeybind
 
 				local debounce2 = false
 
