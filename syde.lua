@@ -4188,6 +4188,19 @@ function syde:Init(library)
 				connection = nil,
 			}
 		end
+		local rainbowState = RainbowStates[v]
+		local function stopRainbowAnimation()
+			if rainbowState and rainbowState.connection then
+				rainbowState.connection:Disconnect()
+				rainbowState.connection = nil
+			end
+		end
+		if rainbowState then
+			v.Destroying:Connect(function()
+				stopRainbowAnimation()
+				RainbowStates[v] = nil
+			end)
+		end
 
 		v.MouseEnter:Connect(function()
 			if not uiclosed then
@@ -4203,10 +4216,14 @@ function syde:Init(library)
 
 			if v.Name == "plugins" and gradient then
 				syde_tween(v.rainbow, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 0 })
-				local state = RainbowStates[v]
-				if state.connection then return end
+				local state = rainbowState
+				if not state or state.connection then return end
 
 				state.connection = RunService.RenderStepped:Connect(function(dt)
+					if syde._destroyed or uiclosed or not v.Parent or not gradient.Parent then
+						stopRainbowAnimation()
+						return
+					end
 					state.hue = (state.hue + dt * 0.6) % 1
 
 					gradient.Color = ColorSequence.new({
@@ -4237,11 +4254,7 @@ function syde:Init(library)
 
 			if v.Name == "plugins" then
 				syde_tween(v.rainbow, 0.5, Enum.EasingStyle.Exponential, { ImageTransparency = 1 })
-				local state = RainbowStates[v]
-				if state and state.connection then
-					state.connection:Disconnect()
-					state.connection = nil
-				end
+				stopRainbowAnimation()
 
 			end
 		end)
