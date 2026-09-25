@@ -6263,7 +6263,11 @@ function telement:ColorPicker(ColorPicker)
 						syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(62, 62, 62)})
 						syde:SaveThemeCfg()
 					end
-					if not skipSave then SaveConfig(game and game.GameId) end
+					if not skipSave then
+						syde.LoadedConfig = syde.LoadedConfig or {}
+						if data.Flag then syde.LoadedConfig[data.Flag .. "_Rainbow"] = enabled end
+						SaveCfg(game and game.GameId)
+					end
 				end
 
 				function data:SetRainbow(enabled, skipSave)
@@ -11587,7 +11591,11 @@ function telement:TextInput(TextInput)
 					end
 					syde_tween(colorpicker.color.Values.Rainbow, 0.5, Enum.EasingStyle.Exponential , {ImageColor3 = Color3.fromRGB(62, 62, 62)})
 				end
-				if not skipSave then SaveConfig(game and game.GameId) end
+				if not skipSave then
+					syde.LoadedConfig = syde.LoadedConfig or {}
+					if data.Flag then syde.LoadedConfig[data.Flag .. "_Rainbow"] = enabled end
+					SaveCfg(game and game.GameId)
+				end
 			end
 
 			function data:SetRainbow(enabled, skipSave)
