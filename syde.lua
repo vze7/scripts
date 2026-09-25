@@ -5043,6 +5043,7 @@ function telement:Toggle(Toggle)
 				if data.Config then
 
 					local State = false
+					local captureConnection
 
 					local enterTween = TweenInfo.new(0.5, Enum.EasingStyle.Exponential)
 
@@ -5072,6 +5073,11 @@ function telement:Toggle(Toggle)
 
 					local function ToggleConfigClose()
 						State = false
+						if captureConnection then
+							captureConnection:Disconnect()
+							captureConnection = nil
+							toggleConfiguration.Container.KeyBind.Bind.v.Text = data.Keybind and data.Keybind.Name or "None"
+						end
 
 						tweenservice:Create(toggleConfiguration, enterTween, { BackgroundTransparency = 1 }):Play()
 						tweenservice:Create(toggleConfiguration.Container.KeyBind.Title, enterTween, { TextTransparency = 1 }):Play()
@@ -5122,7 +5128,7 @@ function telement:Toggle(Toggle)
 						syde_tween(toggleConfiguration.Container.KeyBind.Bind, 0.5, Enum.EasingStyle.Quint, { Size = UDim2.new(0, toggleConfiguration.Container.KeyBind.Bind.v.TextBounds.X + 20,0, 25) })
 					end
 
-					local function setKeybind(key)
+					local function setKeybind(key, skipSave)
 						if not key then
 							toggleConfiguration.Container.KeyBind.Bind.v.Text = 'None'
 							ResizeBindFrame()
@@ -5131,27 +5137,46 @@ function telement:Toggle(Toggle)
 							data.Keybind = key
 							data.KeybindReady = false
 
-							syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
+							tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 							toggleConfiguration.Container.KeyBind.Bind.v.Text = key.Name
-							syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 1, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+							tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 							ResizeBindFrame()
 
 							task.delay(0.5, function()
 								data.KeybindReady = true
 							end)
 						end
+						if not skipSave and data.Flag and data.Save ~= false then
+							if type(syde.AutoSave) == "function" then
+								local saved = syde:AutoSave()
+								if not saved then warn("[Syde Config] Could not save keybind for " .. tostring(data.Flag)) end
+							else
+								SaveConfig(game and game.GameId)
+							end
+						end
 					end
+					data.SetKeybind = function(_, key, skipSave) return setKeybind(key, skipSave) end
 
 					toggleConfiguration.Container.KeyBind.Interact.MouseButton1Click:Connect(function()
-						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
+						if captureConnection then captureConnection:Disconnect() end
+						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 						task.wait(0.2)
 						toggleConfiguration.Container.KeyBind.Bind.v.Text = "..."
-						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 						ResizeBindFrame()
 
 
-						local connection
-						connection = userinput.InputBegan:Connect(function(input, processed)
+						captureConnection = syde:AddConnection(userinput.InputBegan, function(input, processed)
+							if not userinput:GetFocusedTextBox() and syde:IsBindableInput(input)
+								and input.KeyCode ~= Enum.KeyCode.Unknown then
+								setKeybind(input.KeyCode)
+								captureConnection:Disconnect()
+								captureConnection = nil
+							end
+						end)
+					end)
+
+					userinput.InputBegan:Connect(function(input, processed)
 							if not userinput:GetFocusedTextBox() and syde:IsBindableInput(input) then
 								setKeybind(input.KeyCode)
 								connection:Disconnect()
@@ -5241,6 +5266,9 @@ function telement:Toggle(Toggle)
 				data.Flag = flagKey
 				if flagKey then
 					syde.Flags[flagKey] = data
+					local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[flagKey .. "_Keybind"]
+					local key = type(savedKeybind) == "string" and Enum.KeyCode[savedKeybind]
+					if data.Config and key and data.SetKeybind then data:SetKeybind(key, true) end
 				end
 				if data.SFlag then
 					syde.SettingsFlags[data.SFlag] = data
@@ -8868,7 +8896,12 @@ function telement:TextInput(TextInput)
 				end
 
 				local function ToggleConfigClose()
-					State = false
+						State = false
+						if captureConnection then
+							captureConnection:Disconnect()
+							captureConnection = nil
+							toggleConfiguration.Container.KeyBind.Bind.v.Text = data.Keybind and data.Keybind.Name or "None"
+						end
 					if captureConnection then
 						captureConnection:Disconnect()
 						captureConnection = nil
@@ -8947,16 +8980,23 @@ function telement:TextInput(TextInput)
 						data.Keybind = key
 						data.KeybindReady = false
 
-						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 0.25, Enum.EasingStyle.Exponential, { TextTransparency = 1 })
+						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 						toggleConfiguration.Container.KeyBind.Bind.v.Text = key.Name
-						syde_tween(toggleConfiguration.Container.KeyBind.Bind.v, 1, Enum.EasingStyle.Exponential, { TextTransparency = 0 })
+						tweenservice:Create(toggleConfiguration.Container.KeyBind.Bind.v, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 						ResizeBindFrame()
 
 						task.delay(0.5, function()
 							data.KeybindReady = true
 						end)
 					end
-					if not skipSave and data.Flag and data.Save ~= false then SaveConfig(game and game.GameId) end
+					if not skipSave and data.Flag and data.Save ~= false then
+						if type(syde.AutoSave) == "function" then
+							local saved = syde:AutoSave()
+							if not saved then warn("[Syde Config] Could not save keybind for " .. tostring(data.Flag)) end
+						else
+							SaveConfig(game and game.GameId)
+						end
+					end
 				end
 				data.SetKeybind = function(_, key, skipSave) setKeybind(key, skipSave) end
 
