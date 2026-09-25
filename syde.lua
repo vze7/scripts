@@ -5552,6 +5552,25 @@ function telement:Keybind(Keybind)
 				KeyBind.Bind.v.Text = data.Key and (typeof(data.Key) == "EnumItem" and data.Key.Name or tostring(data.Key)) or "NONE"
 				syde_tween(KeyBind.Bind, 0.55, Enum.EasingStyle.Quint , {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)})
 
+				local holdConnection
+				local holdLoop
+				local function stopHold()
+					local wasActive = data.Hold or holdLoop ~= nil
+					data.Hold = false
+					if holdConnection then
+						holdConnection:Disconnect()
+						holdConnection = nil
+					end
+					if holdLoop then
+						holdLoop:Disconnect()
+						holdLoop = nil
+					end
+					if data.Holding and wasActive then pcall(data.CallBack, false) end
+				end
+				KeyBind.Destroying:Connect(function()
+					data.WaitingForKey = false
+					stopHold()
+				end)
 				KeyBind.interact.MouseButton1Click:Connect(function()
 					KeyBind.Bind.v.Text = '...'
 					syde_tween(KeyBind.Bind.UIStroke, 0.25, Enum.EasingStyle.Quart, {Thickness = 1})
@@ -5563,6 +5582,7 @@ function telement:Keybind(Keybind)
 				end)
 
 				local function SetKeybind(keyCode)
+					if data.Hold then stopHold() end
 					if keyCode and keyCode ~= Enum.KeyCode.Unknown then
 						if typeof(keyCode) == "string" then
 							keyCode = Enum.KeyCode[keyCode] or Enum.UserInputType[keyCode] or keyCode
@@ -5614,19 +5634,18 @@ function telement:Keybind(Keybind)
 					end
 
 					if isMatch then
+						if data.Hold then return end
 						data.Hold = true
 
-						local holdConnection
 						holdConnection = input.Changed:Connect(function(prop)
-							if prop == "UserInputState" then
-								local state = input.UserInputState
-								data.Hold = (state == Enum.UserInputState.Begin)
-								if state == Enum.UserInputState.End and holdConnection then
+							if prop == "UserInputState" and input.UserInputState == Enum.UserInputState.End then
+								data.Hold = false
+								if holdConnection then
 									holdConnection:Disconnect()
+									holdConnection = nil
 								end
 							end
 						end)
-
 						local success, result = pcall(data.CallBack)
 						if not data.Holding then
 							if not success then
@@ -5634,15 +5653,14 @@ function telement:Keybind(Keybind)
 							end
 						else
 							if data.Hold then
-								local holdLoop
-								holdLoop = runservice.RenderStepped:Connect(function()
-									if not data.Hold then
-										data.CallBack(false)
-										holdLoop:Disconnect()
-									else
-										data.CallBack(false)
-									end
-								end)
+holdLoop = runservice.RenderStepped:Connect(function()
+	if not data.Hold or not KeyBind.Parent or syde._destroyed then
+		stopHold()
+		return
+	end
+	local callbackOk = pcall(data.CallBack, false)
+	if not callbackOk then stopHold() end
+end))
 							end
 						end
 					end
@@ -9884,6 +9902,25 @@ function telement:TextInput(TextInput)
 			KeyBind.Bind.v.Text = keyText
 			syde_tween(KeyBind.Bind, 0.55, Enum.EasingStyle.Quint , {Size = UDim2.new(0, KeyBind.Bind.v.TextBounds.X + 30, 0, KeyBind.Bind.Size.Y.Offset)})
 
+			local holdConnection
+			local holdLoop
+			local function stopHold()
+				local wasActive = data.Hold or holdLoop ~= nil
+				data.Hold = false
+				if holdConnection then
+					holdConnection:Disconnect()
+					holdConnection = nil
+				end
+				if holdLoop then
+					holdLoop:Disconnect()
+					holdLoop = nil
+				end
+				if data.Holding and wasActive then pcall(data.CallBack, false) end
+			end
+			KeyBind.Destroying:Connect(function()
+				data.WaitingForKey = false
+				stopHold()
+			end)
 			KeyBind.interact.MouseButton1Click:Connect(function()
 				KeyBind.Bind.v.Text = '...'
 				syde_tween(KeyBind.Bind.UIStroke, 0.25, Enum.EasingStyle.Quart, {Thickness = 1})
@@ -9895,6 +9932,7 @@ function telement:TextInput(TextInput)
 			end)
 
 			local function SetKeybind(keyCode)
+				if data.Hold then stopHold() end
 				if typeof(keyCode) == "EnumItem" and keyCode ~= Enum.KeyCode.Unknown then
 					data.Key = keyCode
 					syde_tween(KeyBind.Bind.UIStroke, 0.25, Enum.EasingStyle.Quart, {Thickness = 0})
@@ -9931,19 +9969,18 @@ function telement:TextInput(TextInput)
 				end
 
 				if isMatchingKey then
+					if data.Hold then return end
 					data.Hold = true
 
-					local holdConnection
 					holdConnection = input.Changed:Connect(function(prop)
-						if prop == "UserInputState" then
-							local state = input.UserInputState
-							data.Hold = (state == Enum.UserInputState.Begin)
-							if state == Enum.UserInputState.End and holdConnection then
+						if prop == "UserInputState" and input.UserInputState == Enum.UserInputState.End then
+							data.Hold = false
+							if holdConnection then
 								holdConnection:Disconnect()
+								holdConnection = nil
 							end
 						end
 					end)
-
 					local success, result = pcall(data.CallBack)
 					if not data.Holding then
 						if not success then
@@ -9951,15 +9988,14 @@ function telement:TextInput(TextInput)
 						end
 					else
 						if data.Hold then
-							local holdLoop
-							holdLoop = runservice.RenderStepped:Connect(function()
-								if not data.Hold then
-									data.CallBack(false)
-									holdLoop:Disconnect()
-								else
-									data.CallBack(false)
-								end
-							end)
+holdLoop = runservice.RenderStepped:Connect(function()
+	if not data.Hold or not KeyBind.Parent or syde._destroyed then
+		stopHold()
+		return
+	end
+	local callbackOk = pcall(data.CallBack, false)
+	if not callbackOk then stopHold() end
+end))
 						end
 					end
 				end
