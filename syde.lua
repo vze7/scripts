@@ -10801,8 +10801,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 					for index = 1, visibleCount do
 						local name = SelectedOrder[index]
 						local playerData = OptionDataByName[name]
-
-						local displayName = OptionLabels[name] or name
+						local displayName = tostring(playerData and playerData.Username or OptionLabels[name] or name)
 						local hasAvatar = playerData and playerData.Image and playerData.Image ~= ""
 
 						local card = Instance.new("Frame")
@@ -10823,18 +10822,29 @@ holdLoop = runservice.RenderStepped:Connect(function()
 						cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 						cardStroke.Parent = card
 						
-						if hasAvatar then
-							local avatar = Instance.new("ImageLabel")
-							avatar.Name = "Avatar"
-							avatar.BackgroundTransparency = 1
-							avatar.Image = playerData.Image
-							avatar.Size = UDim2.fromOffset(14, 14)
-							avatar.Position = UDim2.fromOffset((cardWidth - 14) / 2, 2)
-							avatar.ZIndex = card.ZIndex + 1
-							avatar.Parent = card
-							local corner = Instance.new("UICorner")
-							corner.CornerRadius = UDim.new(1, 0)
-							corner.Parent = avatar
+						local avatar = Instance.new("ImageLabel")
+						avatar.Name = "Avatar"
+						avatar.BackgroundColor3 = Color3.fromRGB(55, 55, 58)
+						avatar.BackgroundTransparency = hasAvatar and 1 or 0
+						avatar.Image = hasAvatar and playerData.Image or ""
+						avatar.Size = UDim2.fromOffset(14, 14)
+						avatar.Position = UDim2.fromOffset((cardWidth - 14) / 2, 2)
+						avatar.ZIndex = card.ZIndex + 1
+						avatar.Parent = card
+						local corner = Instance.new("UICorner")
+						corner.CornerRadius = UDim.new(1, 0)
+						corner.Parent = avatar
+						if not hasAvatar then
+							local fallback = Instance.new("TextLabel")
+							fallback.Name = "AvatarFallback"
+							fallback.BackgroundTransparency = 1
+							fallback.Text = "?"
+							fallback.TextColor3 = Color3.fromRGB(205, 205, 210)
+							fallback.Font = Enum.Font.GothamMedium
+							fallback.TextSize = 10
+							fallback.Size = UDim2.fromScale(1, 1)
+							fallback.ZIndex = avatar.ZIndex + 1
+							fallback.Parent = avatar
 						end
 						
 						local nameLabel = Instance.new("TextLabel")
