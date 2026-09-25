@@ -7207,12 +7207,15 @@ function telement:Slider(Slider)
 						if dragging then
 							local sliderStart = Slider.slide.AbsolutePosition.X
 							local sliderWidth = Slider.slide.AbsoluteSize.X
+							local range = Options.Range[2] - Options.Range[1]
+							local increment = tonumber(Options.Increment)
+							if sliderWidth <= 0 or range ~= range or range <= 0 or range == math.huge
+								or not increment or increment ~= increment or increment <= 0 or increment == math.huge then return end
 							local sliderPosition = (x - sliderStart) / sliderWidth
 							sliderPosition = math.clamp(sliderPosition, 0, 1)
 
-							local range = Options.Range[2] - Options.Range[1]
 							local newValue = Options.Range[1] + sliderPosition * range
-							newValue = math.floor((newValue - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
+							newValue = math.floor((newValue - Options.Range[1]) / increment + 0.5) * increment + Options.Range[1]
 							newValue = syde:RoundTo(newValue, syde:DecimalPlaces(Options.Increment))
 
 							-- Update the slider visual position
@@ -9611,13 +9614,15 @@ function telement:TextInput(TextInput)
 					if dragging then
 						local sliderStart = Slider.slide.AbsolutePosition.X
 						local sliderWidth = Slider.slide.AbsoluteSize.X
-						if sliderWidth <= 0 then return end
+						local range = Options.Range[2] - Options.Range[1]
+						local increment = tonumber(Options.Increment)
+						if sliderWidth <= 0 or range ~= range or range <= 0 or range == math.huge
+							or not increment or increment ~= increment or increment <= 0 or increment == math.huge then return end
 						local sliderPosition = (x - sliderStart) / sliderWidth
 						sliderPosition = math.clamp(sliderPosition, 0, 1)
 
-						local range = Options.Range[2] - Options.Range[1]
 						local newValue = Options.Range[1] + sliderPosition * range
-						newValue = math.floor((newValue - Options.Range[1]) / Options.Increment + 0.5) * Options.Increment + Options.Range[1]
+						newValue = math.floor((newValue - Options.Range[1]) / increment + 0.5) * increment + Options.Range[1]
 						newValue = syde:RoundTo(newValue, syde:DecimalPlaces(Options.Increment))
 
 						if newValue ~= Options.Value then
