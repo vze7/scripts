@@ -5448,7 +5448,7 @@ function telement:Toggle(Toggle)
 						end)
 					end)
 
-					userinput.InputBegan:Connect(function(input, processed)
+					syde:AddConnection(userinput.InputBegan, function(input, processed)
 						if not userinput:GetFocusedTextBox() and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
 							data:Set(not data.V)
 						end
