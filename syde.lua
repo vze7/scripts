@@ -12278,7 +12278,7 @@ function initelement:AddSlider(SliderConfig)
 			local origCb = SliderConfig.Callback or SliderConfig.CallBack
 			SliderConfig.Callback = function(val)
 				if origCb then origCb(val) end
-				SaveConfig(game and game.GameId)
+				if SliderConfig.Save then SaveConfig(game and game.GameId) end
 			end
 
 			local sliderObj = self:Slider(SliderConfig)
@@ -12303,7 +12303,7 @@ function initelement:AddSlider(SliderConfig)
 			DropdownConfig.Save = DropdownConfig.Save ~= false
 			DropdownConfig.Callback = function(val)
 				if userCb then userCb(val) end
-				SaveCfg(game and game.GameId)
+				if DropdownConfig.Save then SaveCfg(game and game.GameId) end
 			end
 
 			local dropObj = self:Dropdown(DropdownConfig)
