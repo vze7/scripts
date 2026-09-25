@@ -502,6 +502,10 @@ end
 
 local RunService = game:GetService'RunService'
 local camera = workspace.CurrentCamera
+while not camera do
+	RunService.RenderStepped:Wait()
+	camera = workspace.CurrentCamera
+end
 
 
 do
@@ -516,8 +520,18 @@ do
 end
 
 local binds = {}
-local root = Instance.new('Folder', camera)
+local root = Instance.new('Folder')
 root.Name = 'neon'
+root.Parent = workspace
+
+local cameraChangedConnection = workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()
+	camera = workspace.CurrentCamera
+	for frame, binding in pairs(binds) do
+		if frame.Parent and binding.update then
+			binding.update(true)
+		end
+	end
+end)
 
 
 local GenUid; do -- Generate unique names for RenderStepped bindings
@@ -642,6 +656,9 @@ function syde:BindFrame(frame, properties)
 	end
 
 	local function UpdateOrientation(fetchProps)
+		if not camera or not camera.Parent then
+			return false
+		end
 		local zIndex = 1 - 0.05*frame.ZIndex
 		-- the transparency inversion bug still surfaces when there's z-fighting
 		local tl, br = frame.AbsolutePosition, frame.AbsolutePosition + frame.AbsoluteSize
@@ -678,6 +695,7 @@ function syde:BindFrame(frame, properties)
 				end
 			end
 		end
+		return true
 	end
 
 	UpdateOrientation(true)
@@ -690,6 +708,7 @@ function syde:BindFrame(frame, properties)
 		uid = uid;
 		parts = parts;
 		folder = f;
+		update = UpdateOrientation;
 		disconnectDestroying = disconnectDestroying;
 	}
 	return binds[frame].parts
@@ -3638,6 +3657,9 @@ function syde:Destroy()
 		self:FlushConfig()
 	end
 	self._destroyed = true
+	if cameraChangedConnection and cameraChangedConnection.Connected then
+		cameraChangedConnection:Disconnect()
+	end
 	cancelRejoin(self)
 	configLoadGeneration += 1
 	syde.IsLoadingConfig = false
