@@ -6323,14 +6323,19 @@ function telement:ColorPicker(ColorPicker)
 						stopColorDrag(true)
 					end
 				end)
+				local _, disconnectColorFocus = syde:AddConnection(userinput.WindowFocusReleased, function()
+					stopColorDrag(true)
+				end)
 
 				syde:AddConnection(SVPicker.InputBegan, function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						stopColorDrag(false)
 						SV = runservice.RenderStepped:Connect(function()
+							local pickerSize = SVPicker.AbsoluteSize
+							if pickerSize.X <= 0 or pickerSize.Y <= 0 then return end
 							local mouse = game.Players.LocalPlayer:GetMouse()
-							local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
-							local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, SVPicker.AbsoluteSize.Y) / SVPicker.AbsoluteSize.Y
+							local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, pickerSize.X) / pickerSize.X
+							local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, pickerSize.Y) / pickerSize.Y
 
 							HSV[2] = ColorX
 							HSV[3] = 1 - ColorY
@@ -6350,8 +6355,10 @@ function telement:ColorPicker(ColorPicker)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						stopColorDrag(false)
 						HUE = runservice.RenderStepped:Connect(function()
+							local sliderWidth = HUESlider.AbsoluteSize.X
+							if sliderWidth <= 0 then return end
 							local mouse = game.Players.LocalPlayer:GetMouse()
-							local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
+							local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, sliderWidth) / sliderWidth
 
 							HSV[1] = 1 - ColorX
 
@@ -6530,6 +6537,7 @@ function telement:ColorPicker(ColorPicker)
 				end)
 				colorpicker.Destroying:Connect(function()
 					stopColorDrag(false)
+					if disconnectColorFocus then disconnectColorFocus() end
 					if colorDragInputConnection and colorDragInputConnection.Connected then
 						colorDragInputConnection:Disconnect()
 					end
@@ -11836,14 +11844,19 @@ function telement:TextInput(TextInput)
 					stopColorDrag(true)
 				end
 			end)
+			local _, disconnectColorFocus = syde:AddConnection(userinput.WindowFocusReleased, function()
+				stopColorDrag(true)
+			end)
 
 			syde:AddConnection(SVPicker.InputBegan, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
 					stopColorDrag(false)
 					SV = runservice.RenderStepped:Connect(function()
+						local pickerSize = SVPicker.AbsoluteSize
+						if pickerSize.X <= 0 or pickerSize.Y <= 0 then return end
 						local mouse = game.Players.LocalPlayer:GetMouse()
-						local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
-						local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, SVPicker.AbsoluteSize.Y) / SVPicker.AbsoluteSize.Y
+						local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, pickerSize.X) / pickerSize.X
+						local ColorY = math.clamp(mouse.Y - SVPicker.AbsolutePosition.Y, 0, pickerSize.Y) / pickerSize.Y
 
 						HSV[2] = ColorX
 						HSV[3] = 1 - ColorY
@@ -11863,8 +11876,10 @@ function telement:TextInput(TextInput)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 then
 					stopColorDrag(false)
 					HUE = runservice.RenderStepped:Connect(function()
+						local sliderWidth = HUESlider.AbsoluteSize.X
+						if sliderWidth <= 0 then return end
 						local mouse = game.Players.LocalPlayer:GetMouse()
-						local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
+						local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, sliderWidth) / sliderWidth
 
 						HSV[1] = 1 - ColorX
 
@@ -12047,6 +12062,7 @@ function telement:TextInput(TextInput)
 			end)
 			colorpicker.Destroying:Connect(function()
 				stopColorDrag(false)
+				if disconnectColorFocus then disconnectColorFocus() end
 				if colorDragInputConnection and colorDragInputConnection.Connected then
 					colorDragInputConnection:Disconnect()
 				end
