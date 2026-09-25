@@ -5681,7 +5681,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 	end
 	local callbackOk = pcall(data.CallBack, false)
 	if not callbackOk then stopHold() end
-end))
+								end)
 							end
 						end
 					end
@@ -9981,6 +9981,9 @@ function telement:TextInput(TextInput)
 					data.Key = nil
 					KeyBind.Bind.v.Text = "NONE"
 				end
+				if type(Keybind.OnKeyChanged) == "function" then
+					pcall(Keybind.OnKeyChanged, data.Key)
+				end
 			end
 
 			-- Main input handler
@@ -10035,7 +10038,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 	end
 	local callbackOk = pcall(data.CallBack, false)
 	if not callbackOk then stopHold() end
-end))
+								end)
 						end
 					end
 				end
@@ -12447,6 +12450,18 @@ function initelement:AddSlider(SliderConfig)
 			local control
 			local controlRemoved = false
 			local refreshPlayers
+			local refreshScheduled = false
+
+			local function schedulePlayerRefresh()
+				if controlRemoved or refreshScheduled then return end
+				refreshScheduled = true
+				task.defer(function()
+					refreshScheduled = false
+					if not controlRemoved and refreshPlayers then
+						refreshPlayers()
+					end
+				end)
+			end
 
 			local function playerOption(target, offline)
 				local userId = tonumber(target.UserId) or 0
@@ -12521,7 +12536,7 @@ function initelement:AddSlider(SliderConfig)
 						departedChanged = true
 					end
 				end
-				if departedChanged and refreshPlayers then task.defer(refreshPlayers) end
+				if departedChanged and refreshPlayers then schedulePlayerRefresh() end
 				if callback then callback(value) end
 			end
 
@@ -12534,7 +12549,7 @@ function initelement:AddSlider(SliderConfig)
 
 			local addedConnection, disconnectAdded = syde:AddConnection(playerService.PlayerAdded, function(joining)
 				departedPlayers[joining.Name] = nil
-				task.defer(refreshPlayers)
+				schedulePlayerRefresh()
 			end)
 			local removingConnection, disconnectRemoving = syde:AddConnection(playerService.PlayerRemoving, function(leaving)
 				if selectedNames[leaving.Name] then
@@ -12546,7 +12561,7 @@ function initelement:AddSlider(SliderConfig)
 				else
 					departedPlayers[leaving.Name] = nil
 				end
-				task.defer(refreshPlayers)
+				schedulePlayerRefresh()
 			end)
 			local removeControl = control.remove
 			local disconnectFrameDestroying
@@ -12791,6 +12806,7 @@ function initelement:AddButton(ButtonConfig)
 
 			local cb = BindConfig.Callback or BindConfig.CallBack or function() end
 			local name = BindConfig.Name or BindConfig.Title or "Bind"
+			local bindObj
 
 			local bindData = self:Keybind({
 				Title = name,
@@ -12800,15 +12816,17 @@ function initelement:AddButton(ButtonConfig)
 				Save = BindConfig.Save ~= false,
 				OnKeyChanged = function(newKey)
 					if bindObj then
-						bindObj.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
+						bindObj.Value = typeof(newKey) == "EnumItem" and newKey.Name or "NONE"
 						bindObj.Key = newKey
 					end
-					SaveCfg(game and game.GameId)
+					if BindConfig.Save ~= false then
+						SaveCfg(game and game.GameId)
+					end
 				end,
 				CallBack = cb
 			})
 
-			local bindObj = {
+			bindObj = {
 				Type = "Bind",
 				Save = BindConfig.Save ~= false,
 				Flag = flagName,
@@ -12827,9 +12845,8 @@ function initelement:AddButton(ButtonConfig)
 					if bindData and bindData.Set then
 						bindData:Set(newKey)
 					end
-					self.Value = typeof(newKey) == "EnumItem" and newKey.Name or tostring(newKey)
+					self.Value = typeof(newKey) == "EnumItem" and newKey.Name or "NONE"
 					self.Key = newKey
-					SaveCfg(game and game.GameId)
 				end,
 				toggle = function(self)
 					if bindData and bindData._frame then
