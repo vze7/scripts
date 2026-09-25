@@ -5681,6 +5681,7 @@ function telement:Keybind(Keybind)
 
 				local holdConnection
 				local holdLoop
+				local keybindInputDisconnect
 				local function stopHold()
 					local wasActive = data.Hold or holdLoop ~= nil
 					data.Hold = false
@@ -5697,6 +5698,14 @@ function telement:Keybind(Keybind)
 				KeyBind.Destroying:Connect(function()
 					data.WaitingForKey = false
 					stopHold()
+					if keybindInputDisconnect then
+						keybindInputDisconnect()
+						keybindInputDisconnect = nil
+					end
+					if flagKey and syde.Flags[flagKey] == data then syde.Flags[flagKey] = nil end
+					if Keybind.SFlag and syde.SettingsFlags[Keybind.SFlag] == data then
+						syde.SettingsFlags[Keybind.SFlag] = nil
+					end
 				end)
 				KeyBind.interact.MouseButton1Click:Connect(function()
 					KeyBind.Bind.v.Text = '...'
@@ -5734,7 +5743,7 @@ function telement:Keybind(Keybind)
 				end
 
 				-- Main input handler
-				syde:AddConnection(userinput.InputBegan, function(input, processed)
+				local _, disconnectInput = syde:AddConnection(userinput.InputBegan, function(input, processed)
 					if data.WaitingForKey then
 						if syde:IsBindableInput(input) then
 							data.WaitingForKey = false
@@ -5793,6 +5802,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 					end
 				end)
 
+				keybindInputDisconnect = disconnectInput
 				data._frame = KeyBind
 				data.toggle = function(self) KeyBind.Visible = not KeyBind.Visible end
 				data.remove = function(self) KeyBind:Destroy() end
@@ -10097,6 +10107,7 @@ function telement:TextInput(TextInput)
 
 			local holdConnection
 			local holdLoop
+			local keybindInputDisconnect
 			local function stopHold()
 				local wasActive = data.Hold or holdLoop ~= nil
 				data.Hold = false
@@ -10113,6 +10124,10 @@ function telement:TextInput(TextInput)
 			KeyBind.Destroying:Connect(function()
 				data.WaitingForKey = false
 				stopHold()
+				if keybindInputDisconnect then
+					keybindInputDisconnect()
+					keybindInputDisconnect = nil
+				end
 			end)
 			KeyBind.interact.MouseButton1Click:Connect(function()
 				KeyBind.Bind.v.Text = '...'
@@ -10140,7 +10155,7 @@ function telement:TextInput(TextInput)
 			end
 
 			-- Main input handler
-			syde:AddConnection(userinput.InputBegan, function(input, processed)
+			local _, disconnectInput = syde:AddConnection(userinput.InputBegan, function(input, processed)
 				if data.WaitingForKey then
 					if syde:IsBindableInput(input) then
 						data.WaitingForKey = false
@@ -10197,6 +10212,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 				end
 			end)
 
+			keybindInputDisconnect = disconnectInput
 			data._frame = KeyBind
 			data.toggle = function(self) KeyBind.Visible = not KeyBind.Visible end
 			data.remove = function(self) KeyBind:Destroy() end
