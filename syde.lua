@@ -12117,7 +12117,9 @@ function telement:TextInput(TextInput)
 			ToggleConfig = ToggleConfig or {}
 			local initializing = true
 			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
-			local defVal = ToggleConfig.Default ~= nil and ToggleConfig.Default or (ToggleConfig.Value ~= nil and ToggleConfig.Value or false)
+			local defVal = ToggleConfig.Default
+			if defVal == nil then defVal = ToggleConfig.Value end
+			if defVal == nil then defVal = false end
 
 			if syde.LoadedConfig and syde.LoadedConfig[flagName] ~= nil then
 				defVal = syde.LoadedConfig[flagName]
@@ -12133,7 +12135,9 @@ function telement:TextInput(TextInput)
 				Save = ToggleConfig.Save ~= false,
 				CallBack = function(v)
 					if userCb then userCb(v) end
-					if not initializing then SaveConfig(game and game.GameId) end
+					if not initializing and ToggleConfig.Save ~= false then
+				SaveConfig(game and game.GameId)
+			end
 				end
 			})
 			local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[flagName .. "_Keybind"]
