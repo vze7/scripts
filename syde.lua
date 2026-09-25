@@ -2441,14 +2441,16 @@ end
 function syde:ListConfigs()
 	local list = {}
 	local folder = syde.Folder or syde.ConfigFolder or "FireHub"
-	if not listfiles or not isfolder or not isfolder(folder) then return list end
+	if not listfiles or not isfolder then return list end
+	local folderOk, folderExists = pcall(isfolder, folder)
+	if not folderOk or not folderExists then return list end
 
 	local ok, files = pcall(listfiles, folder)
 	if not ok or type(files) ~= "table" then return list end
 
 	for _, full in ipairs(files) do
 		local name = tostring(full):match("([^/\\]+)%.txt$")
-		if name and name ~= "SettingsConfig" then
+		if name and name ~= "SettingsConfig" and name ~= "_autoload" then
 			table.insert(list, name)
 		end
 	end
