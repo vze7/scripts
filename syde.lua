@@ -10135,8 +10135,9 @@ function telement:TextInput(TextInput)
 				if playerPreview and input then
 					local pointer = input.Position
 					for button, removeSelected in pairs(playerPreviewRemoveButtons) do
-						if button.Parent then
-							local origin, size = button.AbsolutePosition, button.AbsoluteSize
+						local card = button.Parent
+						if card and card.Parent == playerPreview then
+							local origin, size = card.AbsolutePosition, card.AbsoluteSize
 							if pointer.X >= origin.X and pointer.X <= origin.X + size.X
 								and pointer.Y >= origin.Y and pointer.Y <= origin.Y + size.Y then
 								removeSelected()
