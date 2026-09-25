@@ -5811,6 +5811,60 @@ function telement:ColorPicker(ColorPicker)
 					local UIS = game:GetService("UserInputService")
 					local RS = game:GetService("RunService")
 					local mouse = game.Players.LocalPlayer:GetMouse()
+					local disconnectGradientInputEnded
+					local disconnectGradientFocusReleased
+					local disconnectGradientHeartbeat
+
+					local function stopGradientDrag()
+						DraggingPin = nil
+						if disconnectGradientInputEnded then
+							disconnectGradientInputEnded()
+							disconnectGradientInputEnded = nil
+						end
+						if disconnectGradientFocusReleased then
+							disconnectGradientFocusReleased()
+							disconnectGradientFocusReleased = nil
+						end
+						if disconnectGradientHeartbeat then
+							disconnectGradientHeartbeat()
+							disconnectGradientHeartbeat = nil
+						end
+					end
+
+					local function startGradientDrag()
+						if disconnectGradientHeartbeat then return end
+						local _, disconnectHeartbeat = syde:AddConnection(RS.Heartbeat, function()
+							if not DraggingPin then return end
+							local width = g.AbsoluteSize.X
+						if not g.Parent or width <= 0 then
+							stopGradientDrag()
+							return
+						end
+
+						local relX = math.clamp((mouse.X - g.AbsolutePosition.X) / width, 0, 1)
+						if DraggingPin == 2 then
+							relX = math.clamp(relX, 0, Keys[3].Time - 0.01)
+						elseif DraggingPin == 3 then
+							relX = math.clamp(relX, Keys[2].Time + 0.01, 1)
+						end
+
+						Keys[DraggingPin] = ColorSequenceKeypoint.new(relX, Keys[DraggingPin].Value)
+						updateUI()
+						end)
+					disconnectGradientHeartbeat = disconnectHeartbeat
+
+					local _, disconnectInputEnded = syde:AddConnection(UIS.InputEnded, function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then
+							stopGradientDrag()
+						end
+					end)
+					disconnectGradientInputEnded = disconnectInputEnded
+
+					local _, disconnectFocusReleased = syde:AddConnection(UIS.WindowFocusReleased, stopGradientDrag)
+					disconnectGradientFocusReleased = disconnectFocusReleased
+				end
+
+				g.Destroying:Connect(stopGradientDrag)
 
 					local function updateUI()
 						g.Pin1.Position = UDim2.new(Keys[2].Time, 0, 0.5, 0)
@@ -5827,6 +5881,7 @@ function telement:ColorPicker(ColorPicker)
 					g.Pin1.InputBegan:Connect(function(input)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 then
 							DraggingPin = 2
+							startGradientDrag()
 							ActivePin = 2
 							local h, s, v = Keys[2].Value:ToHSV()
 							HSV[1], HSV[2], HSV[3] = h, s, v
@@ -5837,34 +5892,12 @@ function telement:ColorPicker(ColorPicker)
 					g.Pin2.InputBegan:Connect(function(input)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 then
 							DraggingPin = 3
+							startGradientDrag()
 							ActivePin = 3
 							local h, s, v = Keys[3].Value:ToHSV()
 							HSV[1], HSV[2], HSV[3] = h, s, v
 							updatestuff()
 						end
-					end)
-
-					UIS.InputEnded:Connect(function(input)
-						if input.UserInputType == Enum.UserInputType.MouseButton1 then
-							DraggingPin = nil
-						end
-					end)
-
-					RS.Heartbeat:Connect(function()
-						if not DraggingPin then return end
-
-						local relX = (mouse.X - g.AbsolutePosition.X) / g.AbsoluteSize.X
-						relX = math.clamp(relX, 0, 1)
-
-						if DraggingPin == 2 then
-							relX = math.clamp(relX, 0, Keys[3].Time - 0.01) 
-						elseif DraggingPin == 3 then
-							relX = math.clamp(relX, Keys[2].Time + 0.01, 1) 
-						end
-
-						Keys[DraggingPin] = ColorSequenceKeypoint.new(relX, Keys[DraggingPin].Value)
-
-						updateUI()
 					end)
 
 					updateUI()
@@ -11188,6 +11221,60 @@ function telement:TextInput(TextInput)
 				local UIS = game:GetService("UserInputService")
 				local RS = game:GetService("RunService")
 				local mouse = game.Players.LocalPlayer:GetMouse()
+				local disconnectGradientInputEnded
+				local disconnectGradientFocusReleased
+				local disconnectGradientHeartbeat
+
+				local function stopGradientDrag()
+					DraggingPin = nil
+					if disconnectGradientInputEnded then
+						disconnectGradientInputEnded()
+						disconnectGradientInputEnded = nil
+					end
+					if disconnectGradientFocusReleased then
+						disconnectGradientFocusReleased()
+						disconnectGradientFocusReleased = nil
+					end
+					if disconnectGradientHeartbeat then
+						disconnectGradientHeartbeat()
+						disconnectGradientHeartbeat = nil
+					end
+				end
+
+				local function startGradientDrag()
+					if disconnectGradientHeartbeat then return end
+					local _, disconnectHeartbeat = syde:AddConnection(RS.Heartbeat, function()
+						if not DraggingPin then return end
+						local width = g.AbsoluteSize.X
+						if not g.Parent or width <= 0 then
+							stopGradientDrag()
+							return
+						end
+
+						local relX = math.clamp((mouse.X - g.AbsolutePosition.X) / width, 0, 1)
+						if DraggingPin == 2 then
+							relX = math.clamp(relX, 0, Keys[3].Time - 0.01)
+						elseif DraggingPin == 3 then
+							relX = math.clamp(relX, Keys[2].Time + 0.01, 1)
+						end
+
+						Keys[DraggingPin] = ColorSequenceKeypoint.new(relX, Keys[DraggingPin].Value)
+						updateUI()
+					end)
+					disconnectGradientHeartbeat = disconnectHeartbeat
+
+					local _, disconnectInputEnded = syde:AddConnection(UIS.InputEnded, function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 then
+							stopGradientDrag()
+						end
+					end)
+					disconnectGradientInputEnded = disconnectInputEnded
+
+					local _, disconnectFocusReleased = syde:AddConnection(UIS.WindowFocusReleased, stopGradientDrag)
+					disconnectGradientFocusReleased = disconnectFocusReleased
+				end
+
+				g.Destroying:Connect(stopGradientDrag)
 
 				local function updateUI()
 					g.Pin1.Position = UDim2.new(Keys[2].Time, 0, 0.5, 0)
@@ -11204,6 +11291,7 @@ function telement:TextInput(TextInput)
 				g.Pin1.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						DraggingPin = 2
+						startGradientDrag()
 						ActivePin = 2
 						local h, s, v = Keys[2].Value:ToHSV()
 						HSV[1], HSV[2], HSV[3] = h, s, v
@@ -11214,34 +11302,12 @@ function telement:TextInput(TextInput)
 				g.Pin2.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						DraggingPin = 3
+						startGradientDrag()
 						ActivePin = 3
 						local h, s, v = Keys[3].Value:ToHSV()
 						HSV[1], HSV[2], HSV[3] = h, s, v
 						updatestuff()
 					end
-				end)
-
-				UIS.InputEnded:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						DraggingPin = nil
-					end
-				end)
-
-				RS.Heartbeat:Connect(function()
-					if not DraggingPin then return end
-
-					local relX = (mouse.X - g.AbsolutePosition.X) / g.AbsoluteSize.X
-					relX = math.clamp(relX, 0, 1)
-
-					if DraggingPin == 2 then
-						relX = math.clamp(relX, 0, Keys[3].Time - 0.01) 
-					elseif DraggingPin == 3 then
-						relX = math.clamp(relX, Keys[2].Time + 0.01, 1) 
-					end
-
-					Keys[DraggingPin] = ColorSequenceKeypoint.new(relX, Keys[DraggingPin].Value)
-
-					updateUI()
 				end)
 
 				updateUI()
