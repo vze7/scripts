@@ -667,7 +667,7 @@ function syde:UnbindFrame(frame)
 	if cb then
 		RunService:UnbindFromRenderStep(cb.uid)
 		for _, v in pairs(cb.parts) do
-			v:Destroy()
+			if v and v.Parent then v:Destroy() end
 		end
 		if cb.folder and cb.folder.Parent then
 			cb.folder:Destroy()
