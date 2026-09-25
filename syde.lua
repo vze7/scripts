@@ -131,7 +131,7 @@ local screenSize =      workspace.CurrentCamera.ViewportSize
 local isMobile =        userinput.TouchEnabled or (screenSize.X < 1024 and screenSize.Y < 768)
 local dragOffset =        255
 local dragOffsetMobile =  150
-local camera =          workspace.CurrentCamera
+local layoutCamera =    workspace.CurrentCamera
 
 local function selectedChipAtPosition(scroller, input)
 	if not scroller.Visible or not input or not input.Position then return nil end
@@ -642,6 +642,7 @@ function syde:BindFrame(frame, properties)
 	binds[frame] = {
 		uid = uid;
 		parts = parts;
+		folder = f;
 	}
 	return binds[frame].parts
 end
@@ -667,6 +668,9 @@ function syde:UnbindFrame(frame)
 		RunService:UnbindFromRenderStep(cb.uid)
 		for _, v in pairs(cb.parts) do
 			v:Destroy()
+		end
+		if cb.folder and cb.folder.Parent then
+			cb.folder:Destroy()
 		end
 		binds[frame] = nil
 	else
@@ -2652,10 +2656,12 @@ function syde:SetWatermarkEnabled(enabled)
 end
 
 function applyLayout(isMobile)
-	local viewport = camera.ViewportSize
+	local viewportCamera = layoutCamera
+	if not viewportCamera then return end
+	local viewport = viewportCamera.ViewportSize
 	local width = math.min(isMobile and 543 or 715, math.max(1, viewport.X - 24))
 	local height = math.min(isMobile and 321 or 575, math.max(1, viewport.Y - 24))
-	syde_tween(Library.main, 0.2, Enum.EasingStyle.Quint, {Size = UDim2.fromOffset(width, height)})
+	tweenservice:Create(Library.main, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Size = UDim2.fromOffset(width, height)}):Play()
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then
 		shadow.Visible = not isMobile 
@@ -2665,8 +2671,8 @@ end
 
 local function updateLayout()
 	if uiclosed then return end
-	if not camera then return end
-	screenSize = camera.ViewportSize
+	if not layoutCamera then return end
+	screenSize = layoutCamera.ViewportSize
 	isMobile = userinput.TouchEnabled or (screenSize.X < 1024 and screenSize.Y < 768)
 	applyLayout(isMobile)
 end
@@ -3429,6 +3435,16 @@ function syde:Destroy()
 		local connection = connectionData and (connectionData.Connection or connectionData)
 		if connection and connection.Connected then connection:Disconnect() end
 		table.remove(syde.Connections, index)
+	end
+	local boundFrames = {}
+	for frame in pairs(binds) do
+		boundFrames[#boundFrames + 1] = frame
+	end
+	for _, frame in ipairs(boundFrames) do
+		self:UnbindFrame(frame)
+	end
+	if root and root.Parent then
+		root:Destroy()
 	end
 	performanceOverlay.frame = nil
 	performanceOverlay.label = nil
@@ -8011,10 +8027,10 @@ function telement:TextInput(TextInput)
 			cameraViewportDisconnect()
 			cameraViewportDisconnect = nil
 		end
-		camera = workspace.CurrentCamera
-		if camera then
+		layoutCamera = workspace.CurrentCamera
+		if layoutCamera then
 			local _, disconnectViewport = syde:AddConnection(
-				camera:GetPropertyChangedSignal("ViewportSize"),
+				layoutCamera:GetPropertyChangedSignal("ViewportSize"),
 				updateLayout
 			)
 			cameraViewportDisconnect = disconnectViewport
