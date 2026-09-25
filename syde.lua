@@ -10618,7 +10618,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 				playerPreview.BackgroundTransparency = 1
 				playerPreview.ClipsDescendants = true
 				playerPreview.Position = UDim2.fromOffset(6, 0)
-				playerPreview.Size = UDim2.new(1, -46, 0, 30)
+				playerPreview.Size = UDim2.new(1, -46, 0, 42)
 				playerPreview.ZIndex = dropdown.dropholder.drop.selected.ZIndex + 1
 				playerPreview.Visible = false
 				playerPreview.Parent = dropdown.dropholder.drop
@@ -10789,47 +10789,28 @@ holdLoop = runservice.RenderStepped:Connect(function()
 					table.clear(playerPreviewRemoveButtons)
 					for _, child in ipairs(playerPreview:GetChildren()) do child:Destroy() end
 					local width = playerPreview.AbsoluteSize.X > 0 and playerPreview.AbsoluteSize.X or 260
+					local cardWidth = 68
+					local cardGap = 6
+					local slots = math.max(1, math.floor((width + cardGap) / (cardWidth + cardGap)))
+					local hasOverflow = #SelectedOrder > slots
+					local visibleCount = math.min(
+						#SelectedOrder,
+						hasOverflow and math.max(0, slots - 1) or slots
+					)
 					local currentXOffset = 0
-					local visibleCount = 0
-					
-					for index = 1, #SelectedOrder do
-						local name = SelectedOrder[index]
-						local displayName = OptionLabels[name] or name
-						local textSize = textservice:GetTextSize(displayName, 12, Enum.Font.Gotham, Vector2.new(999, 20))
-						local textWidth = math.min(textSize.X, 100)
-						local playerData = OptionDataByName[name]
-						local hasAvatar = playerData and playerData.Image and playerData.Image ~= ""
-						local cardWidth = (hasAvatar and 22 or 6) + textWidth + 20
-						
-						if index < #SelectedOrder and currentXOffset + cardWidth + 36 > width then
-							break
-						elseif index == #SelectedOrder and currentXOffset + cardWidth > width then
-							break
-						end
-						
-						visibleCount = visibleCount + 1
-						currentXOffset = currentXOffset + cardWidth + 6
-					end
-					
-					local hasOverflow = #SelectedOrder > visibleCount
-					
-					currentXOffset = 0
 					for index = 1, visibleCount do
 						local name = SelectedOrder[index]
 						local playerData = OptionDataByName[name]
-						
+
 						local displayName = OptionLabels[name] or name
-						local textSize = textservice:GetTextSize(displayName, 12, Enum.Font.Gotham, Vector2.new(999, 20))
-						local textWidth = math.min(textSize.X, 100)
 						local hasAvatar = playerData and playerData.Image and playerData.Image ~= ""
-						local cardWidth = (hasAvatar and 22 or 6) + textWidth + 20
-						
+
 						local card = Instance.new("Frame")
 						card.Name = name
 						card.BackgroundTransparency = 0
 						card.BackgroundColor3 = Color3.fromRGB(33, 33, 33)
-						card.Size = UDim2.fromOffset(cardWidth, 20)
-						card.Position = UDim2.fromOffset(currentXOffset, 5)
+						card.Size = UDim2.fromOffset(cardWidth, 38)
+						card.Position = UDim2.fromOffset(currentXOffset, 1)
 						card.ZIndex = playerPreview.ZIndex + 1
 						card.Parent = playerPreview
 						
@@ -10848,7 +10829,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 							avatar.BackgroundTransparency = 1
 							avatar.Image = playerData.Image
 							avatar.Size = UDim2.fromOffset(14, 14)
-							avatar.Position = UDim2.fromOffset(4, 3)
+							avatar.Position = UDim2.fromOffset((cardWidth - 14) / 2, 2)
 							avatar.ZIndex = card.ZIndex + 1
 							avatar.Parent = card
 							local corner = Instance.new("UICorner")
@@ -10862,10 +10843,11 @@ holdLoop = runservice.RenderStepped:Connect(function()
 						nameLabel.Text = displayName
 						nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 						nameLabel.Font = Enum.Font.Gotham
-						nameLabel.TextSize = 12
 						nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-						nameLabel.Size = UDim2.fromOffset(textWidth, 20)
-						nameLabel.Position = UDim2.fromOffset(hasAvatar and 22 or 6, 0)
+						nameLabel.TextSize = 9
+						nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+						nameLabel.Size = UDim2.fromOffset(cardWidth - 4, 16)
+						nameLabel.Position = UDim2.fromOffset(2, 19)
 						nameLabel.ZIndex = card.ZIndex + 1
 						nameLabel.Parent = card
 						
@@ -10874,9 +10856,9 @@ holdLoop = runservice.RenderStepped:Connect(function()
 						remove.BackgroundTransparency = 1
 						remove.Text = "×"
 						remove.TextColor3 = Color3.fromRGB(150, 150, 150)
-						remove.TextSize = 14
-						remove.Size = UDim2.fromOffset(20, 20)
-						remove.Position = UDim2.fromOffset((hasAvatar and 22 or 6) + textWidth, 0)
+						remove.TextSize = 12
+						remove.Size = UDim2.fromOffset(16, 16)
+						remove.Position = UDim2.fromOffset(cardWidth - 15, -2)
 						remove.ZIndex = card.ZIndex + 2
 						remove.Parent = card
 						
@@ -10889,7 +10871,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 						playerPreviewRemoveButtons[remove] = removeSelected
 						remove.Activated:Connect(removeSelected)
 						
-						currentXOffset = currentXOffset + cardWidth + 6
+						currentXOffset = currentXOffset + cardWidth + cardGap
 					end
 					
 					if hasOverflow then
@@ -10899,9 +10881,9 @@ holdLoop = runservice.RenderStepped:Connect(function()
 						more.Text = "+" .. tostring(#SelectedOrder - visibleCount)
 						more.TextColor3 = Color3.fromRGB(150, 150, 150)
 						more.Font = Enum.Font.Gotham
-						more.TextSize = 12
-						more.Size = UDim2.fromOffset(30, 20)
-						more.Position = UDim2.fromOffset(currentXOffset, 5)
+						more.TextSize = 10
+						more.Size = UDim2.fromOffset(cardWidth, 38)
+						more.Position = UDim2.fromOffset(visibleCount * (cardWidth + cardGap), 1)
 						more.ZIndex = playerPreview.ZIndex + 1
 						more.Parent = playerPreview
 					end
