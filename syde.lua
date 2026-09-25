@@ -5723,6 +5723,7 @@ function telement:ColorPicker(ColorPicker)
 					CallBack = ColorPicker.CallBack;
 					SFlag = ColorPicker.SFlag;
 					RainbowUpdating = false;
+					RainbowUpdateState = type(ColorPicker._RainbowUpdateState) == "table" and ColorPicker._RainbowUpdateState or {Updating = false};
 				}
 
 				ColorPicker.Linkable = ColorPicker.Linkable or true
@@ -6659,9 +6660,11 @@ function telement:ColorPicker(ColorPicker)
 				local function updateRainbowColor()
 					rainbowUpdateDepth += 1
 					data.RainbowUpdating = true
+					data.RainbowUpdateState.Updating = true
 					local ok, failure = pcall(updatestuff)
 					rainbowUpdateDepth -= 1
 					data.RainbowUpdating = rainbowUpdateDepth > 0
+					data.RainbowUpdateState.Updating = data.RainbowUpdating
 					return ok, failure
 				end
 
@@ -7708,8 +7711,8 @@ function telement:TextInput(TextInput)
 			end,
 		})
 
-		local accentColorPicker
-		accentColorPicker = a:ColorPicker({
+		local accentRainbowState = {Updating = false}
+		a:ColorPicker({
 			Title = 'Accent',
 			RD = false,
 			Linkable = true,
@@ -7717,19 +7720,20 @@ function telement:TextInput(TextInput)
 			Flag = "Accent",
 			SFlag = 'AC',
 			Save = true,
+			_RainbowUpdateState = accentRainbowState,
 			CallBack = function(v)
 				syde:UpdateTheme({
 					['Accent'] = v
 				})
-				if not (accentColorPicker and accentColorPicker.RainbowUpdating) then
+				if not accentRainbowState.Updating then
 					syde:SaveThemeCfg()
 					SaveCfg(game and game.GameId)
 				end
 			end,
 		})
 
-		local hitboxColorPicker
-		hitboxColorPicker = a:ColorPicker({
+		local hitboxRainbowState = {Updating = false}
+		a:ColorPicker({
 			Title = 'Hitbox',
 			RD = false,
 			Linkable = true,
@@ -7737,11 +7741,12 @@ function telement:TextInput(TextInput)
 			Flag = "HitBox",
 			SFlag = 'HB',
 			Save = true,
+			_RainbowUpdateState = hitboxRainbowState,
 			CallBack = function(c)
 				syde:UpdateTheme({
 					['HitBox'] = c
 				})
-				if not (hitboxColorPicker and hitboxColorPicker.RainbowUpdating) then
+				if not hitboxRainbowState.Updating then
 					syde:SaveThemeCfg()
 					SaveCfg(game and game.GameId)
 				end
@@ -7955,31 +7960,33 @@ function telement:TextInput(TextInput)
 			end
 		})
 
-		local titleColorPicker
-		titleColorPicker = a:ColorPicker({
+		local titleRainbowState = {Updating = false}
+		a:ColorPicker({
 			Title = 'Hub title color',
 			Color = syde.HeaderTitleColor or top.title.TextColor3,
 			Flag = 'HeaderTitleColor',
 			SFlag = 'HTC',
 			Save = true,
+			_RainbowUpdateState = titleRainbowState,
 			CallBack = function(color)
 				syde.HeaderTitleColor = color
 				top.title.TextColor3 = color
-				if not (titleColorPicker and titleColorPicker.RainbowUpdating) then syde:SaveThemeCfg() end
+				if not titleRainbowState.Updating then syde:SaveThemeCfg() end
 			end,
 		})
 
-		local subtitleColorPicker
-		subtitleColorPicker = a:ColorPicker({
+		local subtitleRainbowState = {Updating = false}
+		a:ColorPicker({
 			Title = 'Hub subtitle color',
 			Color = syde.HeaderSubtitleColor or top.title.sub.TextColor3,
 			Flag = 'HeaderSubtitleColor',
 			SFlag = 'HSC',
 			Save = true,
+			_RainbowUpdateState = subtitleRainbowState,
 			CallBack = function(color)
 				syde.HeaderSubtitleColor = color
 				top.title.sub.TextColor3 = color
-				if not (subtitleColorPicker and subtitleColorPicker.RainbowUpdating) then syde:SaveThemeCfg() end
+				if not subtitleRainbowState.Updating then syde:SaveThemeCfg() end
 			end,
 		})
 		local cornerImageId = syde.LoadedConfig and syde.LoadedConfig.CornerImageId or syde.CornerImageDefault or ""
@@ -11256,6 +11263,7 @@ end))
 					CallBack = ColorPicker.CallBack;
 					Flag = ColorPicker.Flag;
 					RainbowUpdating = false;
+					RainbowUpdateState = type(ColorPicker._RainbowUpdateState) == "table" and ColorPicker._RainbowUpdateState or {Updating = false};
 			}
 
 			ColorPicker.Linkable = ColorPicker.Linkable or true
@@ -12225,9 +12233,11 @@ end))
 			local function updateRainbowColor()
 				rainbowUpdateDepth += 1
 				data.RainbowUpdating = true
+				data.RainbowUpdateState.Updating = true
 				local ok, failure = pcall(updatestuff)
 				rainbowUpdateDepth -= 1
 				data.RainbowUpdating = rainbowUpdateDepth > 0
+				data.RainbowUpdateState.Updating = data.RainbowUpdating
 				return ok, failure
 			end
 
@@ -12915,18 +12925,19 @@ function initelement:AddButton(ButtonConfig)
 
 			local cb = ColorpickerConfig.Callback or ColorpickerConfig.CallBack or function() end
 			local suppressSave = false
-			local pickerData
-			pickerData = self:ColorPicker({
+			local rainbowState = {Updating = false}
+			local pickerData = self:ColorPicker({
 				Title = name,
 				Color = defColor,
 				Flag = flagName,
 				Save = ColorpickerConfig.Save ~= false,
+				_RainbowUpdateState = rainbowState,
 				CallBack = function(col)
 					if cb then
 						local ok, failure = pcall(cb, col)
 						if not ok then syde:Report("Colorpicker '" .. tostring(flagName) .. "' callback", failure) end
 					end
-					if not suppressSave and not (pickerData and pickerData.RainbowUpdating) and ColorpickerConfig.Save ~= false then
+					if not suppressSave and not rainbowState.Updating and ColorpickerConfig.Save ~= false then
 						SaveConfig(game and game.GameId)
 					end
 				end
@@ -13002,19 +13013,21 @@ function initelement:AddButton(ButtonConfig)
 				local slot = {Value = default}
 				pickerData.Pickers[index] = slot
 				local childFlag = flagName .. "__Color_" .. tostring(index)
+				local rainbowState = {Updating = false}
 				local control
 				control = self:ColorPicker({
 					Title = tostring(name) .. " · " .. tostring(entryName),
 					Color = default,
 					Flag = childFlag,
 					Save = false,
+					_RainbowUpdateState = rainbowState,
 					CallBack = function(color)
 						slot.Value = color
 						values[index] = color
 						if not suppressCallback then
 							local ok, failure = pcall(callback, index, color, snapshot())
 							if not ok then syde:Report("Multi colorpicker '" .. tostring(flagName) .. "' callback", failure) end
-							if pickerData.Save and not (control and control.RainbowUpdating) then SaveConfig(game and game.GameId) end
+							if pickerData.Save and not rainbowState.Updating then SaveConfig(game and game.GameId) end
 						end
 					end,
 				})
