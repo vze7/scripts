@@ -12309,7 +12309,6 @@ end))
 --------------------------------------------------------------------------------
 		function initelement:AddToggle(ToggleConfig)
 			ToggleConfig = ToggleConfig or {}
-			local initializing = true
 			local flagName = ToggleConfig.Flag or ToggleConfig.Name or ToggleConfig.Title or "Toggle"
 			local defVal = ToggleConfig.Default
 			if defVal == nil then defVal = ToggleConfig.Value end
@@ -12330,9 +12329,6 @@ end))
 				Save = ToggleConfig.Save ~= false,
 				CallBack = function(v)
 					if userCb then userCb(v) end
-					if not initializing and ToggleConfig.Save ~= false then
-				SaveConfig(game and game.GameId)
-			end
 				end
 			})
 			local savedKeybind = syde.LoadedConfig and syde.LoadedConfig[flagName .. "_Keybind"]
@@ -12346,7 +12342,6 @@ end))
 			data.Flag = flagName
 			data.Value = defVal
 			syde.Flags[flagName] = data
-			initializing = false
 			return data
 		end
 
