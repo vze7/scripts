@@ -1446,7 +1446,7 @@ local activeWiggles = setmetatable({}, { __mode = "k" })
 local nextWiggleId = 0
 
 function syde:WiggleText(label)
-	if self._destroyed or not label or not label:IsA("TextLabel") then return false end
+	if self._destroyed or typeof(label) ~= "Instance" or not label:IsA("TextLabel") then return false end
 	if not label.Text or label.Text == "" then return false end
 
 	-- Replacing an animation must also unbind its previous render callback.
@@ -1525,6 +1525,7 @@ end
 
 
 function syde:StopWiggle(label)
+	if typeof(label) ~= "Instance" or not label:IsA("TextLabel") then return false end
 	local state = activeWiggles[label]
 	if not state then return false end
 	activeWiggles[label] = nil
