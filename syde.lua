@@ -1442,21 +1442,22 @@ function syde:removeLoadTween(object)
 end
 
 local RunService = game:GetService("RunService")
+local activeWiggles = setmetatable({}, { __mode = "k" })
+local nextWiggleId = 0
 
 function syde:WiggleText(label)
-	if not label or not label:IsA("TextLabel") then return end
-	if not label.Text or label.Text == "" then return end
+	if self._destroyed or not label or not label:IsA("TextLabel") then return false end
+	if not label.Text or label.Text == "" then return false end
 
-	-- Remove old animation
-	if label:FindFirstChild("WiggleContainer") then
-		label.WiggleContainer:Destroy()
-	end
+	-- Replacing an animation must also unbind its previous render callback.
+	self:StopWiggle(label)
 
 	local container = Instance.new("Folder")
 	container.Name = "WiggleContainer"
 	container.Parent = label
 
 	-- Hide original label text
+	local originalTextTransparency = label.TextTransparency
 	label.TextTransparency = 1
 
 	local baseText = label.Text:gsub("<.->", "") -- remove RichText tags
@@ -1489,8 +1490,28 @@ function syde:WiggleText(label)
 
 	-- Animate characters
 	local t = 0
-	local id = "Wiggle_" .. tostring(math.random(1, 999999))
+	nextWiggleId += 1
+	local id = "SydeWiggle_" .. tostring(nextWiggleId)
+	local state = {
+		id = id,
+		container = container,
+		originalTextTransparency = originalTextTransparency,
+	}
+	activeWiggles[label] = state
+	local _, disconnectDestroying = self:AddConnection(label.Destroying, function()
+		self:StopWiggle(label)
+	end)
+	state.disconnectDestroying = disconnectDestroying
+
 	RunService:BindToRenderStep(id, Enum.RenderPriority.First.Value, function(dt)
+		if activeWiggles[label] ~= state then
+			RunService:UnbindFromRenderStep(id)
+			return
+		end
+		if not container.Parent then
+			self:StopWiggle(label)
+			return
+		end
 		t += dt * 6
 		for i, charLabel in ipairs(chars) do
 			local offset = math.sin(t + i * 0.3) * 3 -- wiggle amplitude
@@ -1498,20 +1519,26 @@ function syde:WiggleText(label)
 		end
 	end)
 
-	label.Destroying:Connect(function()
-		RunService:UnbindFromRenderStep(id)
-	end)
+	return true
 end
 
 
 function syde:StopWiggle(label)
-	for i, data in ipairs(self.Connections) do
-		if data.label == label then
-			data.conn:Disconnect()
-			table.remove(self.Connections, i)
-			break
-		end
+	local state = activeWiggles[label]
+	if not state then return false end
+	activeWiggles[label] = nil
+	RunService:UnbindFromRenderStep(state.id)
+	if state.disconnectDestroying then
+		state.disconnectDestroying()
+		state.disconnectDestroying = nil
 	end
+	if label.Parent then
+		label.TextTransparency = state.originalTextTransparency
+	end
+	if state.container and state.container.Parent then
+		state.container:Destroy()
+	end
+	return true
 end
 
 
@@ -3626,6 +3653,13 @@ function syde:Destroy()
 		performanceOverlay.connection:Disconnect()
 		performanceOverlay.connection = nil
 	end
+	local wiggleLabels = {}
+	for label in pairs(activeWiggles) do
+		wiggleLabels[#wiggleLabels + 1] = label
+	end
+	for _, label in ipairs(wiggleLabels) do
+		self:StopWiggle(label)
+	end
 	for index = #syde.Connections, 1, -1 do
 		local connectionData = syde.Connections[index]
 		local connection = connectionData and (connectionData.Connection or connectionData)
@@ -5410,14 +5444,6 @@ function telement:Toggle(Toggle)
 								setKeybind(input.KeyCode)
 								captureConnection:Disconnect()
 								captureConnection = nil
-							end
-						end)
-					end)
-
-					userinput.InputBegan:Connect(function(input, processed)
-							if not userinput:GetFocusedTextBox() and syde:IsBindableInput(input) then
-								setKeybind(input.KeyCode)
-								connection:Disconnect()
 							end
 						end)
 					end)
