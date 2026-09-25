@@ -1420,8 +1420,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 	local function cleanupResize()
 		finishResize(false)
 		for index = #resizeDisconnects, 1, -1 do
-		 tresizeDisconnects[index]()
-		 tresizeDisconnects[index] = nil
+			resizeDisconnects[index]()
+			resizeDisconnects[index] = nil
 		end
 		if preview.Parent then preview:Destroy() end
 	end
