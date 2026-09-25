@@ -6149,6 +6149,9 @@ function telement:ColorPicker(ColorPicker)
 				local linkDragging = false
 				local originalPosition = UDim2.new(0.5, 0,0, 0)
 				local draggedColorPicker = nil
+				local followMouseConnection
+				local linkableColorPickers = {}
+				local lastHoveredPicker = nil
 
 				local function isMouseOver(guiObject)
 					local mouse = game.Players.LocalPlayer:GetMouse()
@@ -6163,31 +6166,54 @@ function telement:ColorPicker(ColorPicker)
 
 					TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(0, 40,1, 0)}):Play()
 
-					local followMouse
-					followMouse = RunService.RenderStepped:Connect(function()
+					if followMouseConnection then followMouseConnection:Disconnect() end
+					table.clear(linkableColorPickers)
+					lastHoveredPicker = nil
+					for _, otherPicker in pairs(Page:GetChildren()) do
+						local linkable = otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable")
+						if linkable and linkable.Value and otherPicker ~= draggedColorPicker then
+							table.insert(linkableColorPickers, otherPicker)
+						end
+					end
+					followMouseConnection = RunService.RenderStepped:Connect(function()
 						if not linkDragging then
-							followMouse:Disconnect()
+							followMouseConnection:Disconnect()
+							followMouseConnection = nil
 							return
 						end
 						local mouse = game.Players.LocalPlayer:GetMouse()
-						--	colorpicker.HueValues.Link.Frame.Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260)
-						TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260) }):Play()
+						colorpicker.HueValues.Link.Frame.Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260)
 
-						for _, otherPicker in pairs(Page:GetChildren()) do
-							if otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable") and otherPicker.isLinkable.Value then
-								if isMouseOver(otherPicker) and otherPicker ~= draggedColorPicker then
-									TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-								else
-									TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								end
+						local hoveredPicker
+						for _, otherPicker in ipairs(linkableColorPickers) do
+							if otherPicker.Parent and isMouseOver(otherPicker) then
+								hoveredPicker = otherPicker
+								break
 							end
+						end
+						if hoveredPicker ~= lastHoveredPicker then
+							local previousStroke = lastHoveredPicker and lastHoveredPicker:FindFirstChild("UIStroke")
+							local hoveredStroke = hoveredPicker and hoveredPicker:FindFirstChild("UIStroke")
+							if previousStroke then previousStroke.Transparency = 1 end
+							if hoveredStroke then hoveredStroke.Transparency = 0 end
+							lastHoveredPicker = hoveredPicker
 						end
 					end)
 				end)
 
-				UserInputService.InputEnded:Connect(function(input)
+				local _, disconnectLinkInput = syde:AddConnection(UserInputService.InputEnded, function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 and linkDragging then
 						linkDragging = false
+						if followMouseConnection then
+							followMouseConnection:Disconnect()
+							followMouseConnection = nil
+						end
+						if lastHoveredPicker then
+							local stroke = lastHoveredPicker:FindFirstChild("UIStroke")
+							if stroke then stroke.Transparency = 1 end
+							lastHoveredPicker = nil
+						end
+						table.clear(linkableColorPickers)
 						local foundTarget = false
 
 						for _, otherPicker in pairs(Page:GetChildren()) do
@@ -6220,7 +6246,21 @@ function telement:ColorPicker(ColorPicker)
 							):Play()
 						end
 					end
-				end) 
+				end)
+				colorpicker.Destroying:Connect(function()
+					linkDragging = false
+					if followMouseConnection then
+						followMouseConnection:Disconnect()
+						followMouseConnection = nil
+					end
+					if lastHoveredPicker then
+						local stroke = lastHoveredPicker:FindFirstChild("UIStroke")
+						if stroke then stroke.Transparency = 1 end
+						lastHoveredPicker = nil
+					end
+					table.clear(linkableColorPickers)
+					if disconnectLinkInput then disconnectLinkInput() end
+				end)
 
 				local function updateColorPicker()
 					local Hue, Saturation, Value = HueSat.Value:ToHSV()
@@ -11465,6 +11505,9 @@ function telement:TextInput(TextInput)
 			local linkDragging = false
 			local originalPosition = UDim2.new(0.5, 0,0, 0)
 			local draggedColorPicker = nil
+			local followMouseConnection
+			local linkableColorPickers = {}
+			local lastHoveredPicker = nil
 
 			local function isMouseOver(guiObject)
 				local mouse = game.Players.LocalPlayer:GetMouse()
@@ -11479,31 +11522,54 @@ function telement:TextInput(TextInput)
 
 				TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(0, 40,1, 0)}):Play()
 
-				local followMouse
-				followMouse = RunService.RenderStepped:Connect(function()
+				if followMouseConnection then followMouseConnection:Disconnect() end
+				table.clear(linkableColorPickers)
+				lastHoveredPicker = nil
+				for _, otherPicker in pairs(Page:GetChildren()) do
+					local linkable = otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable")
+					if linkable and linkable.Value and otherPicker ~= draggedColorPicker then
+						table.insert(linkableColorPickers, otherPicker)
+					end
+				end
+				followMouseConnection = RunService.RenderStepped:Connect(function()
 					if not linkDragging then
-						followMouse:Disconnect()
+						followMouseConnection:Disconnect()
+						followMouseConnection = nil
 						return
 					end
 					local mouse = game.Players.LocalPlayer:GetMouse()
-					-- colorpicker.HueValues.Link.Frame.Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260)
-					TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260) }):Play()
+					colorpicker.HueValues.Link.Frame.Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260)
 
-					for _, otherPicker in pairs(Page:GetChildren()) do
-						if otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable") and otherPicker.isLinkable.Value then
-							if isMouseOver(otherPicker) and otherPicker ~= draggedColorPicker then
-								TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-							else
-								TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							end
+					local hoveredPicker
+					for _, otherPicker in ipairs(linkableColorPickers) do
+						if otherPicker.Parent and isMouseOver(otherPicker) then
+							hoveredPicker = otherPicker
+							break
 						end
+					end
+					if hoveredPicker ~= lastHoveredPicker then
+						local previousStroke = lastHoveredPicker and lastHoveredPicker:FindFirstChild("UIStroke")
+						local hoveredStroke = hoveredPicker and hoveredPicker:FindFirstChild("UIStroke")
+						if previousStroke then previousStroke.Transparency = 1 end
+						if hoveredStroke then hoveredStroke.Transparency = 0 end
+						lastHoveredPicker = hoveredPicker
 					end
 				end)
 			end)
 
-			UserInputService.InputEnded:Connect(function(input)
+			local _, disconnectLinkInput = syde:AddConnection(UserInputService.InputEnded, function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 and linkDragging then
 					linkDragging = false
+					if followMouseConnection then
+						followMouseConnection:Disconnect()
+						followMouseConnection = nil
+					end
+					if lastHoveredPicker then
+						local stroke = lastHoveredPicker:FindFirstChild("UIStroke")
+						if stroke then stroke.Transparency = 1 end
+						lastHoveredPicker = nil
+					end
+					table.clear(linkableColorPickers)
 					local foundTarget = false
 
 					for _, otherPicker in pairs(Page:GetChildren()) do
@@ -11540,7 +11606,21 @@ function telement:TextInput(TextInput)
 						):Play()
 					end
 				end
-			end) 
+			end)
+			colorpicker.Destroying:Connect(function()
+				linkDragging = false
+				if followMouseConnection then
+					followMouseConnection:Disconnect()
+					followMouseConnection = nil
+				end
+				if lastHoveredPicker then
+					local stroke = lastHoveredPicker:FindFirstChild("UIStroke")
+					if stroke then stroke.Transparency = 1 end
+					lastHoveredPicker = nil
+				end
+				table.clear(linkableColorPickers)
+				if disconnectLinkInput then disconnectLinkInput() end
+			end)
 
 			local function updateColorPicker()
 				local Hue, Saturation, Value = HueSat.Value:ToHSV()
