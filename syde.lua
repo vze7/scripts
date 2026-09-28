@@ -10785,8 +10785,8 @@ holdLoop = runservice.RenderStepped:Connect(function()
 				playerPreview.Name = "PlayerSelectionPreview"
 				playerPreview.BackgroundTransparency = 1
 				playerPreview.ClipsDescendants = true
-				playerPreview.Position = UDim2.fromOffset(6, 0)
-				playerPreview.Size = UDim2.new(1, -46, 0, 42)
+				playerPreview.Position = UDim2.fromOffset(8, 2)
+				playerPreview.Size = UDim2.new(1, -52, 0, 28)
 				playerPreview.ZIndex = dropdown.dropholder.drop.selected.ZIndex + 1
 				playerPreview.Visible = false
 				playerPreview.Parent = dropdown.dropholder.drop
@@ -10876,8 +10876,7 @@ holdLoop = runservice.RenderStepped:Connect(function()
 			headerHitbox.Activated:Connect(function(input)
 				if playerPreview and input then
 					local pointer = input.Position
-					for button, removeSelected in pairs(playerPreviewRemoveButtons) do
-						local card = button.Parent
+					for card, removeSelected in pairs(playerPreviewRemoveButtons) do
 						if card and card.Parent == playerPreview then
 							local origin, size = card.AbsolutePosition, card.AbsoluteSize
 							if pointer.X >= origin.X and pointer.X <= origin.X + size.X
@@ -10957,114 +10956,96 @@ holdLoop = runservice.RenderStepped:Connect(function()
 					placeholderText.Visible = #SelectedOrder == 0
 					table.clear(playerPreviewRemoveButtons)
 					for _, child in ipairs(playerPreview:GetChildren()) do child:Destroy() end
-					local width = playerPreview.AbsoluteSize.X > 0 and playerPreview.AbsoluteSize.X or 260
-					local cardWidth = 68
-					local cardGap = 6
-					local slots = math.max(1, math.floor((width + cardGap) / (cardWidth + cardGap)))
-					local hasOverflow = #SelectedOrder > slots
-					local visibleCount = math.min(
-						#SelectedOrder,
-						hasOverflow and math.max(0, slots - 1) or slots
-					)
-					local currentXOffset = 0
-					for index = 1, visibleCount do
-						local name = SelectedOrder[index]
+					local name = SelectedOrder[1]
+					if name then
 						local playerData = OptionDataByName[name]
-						local displayName = tostring(playerData and playerData.Username or OptionLabels[name] or name)
-						local hasAvatar = playerData and playerData.Image and playerData.Image ~= ""
-
-						local card = Instance.new("Frame")
+						local hasMore = #SelectedOrder > 1
+						local card = Instance.new("TextButton")
 						card.Name = name
-						card.BackgroundTransparency = 0
-						card.BackgroundColor3 = Color3.fromRGB(33, 33, 33)
-						card.Size = UDim2.fromOffset(cardWidth, 38)
-						card.Position = UDim2.fromOffset(currentXOffset, 1)
-						card.ZIndex = playerPreview.ZIndex + 1
+						card.Text = ""
+						card.AutoButtonColor = false
+						card.BackgroundColor3 = Color3.fromRGB(39, 39, 42)
+						card.BorderSizePixel = 0
+						card.ClipsDescendants = true
+						card.Size = UDim2.new(1, hasMore and -42 or 0, 0, 28)
+						card.ZIndex = headerHitbox.ZIndex + 1
 						card.Parent = playerPreview
-						
 						local cardCorner = Instance.new("UICorner")
-						cardCorner.CornerRadius = UDim.new(0, 4)
+						cardCorner.CornerRadius = UDim.new(0, 8)
 						cardCorner.Parent = card
-						
-						local cardStroke = Instance.new("UIStroke")
-						cardStroke.Color = Color3.fromRGB(60, 60, 60)
-						cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-						cardStroke.Parent = card
-						
 						local avatar = Instance.new("ImageLabel")
 						avatar.Name = "Avatar"
-						avatar.BackgroundColor3 = Color3.fromRGB(55, 55, 58)
-						avatar.BackgroundTransparency = hasAvatar and 1 or 0
-						avatar.Image = hasAvatar and playerData.Image or ""
-						avatar.Size = UDim2.fromOffset(14, 14)
-						avatar.Position = UDim2.fromOffset((cardWidth - 14) / 2, 2)
+						avatar.BackgroundTransparency = 1
+						avatar.Image = playerData and playerData.Image or ""
+						avatar.Size = UDim2.fromOffset(20, 20)
+						avatar.Position = UDim2.fromOffset(5, 4)
 						avatar.ZIndex = card.ZIndex + 1
 						avatar.Parent = card
-						local corner = Instance.new("UICorner")
-						corner.CornerRadius = UDim.new(1, 0)
-						corner.Parent = avatar
-						if not hasAvatar then
-							local fallback = Instance.new("TextLabel")
-							fallback.Name = "AvatarFallback"
-							fallback.BackgroundTransparency = 1
-							fallback.Text = "?"
-							fallback.TextColor3 = Color3.fromRGB(205, 205, 210)
-							fallback.Font = Enum.Font.GothamMedium
-							fallback.TextSize = 10
-							fallback.Size = UDim2.fromScale(1, 1)
-							fallback.ZIndex = avatar.ZIndex + 1
-							fallback.Parent = avatar
-						end
-						
+						local avatarCorner = Instance.new("UICorner")
+						avatarCorner.CornerRadius = UDim.new(1, 0)
+						avatarCorner.Parent = avatar
 						local nameLabel = Instance.new("TextLabel")
 						nameLabel.Name = "PlayerName"
 						nameLabel.BackgroundTransparency = 1
-						nameLabel.Text = displayName
-						nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-						nameLabel.Font = Enum.Font.Gotham
+						nameLabel.Text = tostring(playerData and playerData.DisplayName or name)
+						nameLabel.TextColor3 = Color3.fromRGB(240, 240, 242)
+						nameLabel.Font = Enum.Font.GothamMedium
 						nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-						nameLabel.TextSize = 9
-						nameLabel.TextXAlignment = Enum.TextXAlignment.Center
-						nameLabel.Size = UDim2.fromOffset(cardWidth - 4, 16)
-						nameLabel.Position = UDim2.fromOffset(2, 19)
+						nameLabel.TextSize = 11
+						nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+						nameLabel.Size = UDim2.new(1, -57, 0, 13)
+						nameLabel.Position = UDim2.fromOffset(32, 1)
 						nameLabel.ZIndex = card.ZIndex + 1
 						nameLabel.Parent = card
-						
-						local remove = Instance.new("TextButton")
-						remove.Name = "Remove"
-						remove.BackgroundTransparency = 1
-						remove.Text = "×"
-						remove.TextColor3 = Color3.fromRGB(150, 150, 150)
-						remove.TextSize = 12
-						remove.Size = UDim2.fromOffset(16, 16)
-						remove.Position = UDim2.fromOffset(cardWidth - 15, -2)
-						remove.ZIndex = card.ZIndex + 2
-						remove.Parent = card
-						
+						local username = Instance.new("TextLabel")
+						username.Name = "Username"
+						username.BackgroundTransparency = 1
+						username.Text = "@" .. tostring(playerData and playerData.Username or name)
+						username.TextColor3 = Color3.fromRGB(155, 155, 162)
+						username.Font = Enum.Font.Gotham
+						username.TextSize = 9
+						username.TextTruncate = Enum.TextTruncate.AtEnd
+						username.TextXAlignment = Enum.TextXAlignment.Left
+						username.Size = UDim2.new(1, -57, 0, 12)
+						username.Position = UDim2.fromOffset(32, 14)
+						username.ZIndex = card.ZIndex + 1
+						username.Parent = card
+						local removeHint = Instance.new("TextLabel")
+						removeHint.Name = "RemoveHint"
+						removeHint.BackgroundTransparency = 1
+						removeHint.Text = "×"
+						removeHint.TextColor3 = Color3.fromRGB(185, 185, 190)
+						removeHint.TextSize = 16
+						removeHint.Size = UDim2.fromOffset(20, 28)
+						removeHint.Position = UDim2.new(1, -22, 0, 0)
+						removeHint.ZIndex = card.ZIndex + 1
+						removeHint.Parent = card
 						local function removeSelected()
+							if not SelectedOptions[name] then return end
 							RemoveFromSelected(name)
 							UpdateSelectedText()
 							data.Value = table.clone(SelectedOrder)
 							if data.CallBack then data.CallBack(SelectedOrder) end
 						end
-						playerPreviewRemoveButtons[remove] = removeSelected
-						remove.Activated:Connect(removeSelected)
-						
-						currentXOffset = currentXOffset + cardWidth + cardGap
-					end
-					
-					if hasOverflow then
-						local more = Instance.new("TextLabel")
-						more.Name = "MorePlayers"
-						more.BackgroundTransparency = 1
-						more.Text = "+" .. tostring(#SelectedOrder - visibleCount)
-						more.TextColor3 = Color3.fromRGB(150, 150, 150)
-						more.Font = Enum.Font.Gotham
-						more.TextSize = 10
-						more.Size = UDim2.fromOffset(cardWidth, 38)
-						more.Position = UDim2.fromOffset(visibleCount * (cardWidth + cardGap), 1)
-						more.ZIndex = playerPreview.ZIndex + 1
-						more.Parent = playerPreview
+						playerPreviewRemoveButtons[card] = removeSelected
+						card.Activated:Connect(removeSelected)
+						if hasMore then
+							local more = Instance.new("TextLabel")
+							more.Name = "MorePlayers"
+							more.BackgroundColor3 = Color3.fromRGB(43, 43, 47)
+							more.BorderSizePixel = 0
+							more.Text = "+" .. tostring(#SelectedOrder - 1)
+							more.TextColor3 = Color3.fromRGB(215, 215, 220)
+							more.Font = Enum.Font.GothamMedium
+							more.TextSize = 11
+							more.Size = UDim2.fromOffset(38, 28)
+							more.Position = UDim2.new(1, -38, 0, 0)
+							more.ZIndex = playerPreview.ZIndex + 1
+							more.Parent = playerPreview
+							local moreCorner = Instance.new("UICorner")
+							moreCorner.CornerRadius = UDim.new(0, 8)
+							moreCorner.Parent = more
+						end
 					end
 					return
 				end
