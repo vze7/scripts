@@ -352,7 +352,7 @@ function syde:Report(context, err)
 	warn(table.concat({
 		"",
 		"----------screenshot this and send it to king jericoo------",
-		"[ Syde ] " .. tostring(context or "Error"),
+		"[ Syde ] " .. tostring(context or "Errorr"),
 		"Problem: " .. message,
 		"Fix: " .. fix,
 		"------------------------------------------------------------",
@@ -9382,7 +9382,7 @@ function syde:Init(library)
 
 		local accentRainbowState = { Updating = false }
 		visualSettings:ColorPicker({
-			Title = "Cor principal",
+			Title = "Main Color",
 			RD = false,
 			Linkable = true,
 			Color = syde.theme.Accent,
@@ -9597,7 +9597,7 @@ function syde:Init(library)
 
 		local subtitleRainbowState = { Updating = false }
 		visualSettings:ColorPicker({
-			Title = "Cor do subtítulo",
+			Title = "Subtitle Color",
 			Color = syde.HeaderSubtitleColor or top.title.sub.TextColor3,
 			Flag = "HeaderSubtitleColor",
 			SFlag = "HSC",
@@ -9624,7 +9624,7 @@ function syde:Init(library)
 		}
 		syde:SetCornerImage(cornerImageId)
 		visualSettings:TextInput({
-			Title = "Ícone do canto",
+			Title = "Corner Icon",
 			PlaceHolder = "Decal ID beside resize arrow",
 			Default = cornerImageId,
 			NumberOnly = true,
@@ -9637,8 +9637,8 @@ function syde:Init(library)
 		})
 
 		visualSettings:Toggle({
-			Title = "Manter na tela",
-			Description = "Impede que o hub seja arrastado para fora da tela.",
+			Title = "Lock to Screen",
+			Description = "Prevents the hub from being dragged off-screen.",
 			Value = LockToScreen,
 			CallBack = function(v)
 				LockToScreen = v
@@ -9652,7 +9652,7 @@ function syde:Init(library)
 		end
 		visualSettings:Toggle({
 			Title = "Marca d'água",
-			Description = "Mostra o botão flutuante para reabrir o hub.",
+			Description = "Shows the floating button to reopen the hub.",
 			Value = watermarkValue,
 			CallBack = function(v)
 				syde:SetWatermarkEnabled(v)
@@ -9845,7 +9845,7 @@ function syde:Init(library)
 			Content = "Save and load UI settings profiles. The active profile is used for autosave and optional autoload.",
 		})
 
-		configDropdownData = d:Dropdown({
+		configDropdownData = profileSettings:Dropdown({
 			Title = "Saved profiles",
 			Options = syde:ListConfigs(),
 			StarterOption = currentConfigName,
