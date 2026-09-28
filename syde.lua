@@ -3845,6 +3845,9 @@ function syde:MakeWindow(WindowConfig)
 				return HttpService:JSONDecode(rawData)
 			end)
 			if decodeOk and type(decoded) == "table" then
+				if decoded.Blur == nil and type(decoded.BLUR) == "boolean" then
+					decoded.Blur = decoded.BLUR
+				end
 				syde.LoadedConfig = decoded
 				if decoded["ToggleUI"] then
 					local success, keyEnum = pcall(function()
@@ -5129,7 +5132,9 @@ function syde:Init(library)
 		update()
 
 		syde:AddConnection(Players.PlayerAdded, update)
-		syde:AddConnection(Players.PlayerRemoving, update)
+		syde:AddConnection(Players.PlayerRemoving, function()
+			task.defer(update)
+		end)
 
 		local QuickPlay = window.pages.home.general.Quick.QuickPlay
 
@@ -9386,6 +9391,9 @@ function syde:Init(library)
 			Save = true,
 			_RainbowUpdateState = accentRainbowState,
 			CallBack = function(v)
+				if syde.RainbowMode and not accentRainbowState.Updating then
+					syde:SetRainbowMode(false)
+				end
 				syde:UpdateTheme({
 					["Accent"] = v,
 				})
@@ -9407,6 +9415,9 @@ function syde:Init(library)
 			Save = true,
 			_RainbowUpdateState = hitboxRainbowState,
 			CallBack = function(c)
+				if syde.RainbowMode and not hitboxRainbowState.Updating then
+					syde:SetRainbowMode(false)
+				end
 				syde:UpdateTheme({
 					["HitBox"] = c,
 				})
@@ -9573,6 +9584,9 @@ function syde:Init(library)
 			Save = true,
 			_RainbowUpdateState = titleRainbowState,
 			CallBack = function(color)
+				if syde.RainbowMode and not titleRainbowState.Updating then
+					syde:SetRainbowMode(false)
+				end
 				syde.HeaderTitleColor = color
 				top.title.TextColor3 = color
 				if not titleRainbowState.Updating then
