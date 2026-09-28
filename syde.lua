@@ -9342,7 +9342,8 @@ function syde:Init(library)
 
 			for _bn, _bf in pairs(telement) do
 				if type(_bf) == "function" then
-					telement[_bn] = syde:Guard("Building a '" .. tostring(_bn) .. "' element", _bf)
+					local guarded = type(syde.Guard) == "function" and syde:Guard("Building a '" .. tostring(_bn) .. "' element", _bf)
+					telement[_bn] = type(guarded) == "function" and guarded or _bf
 				end
 			end
 
@@ -9908,7 +9909,7 @@ function syde:Init(library)
 			CallBack = refreshConfigList,
 		})
 
-		autoLoadToggle = d:Toggle({
+		autoLoadToggle = profileSettings:Toggle({
 			Title = "Autoload active profile",
 			Description = "Load this profile automatically on the next launch.",
 			Value = autoloadEnabled,
